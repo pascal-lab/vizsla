@@ -13,4 +13,12 @@ description = "Language server for Verilog and System-Verilog"
 [workspace]
 members = [".", "crates/*"]
 
+[workspace.package]
+edition = "2021"
+
 [dependencies]
+
+[workspace.dependencies]
+paths = { path = "./crates/paths", version = "0.0.0" }
+
+nohash-hasher = "0.2.0"
