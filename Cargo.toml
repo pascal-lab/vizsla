@@ -11,5 +11,6 @@ readme = "README.md"
 description = "Language server for Verilog and System-Verilog"
 
 [workspace]
+members = [".", "crates/*"]
 
 [dependencies]
