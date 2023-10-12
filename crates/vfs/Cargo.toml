@@ -1,0 +1,13 @@
+[package]
+name = "vfs"
+version = "0.0.0"
+description = "Isolating high level crates from the file-system, preventing them from directly interacting with the underlying system."
+
+edition.workspace = true
+
+[dependencies]
+rustc-hash = "1.1.0"
+fst = "0.4.7"
+indexmap = "2.0.0"
+nohash-hasher.workspace = true
+paths.workspace = true
