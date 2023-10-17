@@ -5,7 +5,7 @@ use std::{
     borrow::Borrow,
     ffi::OsStr,
     fmt, ops,
-    path::{Component, Path, PathBuf},
+    path::{Component, Path, PathBuf, Prefix},
     convert::{TryFrom, TryInto},
 };
 
@@ -268,7 +268,6 @@ fn normalize(path: &Path) -> PathBuf {
 }
 
 pub fn patch_path_prefix(path: PathBuf) -> PathBuf {
-    use std::path::{Component, Prefix};
     if cfg!(windows) {
         // VSCode might report paths with the file drive in lowercase, but this can mess
         // So we just uppercase the drive letter here unconditionally.

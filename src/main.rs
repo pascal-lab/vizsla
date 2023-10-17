@@ -30,6 +30,8 @@ use utils::{
 mod config;
 use config::Config;
 
+mod line_idx;
+
 const DEFAULT_PROCESS_NAME: &str = "vizsla";
 const DEBUG: bool = cfg!(debug_assertions);
 const VERSION: &str = formatcp!("{}_{}", env!("CARGO_PKG_VERSION"),
