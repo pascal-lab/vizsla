@@ -8,12 +8,12 @@ use std::{
 use const_format::formatcp;
 use anyhow::Context;
 use clap::Parser;
-use::anyhow;
+use ::anyhow;
 use itertools::Itertools;
 use lsp_server::Connection;
 use lsp_types::{
     MessageType,
-    ShowMessageParams
+    ShowMessageParams,
 };
 use tracing_subscriber::{
     fmt::writer::BoxMakeWriter,
@@ -28,9 +28,13 @@ use utils::{
 };
 
 mod config;
+
 use config::Config;
 
 mod line_idx;
+
+mod main_loop;
+mod global_state;
 
 const DEFAULT_PROCESS_NAME: &str = "vizsla";
 const DEBUG: bool = cfg!(debug_assertions);
@@ -52,7 +56,7 @@ pub struct Opt {
 
 fn setup_logging(opt: &Opt) -> anyhow::Result<()> {
     let target: Targets = opt.log.parse()
-                                 .with_context(|| format!("invalid log filter: `{}`", opt.log))?;
+        .with_context(|| format!("invalid log filter: `{}`", opt.log))?;
 
     let writer = match &opt.log_filename {
         Some(path) => {
@@ -99,20 +103,20 @@ fn run_server(opt: &Opt) -> anyhow::Result<()> {
         .and_then(|uri| uri.to_file_path().ok())
         .map(patch_path_prefix)
         .and_then(|path| AbsPathBuf::try_from(path).ok()) {
-            Some(path) => path,
-            None => {
-                let cwd = env::current_dir()?;
-                AbsPathBuf::assert(cwd)
-            }
-        };
+        Some(path) => path,
+        None => {
+            let cwd = env::current_dir()?;
+            AbsPathBuf::assert(cwd)
+        }
+    };
 
     let workspace_roots = workspace_folders
         .map(|workspace| {
             workspace.into_iter()
-                     .filter_map(|folder| folder.uri.to_file_path().ok())
-                     .map(patch_path_prefix)
-                     .filter_map(|path| AbsPathBuf::try_from(path).ok())
-                     .collect::<Vec<_>>()
+                .filter_map(|folder| folder.uri.to_file_path().ok())
+                .map(patch_path_prefix)
+                .filter_map(|path| AbsPathBuf::try_from(path).ok())
+                .collect::<Vec<_>>()
         })
         .filter(|folders| !folders.is_empty())
         .unwrap_or_else(|| vec![root_path.clone()]);
@@ -131,7 +135,7 @@ fn run_server(opt: &Opt) -> anyhow::Result<()> {
                 ShowMessageParams {
                     typ: MessageType::WARNING,
                     message: format!("{}", errors_formatter),
-                }
+                },
             );
             connection.sender.send(lsp_server::Message::Notification(noti)).unwrap();
         }
@@ -144,7 +148,7 @@ fn run_server(opt: &Opt) -> anyhow::Result<()> {
         workspace_roots,
         user_config,
         detached_files,
-        snippets
+        snippets,
     );
 
     let initialize_result = lsp_types::InitializeResult {
@@ -152,7 +156,7 @@ fn run_server(opt: &Opt) -> anyhow::Result<()> {
         server_info: Some(lsp_types::ServerInfo {
             name: opt.process_name.clone(),
             version: Some(VERSION.to_string()),
-        })
+        }),
     };
 
     let initialize_result = serde_json::to_value(initialize_result)?;
@@ -161,6 +165,7 @@ fn run_server(opt: &Opt) -> anyhow::Result<()> {
 
     // TODO: rediscover workspaces
 
+    io_threads.join()?;
     tracing::info!("Server shut down. BYE!");
     Ok(())
 }
