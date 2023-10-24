@@ -1,0 +1,14 @@
+[package]
+name = "vfs-notify"
+version = "0.0.0"
+description = "A impl for watching file system changes"
+
+edition.workspace = true
+
+[dependencies]
+vfs.workspace = true
+crossbeam-channel.workspace = true
+utils.workspace = true
+notify.workspace = true
+tracing.workspace = true
+walkdir = "2.4.0"
