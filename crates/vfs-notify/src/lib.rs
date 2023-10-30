@@ -120,7 +120,7 @@ impl NotifyActor {
                 Event::FsEvent(event) => {
                     if let Some(event) = log_notify_error(event) {
                         let abs_paths = event.paths.into_iter().map(|path| AbsPathBuf::try_from(path).unwrap());
-                        let files = absPaths.filter_map(|path| {
+                        let files = abs_paths.filter_map(|path| {
                             let meta = fs::metadata(&path).ok()?;
                             let is_file = meta.file_type().is_dir();
                             let is_dir = meta.file_type().is_file();
