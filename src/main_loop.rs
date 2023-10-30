@@ -1,33 +1,88 @@
-use lsp_server::Connection;
+use std::time::Instant;
+
+use crossbeam_channel::{select, Receiver};
+use lsp_server::{Connection, Notification, Request};
+use lsp_types::{notification::Notification as _};
 
 use crate::{
     Config,
-    global_state::GlobalState,
+    global_state::GlobalState, dispatcher::ReqDispatcher,
 };
 
+#[derive(Debug)]
+enum Event {
+    Lsp(lsp_server::Message),
+    Task(Task),
+    Vfs(vfs::loader::Message),
+}
+
+#[derive(Debug)]
 pub(crate) enum Task {
     Response(lsp_server::Response),
     Retry(lsp_server::Request),
     // Diagnostics(Vec<(FileId, Vec<lsp_types::Diagnostic>)>)
 }
 
-pub fn main_loop(config: Config, connection: Connection) {
+pub fn main_loop(config: Config, connection: Connection) -> anyhow::Result<()> {
     tracing::info!("initial config: {:#?}", config);
 
-    // Windows scheduler implements priority boosts: if thread waits for an
-    // event (like a condvar), and event fires, priority of the thread is
-    // temporary bumped. This optimization backfires in our case: each time the
-    // `main_loop` schedules a task to run on a threadpool, the worker threads
-    // gets a higher priority, and (on a machine with fewer cores) displaces the
-    // main loop! We work around this by marking the main loop as a
-    // higher-priority thread.
-    #[cfg(windows)]
-    unsafe {
-        use winapi::um::processthreadsapi::*;
-        let thread = GetCurrentThread();
-        let thread_priority_above_normal = 1;
-        SetThreadPriority(thread, thread_priority_above_normal);
-    }
+    // TODO: hack for windwos
 
     GlobalState::new(connection.sender, config).run(connection.receiver)
+}
+
+impl GlobalState {
+    pub(crate) fn run(&mut self, cli_inbox: Receiver<lsp_server::Message>) -> anyhow::Result<()> {
+        // TODO: check for status
+        // TODO: fetch workspace
+
+        while let Some(event) = self.next_event(&cli_inbox) {
+            match &event {
+                Event::Lsp(lsp_server::Message::Notification(Notification { method, .. }))
+                    if method == lsp_types::notification::Exit::METHOD => {
+                        return Ok(());
+                    }
+                _ => self.handle_event(event)?,
+            }
+        }
+        anyhow::bail!("Server {} exited without proper shutdown sequence", &self.config.opt.process_name);
+    }
+
+    fn next_event(&self, cli_inbox: &Receiver<lsp_server::Message>) -> Option<Event> {
+        select! {
+            recv(cli_inbox) -> cli_msg => cli_msg.ok().map(Event::Lsp),
+            recv(self.task_pool.receiver) -> task => Some(Event::Task(task.unwrap())),
+            recv(self.vfs_loader.receiver) -> vfs_task => Some(Event::Vfs(vfs_task.unwrap())),
+        }
+    }
+
+    fn handle_event(&mut self, event: Event) -> anyhow::Result<()> {
+        let loop_start = Instant::now();
+
+        let loop_start_dbg_msg = format!("{loop_start:?}");
+        let event_dbg_msg = format!("{event:?}");
+        tracing::debug!("{} [handle_event]: {}", loop_start_dbg_msg, event_dbg_msg);
+
+        // check if is quiescent when loading workspace
+        match event {
+            Event::Lsp(msg) => match msg {
+                lsp_server::Message::Request(req) => todo!(),
+                lsp_server::Message::Response(_) => todo!(),
+                lsp_server::Message::Notification(_) => todo!(),
+            }
+            Event::Task(_) => todo!(),
+            Event::Vfs(_) => todo!(),
+        }
+    }
+
+    fn handle_lsp_request(&mut self, req_received: Instant, req: Request) {
+        self.register_request(req_received, &req);
+        self.on_request(req);
+    }
+
+    fn on_request(&mut self, req: Request) {
+        let mut dispatcher = ReqDispatcher { req: Some(req), global_state: self };
+
+
+    }
 }
