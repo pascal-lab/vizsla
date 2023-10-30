@@ -83,6 +83,11 @@ impl GlobalState {
     fn on_request(&mut self, req: Request) {
         let mut dispatcher = ReqDispatcher { req: Some(req), global_state: self };
 
+        // Handle shutdown req first
+        dispatcher.on_sync_mut::<lsp_types::request::Shutdown>(|gstate, ()| {
+            gstate.shutdown_requested = true;
+            Ok(())
+        });
 
     }
 }
