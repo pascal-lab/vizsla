@@ -12,15 +12,19 @@ use serde::de::DeserializeOwned;
 use serde_json::Error;
 use utils::paths::AbsPathBuf;
 use std::{iter, path::PathBuf};
-use crate::line_idx::{PositionEncoding, WideEncoding};
+use crate::{
+    line_idx::{PositionEncoding, WideEncoding},
+    Opt,
+};
 
 #[derive(Debug, Clone)]
 pub struct Config {
-    workspace_roots: Vec<AbsPathBuf>,
-    client_caps: lsp_types::ClientCapabilities,
-    root_path: AbsPathBuf,
-    user_config: UserConfig,
-    detached_files: Vec<AbsPathBuf>,
+    pub(crate) opt: Opt,
+    pub(crate) workspace_roots: Vec<AbsPathBuf>,
+    pub(crate) client_caps: lsp_types::ClientCapabilities,
+    pub(crate) root_path: AbsPathBuf,
+    pub(crate) user_config: UserConfig,
+    pub(crate) detached_files: Vec<AbsPathBuf>,
 }
 
 #[derive(Debug, Clone)]
@@ -45,6 +49,7 @@ macro_rules! try_ {
 
 impl Config {
     pub fn new(
+        opt: Opt,
         root_path: AbsPathBuf,
         client_caps: ClientCapabilities,
         workspace_roots: Vec<AbsPathBuf>,
@@ -53,6 +58,7 @@ impl Config {
         snippets: Vec<Snippet>,
     ) -> Self {
         Config {
+            opt,
             workspace_roots,
             client_caps,
             root_path,
@@ -96,6 +102,10 @@ impl Config {
         }
 
         PositionEncoding::Wide(WideEncoding::Utf16)
+    }
+
+    pub fn main_loop_threads_num(&self) -> usize {
+        num_cpus::get_physical().try_into().unwrap_or(1)
     }
 
     pub fn get_server_capabilities(&self) -> ServerCapabilities {

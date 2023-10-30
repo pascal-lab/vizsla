@@ -6,9 +6,8 @@ use std::{
 };
 
 use const_format::formatcp;
-use anyhow::Context;
+use anyhow::{ Context };
 use clap::Parser;
-use ::anyhow;
 use itertools::Itertools;
 use lsp_server::Connection;
 use lsp_types::{
@@ -32,16 +31,18 @@ mod config;
 use config::Config;
 
 mod line_idx;
-
 mod main_loop;
 mod global_state;
+mod mem_docs;
+mod dispatcher;
+mod lsp_ext;
 
 const DEFAULT_PROCESS_NAME: &str = "vizsla";
 const DEBUG: bool = cfg!(debug_assertions);
 const VERSION: &str = formatcp!("{}_{}", env!("CARGO_PKG_VERSION"),
                                 if DEBUG { "DEBUG" } else { "RELEASE" });
 
-#[derive(Debug, Parser)]
+#[derive(Clone, Debug, Parser)]
 #[clap(name = "vizsla", version = VERSION)]
 pub struct Opt {
     #[clap(long, default_value = DEFAULT_PROCESS_NAME)]
@@ -82,7 +83,7 @@ fn setup_logging(opt: &Opt) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn run_server(opt: &Opt) -> anyhow::Result<()> {
+fn run_server(opt: Opt) -> anyhow::Result<()> {
     tracing::info!("Server {}_{} started.", &opt.process_name, VERSION);
 
     // Start connection
@@ -143,6 +144,7 @@ fn run_server(opt: &Opt) -> anyhow::Result<()> {
     }).unwrap_or(Default::default());
 
     let config = Config::new(
+        opt,
         root_path,
         client_caps,
         workspace_roots,
@@ -154,7 +156,7 @@ fn run_server(opt: &Opt) -> anyhow::Result<()> {
     let initialize_result = lsp_types::InitializeResult {
         capabilities: config.get_server_capabilities(),
         server_info: Some(lsp_types::ServerInfo {
-            name: opt.process_name.clone(),
+            name: config.opt.process_name.clone(),
             version: Some(VERSION.to_string()),
         }),
     };
@@ -175,7 +177,7 @@ fn main() -> anyhow::Result<()> {
 
     setup_logging(&opt)?;
 
-    run_server(&opt)?;
+    run_server(opt)?;
 
     Ok(())
 }
