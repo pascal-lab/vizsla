@@ -1,7 +1,7 @@
 use std::{time::Instant, sync::{Arc, RwLock}};
 use crossbeam_channel::{Sender, unbounded, Receiver};
 use lsp_server::{Message, ReqQueue, Request};
-use lsp_types::notification;
+use lsp_types::{request, notification};
 use nohash_hasher::IntMap;
 use utils::thread::{Pool, ThreadIntent};
 
@@ -118,13 +118,54 @@ impl GlobalState {
         }
     }
 
-    pub(crate) fn send_notification<N: notification::Notification>(&self, params: N::Params) {
-        let not = lsp_server::Notification::new(N::METHOD.to_string(), params);
-        self.send(not.into());
+    pub(crate) fn register_request(&mut self, req_received: Instant, req: &Request) {
+        self.req_queue.incoming.register(req.id.clone(), (req.method.clone(), req_received));
     }
 
+    pub(crate) fn make_snapshot(&self) -> GlobalStateSnapshot {
+        GlobalStateSnapshot {
+            config: Arc::clone(&self.config),
+            // workspaces: Arc::clone(&self.workspaces),
+            analysis: self.analysis_host.make_analysis(),
+            vfs: Arc::clone(&self.vfs),
+            mem_docs: self.mem_docs.clone(),
+        }
+    }
+
+    pub(crate) fn is_completed(&self, req: &Request) -> bool {
+        self.req_queue.incoming.is_completed(&req.id)
+    }
+}
+
+
+// Send and Respond stuff
+#[derive(Debug, Eq, PartialEq)]
+pub(crate) enum Progress {
+    Begin,
+    Report,
+    End,
+}
+
+impl Progress {
+    pub(crate) fn fraction(done: usize, total: usize) -> f64 {
+        assert!(done <= total);
+        done as f64 / total.max(1) as f64
+    }
+}
+
+impl GlobalState {
     fn send(&self, message: lsp_server::Message) {
         self.sender.send(message).unwrap()
+    }
+
+    pub(crate) fn send_notification<N: notification::Notification>(&self, params: N::Params) {
+        let notif = lsp_server::Notification::new(N::METHOD.to_string(), params);
+        self.send(notif.into());
+    }
+
+    pub(crate) fn send_request<R: request::Request>(&mut self, params: R::Params, handler: ReqHandler) {
+        let request = self.req_queue.outgoing.register(R::METHOD.to_string(), params, handler);
+        self.send(request.into());
     }
 
     pub(crate) fn respond(&mut self, response: lsp_server::Response) {
@@ -142,17 +183,59 @@ impl GlobalState {
         }
     }
 
-    pub(crate) fn register_request(&mut self, req_received: Instant, req: &Request) {
-        self.req_queue.incoming.register(req.id.clone(), (req.method.clone(), req_received));
-    }
+    pub(crate) fn report_progress(
+        &mut self,
+        title: &str,
+        state: Progress,
+        message: Option<String>,
+        fraction: Option<f64>,
+        cancel_token: Option<String>,
+    ){
+        // TODO: check if work_down_progress enabled in config
+        // if !self.config.work_done_progress() {
+        //     return;
+        // }
 
-    pub(crate) fn make_snapshot(&self) -> GlobalStateSnapshot {
-        GlobalStateSnapshot {
-            config: Arc::clone(&self.config),
-            // workspaces: Arc::clone(&self.workspaces),
-            analysis: self.analysis_host.make_analysis(),
-            vfs: Arc::clone(&self.vfs),
-            mem_docs: self.mem_docs.clone(),
-        }
+        let percentage = fraction.map(|f| {
+            assert!((0.0..=1.0).contains(&f));
+            (f * 100.0) as u32
+        });
+
+        let cancellable = Some(cancel_token.is_some());
+
+        let token = lsp_types::ProgressToken::String(
+            cancel_token.unwrap_or_else(|| format!("{}/{title}", &self.config.opt.process_name)),
+        );
+
+        let work_done_progress = match state {
+            Progress::Begin => {
+                self.send_request::<request::WorkDoneProgressCreate>(
+                    lsp_types::WorkDoneProgressCreateParams { token: token.clone() },
+                    |_, _| (),
+                );
+
+                lsp_types::WorkDoneProgress::Begin(lsp_types::WorkDoneProgressBegin {
+                    title: title.into(),
+                    cancellable,
+                    message,
+                    percentage,
+                })
+            }
+            Progress::Report => {
+                lsp_types::WorkDoneProgress::Report(lsp_types::WorkDoneProgressReport {
+                    cancellable,
+                    message,
+                    percentage,
+                })
+            }
+            Progress::End => {
+                lsp_types::WorkDoneProgress::End(lsp_types::WorkDoneProgressEnd { message })
+            }
+        };
+
+        self.send_notification::<lsp_types::notification::Progress>(lsp_types::ProgressParams {
+            token,
+            value: lsp_types::ProgressParamsValue::WorkDone(work_done_progress),
+        });
     }
 }
