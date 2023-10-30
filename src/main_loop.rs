@@ -1,7 +1,7 @@
 use std::time::Instant;
 
 use crossbeam_channel::{select, Receiver};
-use lsp_server::{Connection, Notification, Request};
+use lsp_server::{Connection, Notification, Request, Response};
 use lsp_types::{notification::Notification as _};
 
 use crate::{
@@ -68,9 +68,11 @@ impl GlobalState {
             Event::Lsp(msg) => match msg {
                 lsp_server::Message::Request(req) => self.handle_lsp_request(loop_start, req),
                 lsp_server::Message::Notification(notif) => self.handle_lsp_notification(notif)?,
-                lsp_server::Message::Response(_) => todo!(),
+                lsp_server::Message::Response(res) => self.handle_response(res),
             }
-            Event::Task(_) => todo!(),
+            Event::Task(task) => {
+
+            }
             Event::Vfs(_) => todo!(),
         }
 
@@ -112,5 +114,12 @@ impl GlobalState {
         .finish();
 
         Ok(())
+    }
+
+    fn handle_response(&mut self, res: Response) {
+        let handler = self.req_queue.outgoing
+                                    .complete(res.id.clone())
+                                    .expect("Received response for unknown request");
+        handler(self, res)
     }
 }
