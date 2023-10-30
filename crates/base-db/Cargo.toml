@@ -1,0 +1,10 @@
+[package]
+name = "base-db"
+version = "0.0.0"
+description = "Indexing database"
+
+edition.workspace = true
+
+[dependencies]
+salsa = "0.17.0-pre.2"
+
