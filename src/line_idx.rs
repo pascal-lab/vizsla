@@ -11,3 +11,9 @@ pub enum WideEncoding {
     Utf16,
     Utf32,
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) enum LineEndings {
+    Unix,
+    Dos,
+}
