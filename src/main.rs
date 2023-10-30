@@ -167,6 +167,8 @@ fn run_server(opt: Opt) -> anyhow::Result<()> {
 
     // TODO: rediscover workspaces
 
+    main_loop::main_loop(config, connection)?;
+
     io_threads.join()?;
     tracing::info!("Server shut down. BYE!");
     Ok(())
