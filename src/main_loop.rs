@@ -6,7 +6,7 @@ use lsp_types::{notification::Notification as _};
 
 use crate::{
     Config,
-    global_state::GlobalState, dispatcher::ReqDispatcher,
+    global_state::GlobalState, dispatcher::{ReqDispatcher, NotifDispatcher},
 };
 
 #[derive(Debug)]
@@ -26,7 +26,7 @@ pub(crate) enum Task {
 pub fn main_loop(config: Config, connection: Connection) -> anyhow::Result<()> {
     tracing::info!("initial config: {:#?}", config);
 
-    // TODO: hack for windwos
+    // TODO: hack for windwos`
 
     GlobalState::new(connection.sender, config).run(connection.receiver)
 }
@@ -66,28 +66,51 @@ impl GlobalState {
         // check if is quiescent when loading workspace
         match event {
             Event::Lsp(msg) => match msg {
-                lsp_server::Message::Request(req) => todo!(),
+                lsp_server::Message::Request(req) => self.handle_lsp_request(loop_start, req),
+                lsp_server::Message::Notification(notif) => self.handle_lsp_notification(notif)?,
                 lsp_server::Message::Response(_) => todo!(),
-                lsp_server::Message::Notification(_) => todo!(),
             }
             Event::Task(_) => todo!(),
             Event::Vfs(_) => todo!(),
         }
+
+        todo!()
     }
 
     fn handle_lsp_request(&mut self, req_received: Instant, req: Request) {
         self.register_request(req_received, &req);
-        self.on_request(req);
+        self.dispatch_request(req);
     }
 
-    fn on_request(&mut self, req: Request) {
+    fn dispatch_request(&mut self, req: Request) {
         let mut dispatcher = ReqDispatcher { req: Some(req), global_state: self };
 
         // Handle shutdown req first
-        dispatcher.on_sync_mut::<lsp_types::request::Shutdown>(|gstate, ()| {
-            gstate.shutdown_requested = true;
+        dispatcher.on_sync_mut::<lsp_types::request::Shutdown>(|this, ()| {
+            this.shutdown_requested = true;
             Ok(())
         });
 
+        match &mut dispatcher {
+            ReqDispatcher { req: Some(req), global_state: this } if this.shutdown_requested => {
+                this.respond(lsp_server::Response::new_err(
+                    req.id.clone(),
+                    lsp_server::ErrorCode::InvalidRequest as i32,
+                    "Shutdown already requested.".to_owned(),
+                ));
+                return;
+            }
+            _ => (),
+        }
+
+        // TODO: Add handlers
+        dispatcher.finish();
+    }
+
+    fn handle_lsp_notification(&mut self, notif: Notification) -> anyhow::Result<()> {
+        NotifDispatcher { notif: Some(notif), global_state: self }
+        .finish();
+
+        Ok(())
     }
 }

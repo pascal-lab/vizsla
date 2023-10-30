@@ -4,7 +4,7 @@ use std::{
     thread
 };
 use ide::Cancelled;
-use lsp_server::{Request, Response};
+use lsp_server::{Request, Response, ExtractError, Notification};
 use serde::{de::DeserializeOwned, Serialize};
 use utils::{json::from_json, thread::ThreadIntent};
 
@@ -19,9 +19,9 @@ pub(crate) struct ReqDispatcher<'a> {
     pub(crate) global_state: &'a mut GlobalState,
 }
 
-type FnSyncMut<R> = fn(&mut GlobalState, <R as lsp_types::request::Request>::Params) -> anyhow::Result<<R as lsp_types::request::Request>::Result>;
-type FnSyncSnapshot<R> = fn(GlobalStateSnapshot, <R as lsp_types::request::Request>::Params) -> anyhow::Result<<R as lsp_types::request::Request>::Result>;
-type FnSync<R> = fn(GlobalStateSnapshot, <R as lsp_types::request::Request>::Params) -> anyhow::Result<<R as lsp_types::request::Request>::Result>;
+type FnReqSynMut<R> = fn(&mut GlobalState, <R as lsp_types::request::Request>::Params) -> anyhow::Result<<R as lsp_types::request::Request>::Result>;
+type FnReqSynSnap<R> = fn(GlobalStateSnapshot, <R as lsp_types::request::Request>::Params) -> anyhow::Result<<R as lsp_types::request::Request>::Result>;
+type FnReqSyn<R> = fn(GlobalStateSnapshot, <R as lsp_types::request::Request>::Params) -> anyhow::Result<<R as lsp_types::request::Request>::Result>;
 
 type FnReqErrHandler = fn(Request) -> Task;
 
@@ -50,7 +50,7 @@ impl ReqDispatcher<'_> {
         }
     }
 
-    pub(crate) fn on_sync_mut<R>(&mut self, f: FnSyncMut<R>) -> &mut Self
+    pub(crate) fn on_sync_mut<R>(&mut self, f: FnReqSynMut<R>) -> &mut Self
     where
         R: lsp_types::request::Request,
         R::Params: DeserializeOwned + UnwindSafe + fmt::Debug,
@@ -73,7 +73,7 @@ impl ReqDispatcher<'_> {
         self
     }
 
-    pub(crate) fn on_sync<R>(&mut self, f: FnSyncSnapshot<R>) -> &mut Self
+    pub(crate) fn on_sync<R>(&mut self, f: FnReqSynSnap<R>) -> &mut Self
     where
         R: lsp_types::request::Request,
         R::Params: DeserializeOwned + UnwindSafe + fmt::Debug,
@@ -98,7 +98,7 @@ impl ReqDispatcher<'_> {
         self
     }
 
-    pub(crate) fn on_no_retry<R>(&mut self, f: FnSyncSnapshot<R>) -> &mut Self
+    pub(crate) fn on_no_retry<R>(&mut self, f: FnReqSynSnap<R>) -> &mut Self
     where
         R: lsp_types::request::Request + 'static,
         R::Params: DeserializeOwned + UnwindSafe + Send + fmt::Debug,
@@ -113,7 +113,7 @@ impl ReqDispatcher<'_> {
     }
 
     fn on_with_intent_and_err_handler<R>(&mut self, intent: ThreadIntent,
-                                         f: FnSyncSnapshot<R>, err_handler: FnReqErrHandler) -> &mut Self
+                                         f: FnReqSynSnap<R>, err_handler: FnReqErrHandler) -> &mut Self
     where
         R: lsp_types::request::Request + 'static,
         R::Params: DeserializeOwned + UnwindSafe + Send + fmt::Debug,
@@ -140,7 +140,7 @@ impl ReqDispatcher<'_> {
         self
     }
 
-    pub(crate) fn on<R>(&mut self, f: FnSyncSnapshot<R>) -> &mut Self
+    pub(crate) fn on<R>(&mut self, f: FnReqSynSnap<R>) -> &mut Self
     where
         R: lsp_types::request::Request + 'static,
         R::Params: DeserializeOwned + UnwindSafe + Send + fmt::Debug,
@@ -149,7 +149,7 @@ impl ReqDispatcher<'_> {
         self.on_with_intent_and_err_handler::<R>(ThreadIntent::Worker, f, |req| Task::Retry(req))
     }
 
-    pub(crate) fn on_latency_sensitive<R>(&mut self, f: FnSyncSnapshot<R>) -> &mut Self
+    pub(crate) fn on_latency_sensitive<R>(&mut self, f: FnReqSynSnap<R>) -> &mut Self
     where
         R: lsp_types::request::Request + 'static,
         R::Params: DeserializeOwned + UnwindSafe + Send + fmt::Debug,
@@ -219,6 +219,47 @@ where
                 lsp_server::ErrorCode::InternalError as i32,
                 message,
             ))
+        }
+    }
+}
+
+pub(crate) struct NotifDispatcher<'a> {
+    pub(crate) notif: Option<lsp_server::Notification>,
+    pub(crate) global_state: &'a mut GlobalState,
+}
+
+type FnNotifSynMut<N> = fn(&mut GlobalState, <N as lsp_types::notification::Notification>::Params) -> anyhow::Result<()>;
+
+impl NotifDispatcher<'_> {
+    pub(crate) fn on_sync_mut<N>(&mut self, f: FnNotifSynMut<N>) -> anyhow::Result<&mut Self>
+    where
+        N: lsp_types::notification::Notification,
+        N::Params: DeserializeOwned + Send,
+    {
+        let notif = match &self.notif {
+            Some(notif) if notif.method == N::METHOD => self.notif.take().unwrap(),
+            _ => return Ok(self),
+        };
+
+        // extract
+        let params = match notif.extract::<N::Params>(N::METHOD) {
+            Ok(it) => it,
+            Err(ExtractError::JsonError { method, error }) => {
+                panic!("Invalid request\nMethod: {method}\n error: {error}",)
+            }
+            // We have checked it
+            Err(ExtractError::MethodMismatch(notif)) => unreachable!(),
+        };
+
+        let _pctx = utils::panic_context::enter(format!("\nnotification: {}", N::METHOD));
+        f(self.global_state, params)?;
+
+        Ok(self)
+    }
+
+    pub(crate) fn finish(&self) {
+        if self.notif.is_some() {
+            tracing::error!("Unhandled notification: {:?}", &self.notif);
         }
     }
 }
