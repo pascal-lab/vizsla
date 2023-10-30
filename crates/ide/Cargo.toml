@@ -1,0 +1,9 @@
+[package]
+name = "ide"
+version = "0.0.0"
+description = "IDE related components"
+
+edition.workspace = true
+
+[dependencies]
+base-db.workspace = true
