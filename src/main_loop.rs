@@ -1,12 +1,15 @@
 use std::time::Instant;
 
+use always_assert::always;
 use crossbeam_channel::{select, Receiver};
 use lsp_server::{Connection, Notification, Request, Response};
 use lsp_types::{notification::Notification as _};
+use vfs::VfsPath;
 
 use crate::{
     Config,
-    global_state::GlobalState, dispatcher::{ReqDispatcher, NotifDispatcher},
+    global_state::{GlobalState, Progress},
+    dispatcher::{ReqDispatcher, NotifDispatcher},
 };
 
 #[derive(Debug)]
@@ -70,10 +73,8 @@ impl GlobalState {
                 lsp_server::Message::Notification(notif) => self.handle_lsp_notification(notif)?,
                 lsp_server::Message::Response(res) => self.handle_response(res),
             }
-            Event::Task(task) => {
-
-            }
-            Event::Vfs(_) => todo!(),
+            Event::Task(task) => self.handle_task(task),
+            Event::Vfs(msg) => self.handle_vfs_msg(msg),
         }
 
         todo!()
@@ -85,6 +86,10 @@ impl GlobalState {
     }
 
     fn dispatch_request(&mut self, req: Request) {
+        if (self.is_completed(&req)) {
+            return;
+        }
+
         let mut dispatcher = ReqDispatcher { req: Some(req), global_state: self };
 
         // Handle shutdown req first
@@ -121,5 +126,71 @@ impl GlobalState {
                                     .complete(res.id.clone())
                                     .expect("Received response for unknown request");
         handler(self, res)
+    }
+
+    fn handle_task(&mut self, task: Task) {
+        self.process_task(task);
+
+        // Coalesce task events in one turn
+        while let Ok(task) = self.task_pool.receiver.try_recv() {
+            self.process_task(task);
+        }
+
+        // TODO: PrimaryCache?
+    }
+
+    fn process_task(&mut self, task: Task) {
+        match task {
+            Task::Response(res) => self.respond(res),
+            Task::Retry(req) => self.dispatch_request(req),
+        }
+    }
+
+    fn handle_vfs_msg(&mut self, msg: vfs::loader::Message) {
+        self.process_vfs_msg(msg);
+
+        // Coalesce task events in one turn
+        while let Ok(msg) = self.vfs_loader.receiver.try_recv() {
+            self.process_vfs_msg(msg);
+        }
+    }
+
+    fn process_vfs_msg(&mut self, msg: vfs::loader::Message) {
+        match msg {
+            vfs::loader::Message::Progress { n_total, n_done, config_version } => {
+                always!(config_version <= self.vfs_config_version);
+
+                self.vfs_progress_config_version = config_version;
+                self.vfs_progress_n_total = n_total;
+                self.vfs_progress_n_done = n_done;
+
+                let state = if n_done == 0 {
+                    Progress::Begin
+                } else if n_done < n_total {
+                    Progress::Report
+                } else {
+                    assert_eq!(n_done, n_total);
+                    Progress::End
+                };
+
+                self.report_progress(
+                    "Roots Scanning",
+                    state,
+                    Some(format!("{n_done}/{n_total}")),
+                    Some(Progress::fraction(n_done, n_total)),
+                    None,
+                );
+            }
+            vfs::loader::Message::Loaded { files } => {
+                let vfs = &mut self.vfs.write().unwrap().0;
+
+                for (path, content) in files {
+                    let path = VfsPath::from(path);
+                    if !self.mem_docs.contains(&path) {
+                        vfs.set_file_contents(path, content);
+                    }
+                }
+            }
+        }
     }
 }
