@@ -38,6 +38,8 @@ num_cpus = "1.16.0"
 rustc-hash = "1.1.0"
 notify = "6.1.1"
 always-assert = "0.1.3"
+parking_lot = "0.12.1"
+triomphe = "0.1.9"
 
 
 [workspace.dependencies]
@@ -53,3 +55,4 @@ serde_json = { package = "serde_json" }
 crossbeam-channel = { package = "crossbeam-channel" }
 notify = { package = "notify" }
 tracing = { package = "tracing" }
+triomphe = { package = "triomphe" }

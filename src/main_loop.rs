@@ -1,4 +1,4 @@
-use std::time::Instant;
+use std::time::{Instant, Duration};
 
 use always_assert::always;
 use crossbeam_channel::{select, Receiver};
@@ -29,7 +29,7 @@ pub(crate) enum Task {
 pub fn main_loop(config: Config, connection: Connection) -> anyhow::Result<()> {
     tracing::info!("initial config: {:#?}", config);
 
-    // TODO: hack for windwos`
+    // TODO: hack for windwos
 
     GlobalState::new(connection.sender, config).run(connection.receiver)
 }
@@ -62,9 +62,8 @@ impl GlobalState {
     fn handle_event(&mut self, event: Event) -> anyhow::Result<()> {
         let loop_start = Instant::now();
 
-        let loop_start_dbg_msg = format!("{loop_start:?}");
         let event_dbg_msg = format!("{event:?}");
-        tracing::debug!("{} [handle_event]: {}", loop_start_dbg_msg, event_dbg_msg);
+        tracing::debug!("{} [handle_event]: {}", format!("{loop_start:?}"), event_dbg_msg);
 
         // check if is quiescent when loading workspace
         match event {
@@ -77,7 +76,14 @@ impl GlobalState {
             Event::Vfs(msg) => self.handle_vfs_msg(msg),
         }
 
-        todo!()
+        let event_handling_duration = loop_start.elapsed();
+
+        let loop_duration = loop_start.elapsed();
+        if loop_duration > Duration::from_millis(100) {
+            tracing::warn!("overly long loop turn took {loop_duration:?} (event handling took {event_handling_duration:?}): {event_dbg_msg}");
+        }
+
+        Ok(())
     }
 
     fn handle_lsp_request(&mut self, req_received: Instant, req: Request) {
@@ -86,10 +92,6 @@ impl GlobalState {
     }
 
     fn dispatch_request(&mut self, req: Request) {
-        if (self.is_completed(&req)) {
-            return;
-        }
-
         let mut dispatcher = ReqDispatcher { req: Some(req), global_state: self };
 
         // Handle shutdown req first
@@ -142,7 +144,11 @@ impl GlobalState {
     fn process_task(&mut self, task: Task) {
         match task {
             Task::Response(res) => self.respond(res),
-            Task::Retry(req) => self.dispatch_request(req),
+            Task::Retry(req) => {
+                if !self.is_completed(&req) {
+                    self.dispatch_request(req);
+                }
+            }
         }
     }
 
@@ -182,7 +188,7 @@ impl GlobalState {
                 );
             }
             vfs::loader::Message::Loaded { files } => {
-                let vfs = &mut self.vfs.write().unwrap().0;
+                let vfs = &mut self.vfs.write().0;
 
                 for (path, content) in files {
                     let path = VfsPath::from(path);

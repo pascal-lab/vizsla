@@ -1,8 +1,12 @@
-use std::{time::Instant, sync::{Arc, RwLock}};
+use std::{time::Instant};
+use base_db::change::Change;
 use crossbeam_channel::{Sender, unbounded, Receiver};
 use lsp_server::{Message, ReqQueue, Request};
 use lsp_types::{request, notification};
 use nohash_hasher::IntMap;
+use parking_lot::{RwLock, RwLockWriteGuard, RwLockUpgradableReadGuard};
+use rustc_hash::FxHashMap;
+use triomphe::Arc;
 use utils::thread::{Pool, ThreadIntent};
 
 use crate::{config::Config, main_loop::Task, mem_docs::MemDocs, line_idx::LineEndings};
@@ -118,10 +122,6 @@ impl GlobalState {
         }
     }
 
-    pub(crate) fn register_request(&mut self, req_received: Instant, req: &Request) {
-        self.req_queue.incoming.register(req.id.clone(), (req.method.clone(), req_received));
-    }
-
     pub(crate) fn make_snapshot(&self) -> GlobalStateSnapshot {
         GlobalStateSnapshot {
             config: Arc::clone(&self.config),
@@ -132,8 +132,91 @@ impl GlobalState {
         }
     }
 
+    pub(crate) fn register_request(&mut self, req_received: Instant, req: &Request) {
+        self.req_queue.incoming.register(req.id.clone(), (req.method.clone(), req_received));
+    }
+
     pub(crate) fn is_completed(&self, req: &Request) -> bool {
         self.req_queue.incoming.is_completed(&req.id)
+    }
+
+    pub(crate) fn process_changes(&mut self) -> bool {
+        let mut file_changes = FxHashMap::default();
+
+        let mut change = Change::new();
+        let mut write_guard = self.vfs.write();
+        let changed_files = write_guard.0.take_changes();
+        if changed_files.is_empty() {
+            return false;
+        }
+
+        let read_guard = RwLockWriteGuard::downgrade_to_upgradable(write_guard);
+        let vfs = &read_guard.0;
+
+        // collapse modifications
+        use vfs::ChangeKind::*;
+        for changed_file in changed_files {
+            file_changes.entry(changed_file.file_id)
+                        .and_modify(|(change, just_created)| {
+                            match (change, just_created, changed_file.change_kind) {
+                                (change, _, Delete) => *change = Delete,
+                                (Create, _, Create | Modify) => {}
+                                (Modify, _, Modify) => {}
+                                (change @ Delete, just_created, Create) => {
+                                    *change = Modify;
+                                    *just_created = true;
+                                }
+                                (change @ Delete, just_created, Modify) => unreachable!(),
+                                (Modify, _, Create) => unreachable!(),
+                            }
+                        })
+                        .or_insert((changed_file.change_kind, matches!(changed_file.change_kind, Create)));
+        }
+
+        let changed_files = file_changes
+            .into_iter()
+            .filter(|(_, ( kind, just_created))| !(*kind == Delete && *just_created))
+            .map(|(file_id, (change_kind, _))| vfs::ChangedFile { file_id, change_kind })
+            .collect::<Vec<_>>();
+
+        // TODO: workspace change
+        let mut bytes = vec![];
+
+        for changed_file in &changed_files {
+            let path = vfs.file_path(changed_file.file_id);
+            // TODO: detect workspace change
+
+            // Collect changes
+            let text = if changed_file.exists() {
+                let bytes = vfs.file_contents(changed_file.file_id).unwrap().to_vec();
+
+                String::from_utf8(bytes).ok().and_then(|text| {
+                    // FIXME: Consider doing normalization in the `vfs` instead? That allows
+                    // getting rid of some locking
+                    let (text, line_endings) = LineEndings::normalize(text);
+                    Some((Arc::<str>::from(text), line_endings))
+                })
+            } else {
+                None
+            };
+
+            bytes.push((changed_file.file_id, text))
+        }
+
+        let (vfs, line_endings_map) = &mut *RwLockUpgradableReadGuard::upgrade(read_guard);
+        bytes.into_iter().for_each(|(file_id, text)| match text {
+            None => change.add_changed_file(file_id, None),
+            Some((text, line_endings)) => {
+                line_endings_map.insert(file_id, line_endings);
+                change.add_changed_file(file_id, Some(text));
+            }
+        });
+
+        self.analysis_host.apply_change(change);
+
+        // Apply workspace changes
+
+        true
     }
 }
 
