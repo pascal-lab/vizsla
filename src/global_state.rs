@@ -166,7 +166,7 @@ impl GlobalState {
                                     *change = Modify;
                                     *just_created = true;
                                 }
-                                (change @ Delete, just_created, Modify) => unreachable!(),
+                                (Delete, _, Modify) => unreachable!(),
                                 (Modify, _, Create) => unreachable!(),
                             }
                         })

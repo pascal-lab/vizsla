@@ -1,5 +1,4 @@
 use triomphe::Arc;
-use std::fmt;
 
 use vfs::FileId;
 

@@ -115,7 +115,6 @@ impl Config {
                 PositionEncoding::Wide(wide) => match wide {
                     WideEncoding::Utf16 => Some(PositionEncodingKind::UTF16),
                     WideEncoding::Utf32 => Some(PositionEncodingKind::UTF32),
-                    _ => None,
                 },
             },
             text_document_sync: Some(TextDocumentSyncOptions {

@@ -4,7 +4,7 @@ use std::{
     thread
 };
 use ide::Cancelled;
-use lsp_server::{Request, Response, ExtractError, Notification};
+use lsp_server::{Request, Response, ExtractError};
 use serde::{de::DeserializeOwned, Serialize};
 use utils::{json::from_json, thread::ThreadIntent};
 
@@ -248,7 +248,7 @@ impl NotifDispatcher<'_> {
                 panic!("Invalid request\nMethod: {method}\n error: {error}",)
             }
             // We have checked it
-            Err(ExtractError::MethodMismatch(notif)) => unreachable!(),
+            Err(ExtractError::MethodMismatch(_)) => unreachable!(),
         };
 
         let _pctx = utils::panic_context::enter(format!("\nnotification: {}", N::METHOD));
