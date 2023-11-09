@@ -10,7 +10,7 @@ pub trait FileLoader {
     fn relevant_packages(&self, file_id: FileId) -> Arc<FxHashSet<PackageId>>;
 }
 
-pub trait Upcast<T: ?Sized> {
+pub trait DbUpcast<T: ?Sized> {
     fn upcast(&self) -> &T;
 }
 
