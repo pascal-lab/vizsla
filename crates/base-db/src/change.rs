@@ -1,3 +1,4 @@
+use salsa::Durability;
 use triomphe::Arc;
 
 use vfs::FileId;
@@ -21,5 +22,13 @@ impl Change {
 
     pub fn add_changed_file(&mut self, file_id: FileId, new_text: Option<Arc<str>>) {
         self.changed_files.push((file_id, new_text))
+    }
+}
+
+fn durability(source_root: &SourceRoot) -> Durability {
+    if source_root.is_library {
+        Durability::HIGH
+    } else {
+        Durability::LOW
     }
 }
