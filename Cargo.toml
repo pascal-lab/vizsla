@@ -40,6 +40,8 @@ notify = "6.1.1"
 always-assert = "0.1.3"
 parking_lot = "0.12.1"
 triomphe = "0.1.9"
+la-arena = "0.3.1"
+smol_str = "0.2.0"
 
 
 [workspace.dependencies]
@@ -56,3 +58,6 @@ crossbeam-channel = { package = "crossbeam-channel" }
 notify = { package = "notify" }
 tracing = { package = "tracing" }
 triomphe = { package = "triomphe" }
+la-arena = { package = "la-arena" }
+smol_str = { package = "smol_str" }
+rustc-hash = { package = "rustc-hash" }
