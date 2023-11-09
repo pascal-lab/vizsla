@@ -50,6 +50,7 @@ utils = { path = "./crates/utils", version = "0.0.0" }
 ide = { path = "./crates/ide/", version = "0.0.0" }
 vfs-notify = { path = "./crates/vfs-notify/", version = "0.0.0" }
 base-db = { path = "./crates/base-db/", version = "0.0.0" }
+ide-db = { path = "./crates/ide-db/", version = "0.0.0" }
 anyhow = { package = "anyhow" }
 nohash-hasher = { package = "nohash-hasher" }
 serde = { package = "serde" }
