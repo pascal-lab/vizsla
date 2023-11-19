@@ -12,6 +12,8 @@ impl RootDb {
     pub fn apply_change(&mut self, change: Change) {
         self.request_cancellation();
         tracing::trace!("apply_change {:?}", change);
-        todo!()
+
+        // TODO: handle root
+        change.apply(self);
     }
 }

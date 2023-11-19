@@ -3,12 +3,13 @@ use triomphe::Arc;
 
 use vfs::FileId;
 
-use crate::source_root::SourceRoot;
+use crate::{source_root::SourceRoot, source_database::SourceRootDb, package_graph::{PackageGraph}};
 
 #[derive(Debug, Default)]
 pub struct Change {
     pub roots: Option<Vec<SourceRoot>>,
     pub changed_files: Vec<(FileId, Option<Arc<str>>)>,
+    pub package_graph: Option<PackageGraph>,
 }
 
 impl Change {
@@ -22,6 +23,22 @@ impl Change {
 
     pub fn add_changed_file(&mut self, file_id: FileId, new_text: Option<Arc<str>>) {
         self.changed_files.push((file_id, new_text))
+    }
+
+    pub fn apply(self, db: &mut dyn SourceRootDb) {
+        // TODO: handle roots
+        for (file_id, new_text) in self.changed_files {
+            let source_root_id = db.source_root_id(file_id);
+            let source_root = db.source_root(source_root_id);
+            let durability = durability(&source_root);
+            // cannot remove a file, so reset it
+            let text = new_text.unwrap_or_else(|| Arc::from(""));
+            db.set_file_text_with_durability(file_id, text, durability);
+        }
+
+        if let Some(package_graph) = self.package_graph {
+            db.set_package_graph_with_durability(Arc::new(package_graph), Durability::HIGH);
+        }
     }
 }
 

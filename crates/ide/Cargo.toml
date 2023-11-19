@@ -7,3 +7,5 @@ edition.workspace = true
 
 [dependencies]
 base-db.workspace = true
+ide-db.workspace = true
+rustc-hash.workspace = true

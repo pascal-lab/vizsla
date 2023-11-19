@@ -1,4 +1,4 @@
-use std::{time::Instant, collections::HashMap};
+use std::time::Instant;
 use base_db::change::Change;
 use crossbeam_channel::{Sender, unbounded, Receiver};
 use lsp_server::{Message, ReqQueue, Request};
@@ -231,10 +231,12 @@ impl GlobalState {
                         .or_insert((changed_file.change_kind, matches!(changed_file.change_kind, Create)));
         };
 
-        let changed_file = file_changes.into_iter()
-                                       .filter(|(_, ( kind, just_created))| !(*kind == Delete && *just_created))
-                                       .map(|(file_id, (change_kind, _))| vfs::ChangedFile { file_id, change_kind })
-                                       .collect::<Vec<_>>();
+        let changed_file = file_changes
+            .into_iter()
+            .filter(|(_, ( kind, just_created))| !(*kind == Delete && *just_created))
+            .map(|(file_id, (change_kind, _))| vfs::ChangedFile { file_id, change_kind })
+            .collect::<Vec<_>>();
+
         Some(changed_file)
     }
 }

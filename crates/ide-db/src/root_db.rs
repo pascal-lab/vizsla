@@ -1,6 +1,6 @@
 use std::{fmt, mem::ManuallyDrop};
 
-use base_db::{self, salsa::{self, Durability}, source_database::{FileLoader, SourceDb}, package_graph::PackageId};
+use base_db::{self, salsa::{self, Durability}, source_database::{FileLoader, SourceDb, SourceRootDb}, package_graph::PackageId};
 use rustc_hash::FxHashSet;
 use triomphe::Arc;
 use vfs::{FileId, AnchoredPath};
@@ -32,15 +32,18 @@ impl fmt::Debug for RootDb {
 
 impl FileLoader for RootDb {
     fn file_text(&self, file_id: FileId) -> Arc<str> {
-        self.file_text(file_id)
+        SourceRootDb::file_text(self, file_id)
     }
 
     fn resolve_path(&self, path: AnchoredPath<'_>) -> Option<FileId> {
-        self.resolve_path(path)
+        let source_root_id = SourceRootDb::source_root_id(self, path.anchor_id);
+        let source_root = SourceRootDb::source_root(self, source_root_id);
+        source_root.resolve_path(path)
     }
 
     fn relevant_packages(&self, file_id: FileId) -> Arc<FxHashSet<PackageId>> {
-        self.relevant_packages(file_id)
+        let source_root_id = SourceRootDb::source_root_id(self, file_id);
+        SourceRootDb::package_id(self, source_root_id)
     }
 }
 
@@ -56,6 +59,7 @@ impl RootDb {
 
     pub fn update_parse_query_lru_capacity(&mut self, lru_capacity: Option<usize>) {
         let lru_capacity = lru_capacity.unwrap_or(DEFAULT_PARSE_LRU_CAP);
+        todo!()
     }
 }
 
