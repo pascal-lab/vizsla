@@ -10,3 +10,4 @@ base-db.workspace = true
 vfs.workspace = true
 rustc-hash.workspace = true
 triomphe.workspace = true
+tracing.workspace = true

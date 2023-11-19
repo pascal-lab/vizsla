@@ -1,6 +1,6 @@
 use std::{fmt, mem::ManuallyDrop};
 
-use base_db::{self, salsa::{self, Durability}, source_database::{FileLoader, SourceDb}};
+use base_db::{self, salsa::{self, Durability}, source_database::{FileLoader, SourceDb}, package_graph::PackageId};
 use rustc_hash::FxHashSet;
 use triomphe::Arc;
 use vfs::{FileId, AnchoredPath};
@@ -9,8 +9,11 @@ use vfs::{FileId, AnchoredPath};
     base_db::source_database::SourceDbStorage,
     base_db::source_database::SourceRootDbStorage,
 )]
+
 pub struct RootDb {
-    storage: ManuallyDrop<salsa::Storage<RootDb>>,
+    // `ManuallyDrop` is used to avoid duplicating drop glue like `Weak::drop'
+    // for improved compile times and performance.
+    storage: ManuallyDrop<salsa::Storage<Self>>,
 }
 
 impl salsa::Database for RootDb {}
@@ -36,7 +39,7 @@ impl FileLoader for RootDb {
         self.resolve_path(path)
     }
 
-    fn relevant_packages(&self, file_id: FileId) -> Arc<FxHashSet<base_db::package_graph::PackageId>> {
+    fn relevant_packages(&self, file_id: FileId) -> Arc<FxHashSet<PackageId>> {
         self.relevant_packages(file_id)
     }
 }

@@ -18,7 +18,7 @@ pub trait DbUpcast<T: ?Sized> {
 // Everything else is derived from these queries.
 #[salsa::query_group(SourceDbStorage)]
 pub trait SourceDb: FileLoader + std::fmt::Debug {
-    // Parses the file into the syntax tree.
+    // TODO: Parses the file into the syntax tree.
     // #[salsa::invoke(parse_query)]
     // fn parse(&self, file_id: FileId) -> Parse<ast::SourceFile>;
 
