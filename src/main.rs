@@ -165,8 +165,6 @@ fn run_server(opt: Opt) -> anyhow::Result<()> {
 
     connection.initialize_finish(initialize_id, initialize_result)?;
 
-    // TODO: rediscover workspaces
-
     main_loop::main_loop(config, connection)?;
 
     io_threads.join()?;

@@ -1,0 +1,12 @@
+[package]
+name = "project-model"
+version = "0.0.0"
+description = "Model of a project"
+
+edition.workspace = true
+
+[dependencies]
+vfs.workspace = true
+anyhow.workspace = true
+const_format.workspace = true
+rustc-hash.workspace = true

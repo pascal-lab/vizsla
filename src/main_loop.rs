@@ -29,7 +29,14 @@ pub(crate) enum Task {
 pub fn main_loop(config: Config, connection: Connection) -> anyhow::Result<()> {
     tracing::info!("initial config: {:#?}", config);
 
-    // TODO: hack for windwos
+    // hack for windwos
+    #[cfg(windows)]
+    unsafe {
+        use winapi::um::processthreadsapi::*;
+        let thread = GetCurrentThread();
+        let thread_priority_above_normal = 1;
+        SetThreadPriority(thread, thread_priority_above_normal);
+    }
 
     GlobalState::new(connection.sender, config).run(connection.receiver)
 }
@@ -38,6 +45,8 @@ impl GlobalState {
     pub(crate) fn run(&mut self, cli_inbox: Receiver<lsp_server::Message>) -> anyhow::Result<()> {
         // TODO: check for status
         // TODO: fetch workspace
+
+        // if self.config.cli_completion_label_details_support
 
         while let Some(event) = self.next_event(&cli_inbox) {
             match &event {

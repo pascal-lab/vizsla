@@ -8,6 +8,7 @@ use lsp_types::{
     WorkspaceFileOperationsServerCapabilities, WorkspaceFoldersServerCapabilities,
     WorkspaceServerCapabilities, OneOf, DeclarationCapability, InlayHintServerCapabilities,
 };
+use project_model::project_manifest::ProjectManifest;
 use serde::de::DeserializeOwned;
 use serde_json::Error;
 use utils::paths::AbsPathBuf;
@@ -25,6 +26,7 @@ pub struct Config {
     pub(crate) root_path: AbsPathBuf,
     pub(crate) user_config: UserConfig,
     pub(crate) detached_files: Vec<AbsPathBuf>,
+    pub(crate) discovered_workspaces: Vec<ProjectManifest>,
 }
 
 #[derive(Debug, Clone)]
@@ -47,6 +49,12 @@ macro_rules! try_ {
     };
 }
 
+macro_rules! try_or_default {
+    ($expr:expr) => {
+        try_!($expr).unwrap_or_default()
+    };
+}
+
 impl Config {
     pub fn new(
         opt: Opt,
@@ -57,6 +65,7 @@ impl Config {
         detached_files: Vec<AbsPathBuf>,
         snippets: Vec<Snippet>,
     ) -> Self {
+        let discovered_workspaces = Self::discover_workspaces(&workspace_roots);
         Config {
             opt,
             workspace_roots,
@@ -64,6 +73,7 @@ impl Config {
             root_path,
             user_config,
             detached_files,
+            discovered_workspaces,
         }
     }
 
@@ -84,6 +94,22 @@ impl Config {
               .properties.iter()
               .any(|cap_string| cap_string.as_str() == "additionalTextEdits")
         ) == Some(true)
+    }
+
+    pub fn cli_did_save_dyn_reg_support(&self) -> bool {
+        let caps = try_or_default!(self.client_caps.text_document.as_ref()?
+                                   .synchronization.clone()?
+        );
+        caps.did_save == Some(true) && caps.dynamic_registration == Some(true)
+    }
+
+    pub fn discover_workspaces(roots: &Vec<AbsPathBuf>) -> Vec<ProjectManifest> {
+        let workspaces = ProjectManifest::discover_all(roots);
+        tracing::info!("discovered workspaces: {workspaces:?}");
+        if workspaces.is_empty() {
+            tracing::info!("no workspaces discovered in {:?}", &roots);
+        }
+        return workspaces;
     }
 
     pub fn negotiated_encoding(&self) -> PositionEncoding {
@@ -250,7 +276,7 @@ pub fn get_field<T: DeserializeOwned>(
     alias: Option<&'static str>,
     default: &str,
 ) -> T {
-    // XXX: check alias first, to work around the VS Code where it pre-fills the
+    // check alias first, to work around the VS Code where it pre-fills the
     // defaults instead of sending an empty object.
     alias
         .into_iter()
@@ -275,9 +301,8 @@ pub fn get_field<T: DeserializeOwned>(
         })
 }
 
-pub fn parse_initialization_options(
-    mut options: serde_json::Value
-) -> (UserConfig, Vec<AbsPathBuf>, Vec<Snippet>, Vec<(String, Error)>){
+pub fn parse_initialization_options(mut options: serde_json::Value)
+                                    -> (UserConfig, Vec<AbsPathBuf>, Vec<Snippet>, Vec<(String, Error)>){
     tracing::info!("Server initialized with options: {:#}", options);
     if options.is_null() || options.as_object().map_or(false, |obj| obj.is_empty()) {
         return Default::default();
