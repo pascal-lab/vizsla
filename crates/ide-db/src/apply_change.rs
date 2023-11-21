@@ -1,4 +1,7 @@
-use base_db::{salsa::{Database, Durability}, change::Change};
+use base_db::{
+    change::Change,
+    salsa::{Database, Durability},
+};
 
 use crate::root_db::RootDb;
 

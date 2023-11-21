@@ -1,10 +1,9 @@
-use std::{fs, collections::BTreeSet};
+use std::{collections::BTreeSet, fs};
 
 use const_format::formatcp;
-use rustc_hash::FxHashSet;
 use vfs::AbsPathBuf;
 
-const MANIFEST_FILE_NAME: &str = formatcp!("vizsla_config.toml");
+pub const MANIFEST_FILE_NAME: &str = formatcp!("vizsla_config.toml");
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct ProjectManifest(AbsPathBuf);
@@ -32,7 +31,9 @@ impl ProjectManifest {
         }
 
         if path.file_name().unwrap_or_default() != MANIFEST_FILE_NAME {
-            return Err(String::from("Project root must point to {MANIFEST_FILE_NAME}.toml: {path}"));
+            return Err(String::from(
+                "Project root must point to {MANIFEST_FILE_NAME}.toml: {path}",
+            ));
         }
 
         Ok(())
@@ -69,10 +70,11 @@ impl ProjectManifest {
     }
 
     pub fn discover_all(paths: &[AbsPathBuf]) -> Vec<ProjectManifest> {
-        paths.iter()
-             .filter_map(|path| ProjectManifest::discover(path).ok())
-             .flatten()
-             .collect::<BTreeSet<_>>()
+        paths
+            .iter()
+            .filter_map(|path| ProjectManifest::discover(path).ok())
+            .flatten()
+            .collect::<BTreeSet<_>>()
             .into_iter()
             .collect::<Vec<_>>()
     }

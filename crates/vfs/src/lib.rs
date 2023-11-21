@@ -1,17 +1,17 @@
-pub mod loader;
 mod anchored_path;
-mod vfs_path;
 pub mod file_set;
+pub mod loader;
+mod vfs_path;
 
-use std::{fmt, mem, hash::BuildHasherDefault};
+use std::{fmt, hash::BuildHasherDefault, mem};
 
 pub use crate::{
     anchored_path::{AnchoredPath, AnchoredPathBuf},
     vfs_path::VfsPath,
 };
 use indexmap::IndexSet;
-pub use utils::paths::{AbsPath, AbsPathBuf};
 use rustc_hash::FxHasher;
+pub use utils::paths::{AbsPath, AbsPathBuf};
 
 #[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct FileId(pub u32);
@@ -43,7 +43,9 @@ impl ChangedFile {
 
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
 pub enum ChangeKind {
-    Create, Modify, Delete,
+    Create,
+    Modify,
+    Delete,
 }
 
 impl Vfs {
@@ -85,7 +87,10 @@ impl Vfs {
         }
 
         *self.get_file_contents_mut(file_id) = contents;
-        self.changes.push(ChangedFile { file_id, change_kind });
+        self.changes.push(ChangedFile {
+            file_id,
+            change_kind,
+        });
         true
     }
 
@@ -97,7 +102,7 @@ impl Vfs {
         mem::take(&mut self.changes)
     }
 
-        pub fn exists(&self, file_id: FileId) -> bool {
+    pub fn exists(&self, file_id: FileId) -> bool {
         self.get_file_contents(file_id).is_some()
     }
 
@@ -121,6 +126,8 @@ impl Vfs {
 
 impl fmt::Debug for Vfs {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Vfs").field("n_files", &self.data.len()).finish()
+        f.debug_struct("Vfs")
+            .field("n_files", &self.data.len())
+            .finish()
     }
 }

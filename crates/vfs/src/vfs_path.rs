@@ -51,7 +51,9 @@ impl VfsPath {
     pub fn starts_with(&self, other: &VfsPath) -> bool {
         match (&self.0, &other.0) {
             (VfsPathKinds::RealPath(lhs), VfsPathKinds::RealPath(rhs)) => lhs.starts_with(rhs),
-            (VfsPathKinds::VirtualPath(lhs), VfsPathKinds::VirtualPath(rhs)) => lhs.starts_with(rhs),
+            (VfsPathKinds::VirtualPath(lhs), VfsPathKinds::VirtualPath(rhs)) => {
+                lhs.starts_with(rhs)
+            }
             (VfsPathKinds::RealPath(_) | VfsPathKinds::VirtualPath(_), _) => false,
         }
     }
@@ -59,7 +61,9 @@ impl VfsPath {
     pub fn strip_prefix(&self, other: &VfsPath) -> Option<&RelPath> {
         match (&self.0, &other.0) {
             (VfsPathKinds::RealPath(lhs), VfsPathKinds::RealPath(rhs)) => lhs.strip_prefix(rhs),
-            (VfsPathKinds::VirtualPath(lhs), VfsPathKinds::VirtualPath(rhs)) => lhs.strip_prefix(rhs),
+            (VfsPathKinds::VirtualPath(lhs), VfsPathKinds::VirtualPath(rhs)) => {
+                lhs.strip_prefix(rhs)
+            }
             (VfsPathKinds::RealPath(_) | VfsPathKinds::VirtualPath(_), _) => None,
         }
     }
@@ -309,7 +313,11 @@ impl VirtualPath {
     /// The extension will not contains `.`. This means `"/foo/bar.baz.rs"` will
     /// return `Some(("bar.baz", Some("rs"))`.
     fn name_and_extension(&self) -> Option<(&str, Option<&str>)> {
-        let file_path = if self.0.ends_with('/') { &self.0[..&self.0.len() - 1] } else { &self.0 };
+        let file_path = if self.0.ends_with('/') {
+            &self.0[..&self.0.len() - 1]
+        } else {
+            &self.0
+        };
         let file_name = match file_path.rfind('/') {
             Some(position) => &file_path[position + 1..],
             None => file_path,

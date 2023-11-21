@@ -1,17 +1,17 @@
-use std::{
-    panic::{UnwindSafe, self},
-    fmt,
-    thread
-};
 use ide::Cancelled;
-use lsp_server::{Request, Response, ExtractError};
+use lsp_server::{ExtractError, Request, Response};
 use serde::{de::DeserializeOwned, Serialize};
+use std::{
+    fmt,
+    panic::{self, UnwindSafe},
+    thread,
+};
 use utils::{json::from_json, thread::ThreadIntent};
 
 use crate::{
     global_state::{GlobalState, GlobalStateSnapshot},
     lsp_ext::LspError,
-    main_loop::Task
+    main_loop::Task,
 };
 
 pub(crate) struct ReqDispatcher<'a> {
@@ -19,9 +19,18 @@ pub(crate) struct ReqDispatcher<'a> {
     pub(crate) global_state: &'a mut GlobalState,
 }
 
-type FnReqSynMut<R> = fn(&mut GlobalState, <R as lsp_types::request::Request>::Params) -> anyhow::Result<<R as lsp_types::request::Request>::Result>;
-type FnReqSynSnap<R> = fn(GlobalStateSnapshot, <R as lsp_types::request::Request>::Params) -> anyhow::Result<<R as lsp_types::request::Request>::Result>;
-type FnReqSyn<R> = fn(GlobalStateSnapshot, <R as lsp_types::request::Request>::Params) -> anyhow::Result<<R as lsp_types::request::Request>::Result>;
+type FnReqSynMut<R> = fn(
+    &mut GlobalState,
+    <R as lsp_types::request::Request>::Params,
+) -> anyhow::Result<<R as lsp_types::request::Request>::Result>;
+type FnReqSynSnap<R> = fn(
+    GlobalStateSnapshot,
+    <R as lsp_types::request::Request>::Params,
+) -> anyhow::Result<<R as lsp_types::request::Request>::Result>;
+type FnReqSyn<R> = fn(
+    GlobalStateSnapshot,
+    <R as lsp_types::request::Request>::Params,
+) -> anyhow::Result<<R as lsp_types::request::Request>::Result>;
 
 type FnReqErrHandler = fn(Request) -> Task;
 
@@ -54,7 +63,7 @@ impl ReqDispatcher<'_> {
     where
         R: lsp_types::request::Request,
         R::Params: DeserializeOwned + UnwindSafe + fmt::Debug,
-        R::Result: Serialize
+        R::Result: Serialize,
     {
         let (req, params, panic_context) = match self.parse::<R>() {
             Some(it) => it,
@@ -104,16 +113,21 @@ impl ReqDispatcher<'_> {
         R::Params: DeserializeOwned + UnwindSafe + Send + fmt::Debug,
         R::Result: Serialize,
     {
-        self.on_with_intent_and_err_handler::<R>(ThreadIntent::Worker, f,
-                                                 |req| Task::Response(Response::new_err(
-                                                     req.id,
-                                                     lsp_server::ErrorCode::ContentModified as i32,
-                                                     "content modified".to_string(),
-                                                 )))
+        self.on_with_intent_and_err_handler::<R>(ThreadIntent::Worker, f, |req| {
+            Task::Response(Response::new_err(
+                req.id,
+                lsp_server::ErrorCode::ContentModified as i32,
+                "content modified".to_string(),
+            ))
+        })
     }
 
-    fn on_with_intent_and_err_handler<R>(&mut self, intent: ThreadIntent,
-                                         f: FnReqSynSnap<R>, err_handler: FnReqErrHandler) -> &mut Self
+    fn on_with_intent_and_err_handler<R>(
+        &mut self,
+        intent: ThreadIntent,
+        f: FnReqSynSnap<R>,
+        err_handler: FnReqErrHandler,
+    ) -> &mut Self
     where
         R: lsp_types::request::Request + 'static,
         R::Params: DeserializeOwned + UnwindSafe + Send + fmt::Debug,
@@ -126,16 +140,19 @@ impl ReqDispatcher<'_> {
 
         let world = self.global_state.make_snapshot();
 
-        self.global_state.task_pool.handle.spawn_and_send(intent, move || {
-            let result = panic::catch_unwind(move || {
-                let _pctx = utils::panic_context::enter(panic_context);
-                f(world, params)
+        self.global_state
+            .task_pool
+            .handle
+            .spawn_and_send(intent, move || {
+                let result = panic::catch_unwind(move || {
+                    let _pctx = utils::panic_context::enter(panic_context);
+                    f(world, params)
+                });
+                match thread_result_to_response::<R>(req.id.clone(), result) {
+                    Ok(response) => Task::Response(response),
+                    Err(_) => err_handler(req),
+                }
             });
-            match thread_result_to_response::<R>(req.id.clone(), result) {
-                Ok(response) => Task::Response(response),
-                Err(_) => err_handler(req),
-            }
-        });
 
         self
     }
@@ -155,7 +172,9 @@ impl ReqDispatcher<'_> {
         R::Params: DeserializeOwned + UnwindSafe + Send + fmt::Debug,
         R::Result: Serialize,
     {
-        self.on_with_intent_and_err_handler::<R>(ThreadIntent::LatencySensitive, f, |req| Task::Retry(req))
+        self.on_with_intent_and_err_handler::<R>(ThreadIntent::LatencySensitive, f, |req| {
+            Task::Retry(req)
+        })
     }
 
     pub(crate) fn finish(&mut self) {
@@ -172,7 +191,10 @@ impl ReqDispatcher<'_> {
 }
 
 // Analysis error code
-fn result_to_response<R>(id: lsp_server::RequestId, result: anyhow::Result<R::Result>) -> Result<Response, Cancelled>
+fn result_to_response<R>(
+    id: lsp_server::RequestId,
+    result: anyhow::Result<R::Result>,
+) -> Result<Response, Cancelled>
 where
     R: lsp_types::request::Request,
     R::Params: DeserializeOwned,
@@ -189,12 +211,19 @@ where
 
     match e.err().unwrap().downcast::<Cancelled>() {
         Ok(cancelled) => Err(cancelled),
-        Err(e) => Ok(Response::new_err(id, lsp_server::ErrorCode::InternalError as i32, e.to_string())),
+        Err(e) => Ok(Response::new_err(
+            id,
+            lsp_server::ErrorCode::InternalError as i32,
+            e.to_string(),
+        )),
     }
 }
 
 // Analysis error code for threads
-fn thread_result_to_response<R>(id: lsp_server::RequestId, result: thread::Result<anyhow::Result<R::Result>>) -> Result<Response, Cancelled>
+fn thread_result_to_response<R>(
+    id: lsp_server::RequestId,
+    result: thread::Result<anyhow::Result<R::Result>>,
+) -> Result<Response, Cancelled>
 where
     R: lsp_types::request::Request,
     R::Params: DeserializeOwned,
@@ -228,7 +257,10 @@ pub(crate) struct NotifDispatcher<'a> {
     pub(crate) global_state: &'a mut GlobalState,
 }
 
-type FnNotifSynMut<N> = fn(&mut GlobalState, <N as lsp_types::notification::Notification>::Params) -> anyhow::Result<()>;
+type FnNotifSynMut<N> = fn(
+    &mut GlobalState,
+    <N as lsp_types::notification::Notification>::Params,
+) -> anyhow::Result<()>;
 
 impl NotifDispatcher<'_> {
     pub(crate) fn on_sync_mut<N>(&mut self, f: FnNotifSynMut<N>) -> anyhow::Result<&mut Self>

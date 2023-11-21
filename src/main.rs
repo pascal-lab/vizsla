@@ -1,46 +1,38 @@
-use std::{
-    path::PathBuf,
-    sync::Arc,
-    fs,
-    io, env,
-};
+use std::{env, fs, io, path::PathBuf, sync::Arc};
 
-use const_format::formatcp;
-use anyhow::{ Context };
+use anyhow::Context;
 use clap::Parser;
+use const_format::formatcp;
 use itertools::Itertools;
 use lsp_server::Connection;
-use lsp_types::{
-    MessageType,
-    ShowMessageParams,
-};
+use lsp_types::{MessageType, ShowMessageParams};
 use tracing_subscriber::{
-    fmt::writer::BoxMakeWriter,
+    filter::Targets, fmt::writer::BoxMakeWriter, layer::SubscriberExt, util::SubscriberInitExt,
     Registry,
-    filter::Targets,
-    layer::SubscriberExt,
-    util::SubscriberInitExt,
 };
 use utils::{
     json::from_json,
-    paths::{AbsPathBuf, patch_path_prefix},
+    paths::{patch_path_prefix, AbsPathBuf},
 };
 
 mod config;
 
 use config::Config;
 
-mod line_idx;
-mod main_loop;
-mod global_state;
-mod mem_docs;
 mod dispatcher;
+mod global_state;
+mod line_idx;
 mod lsp_ext;
+mod main_loop;
+mod mem_docs;
 
 const DEFAULT_PROCESS_NAME: &str = "vizsla";
 const DEBUG: bool = cfg!(debug_assertions);
-const VERSION: &str = formatcp!("{}_{}", env!("CARGO_PKG_VERSION"),
-                                if DEBUG { "DEBUG" } else { "RELEASE" });
+const VERSION: &str = formatcp!(
+    "{}_{}",
+    env!("CARGO_PKG_VERSION"),
+    if DEBUG { "DEBUG" } else { "RELEASE" }
+);
 
 #[derive(Clone, Debug, Parser)]
 #[clap(name = "vizsla", version = VERSION)]
@@ -56,29 +48,28 @@ pub struct Opt {
 }
 
 fn setup_logging(opt: &Opt) -> anyhow::Result<()> {
-    let target: Targets = opt.log.parse()
+    let target: Targets = opt
+        .log
+        .parse()
         .with_context(|| format!("invalid log filter: `{}`", opt.log))?;
 
     let writer = match &opt.log_filename {
         Some(path) => {
             if let Some(parent) = path.parent() {
-                fs::create_dir_all(parent)
-                    .with_context(|| format!("could not create log directory: {}", parent.display()))?;
+                fs::create_dir_all(parent).with_context(|| {
+                    format!("could not create log directory: {}", parent.display())
+                })?;
             }
             let file = fs::File::create(path)
                 .with_context(|| format!("could not create log file: {}", path.display()))?;
             BoxMakeWriter::new(Arc::new(file))
         }
-        None => BoxMakeWriter::new(io::stderr)
+        None => BoxMakeWriter::new(io::stderr),
     };
 
-    let fmt_layer = tracing_subscriber::fmt::layer()
-        .with_writer(writer);
+    let fmt_layer = tracing_subscriber::fmt::layer().with_writer(writer);
 
-    Registry::default()
-        .with(target)
-        .with(fmt_layer)
-        .init();
+    Registry::default().with(target).with(fmt_layer).init();
 
     Ok(())
 }
@@ -91,7 +82,10 @@ fn run_server(opt: Opt) -> anyhow::Result<()> {
 
     // Initialize server
     let (initialize_id, initialize_params) = connection.initialize_start()?;
-    tracing::info!("Server initialized. InitializeParams: {}", &initialize_params);
+    tracing::info!(
+        "Server initialized. InitializeParams: {}",
+        &initialize_params
+    );
     let lsp_types::InitializeParams {
         root_uri,
         capabilities: client_caps,
@@ -103,7 +97,8 @@ fn run_server(opt: Opt) -> anyhow::Result<()> {
     let root_path = match root_uri
         .and_then(|uri| uri.to_file_path().ok())
         .map(patch_path_prefix)
-        .and_then(|path| AbsPathBuf::try_from(path).ok()) {
+        .and_then(|path| AbsPathBuf::try_from(path).ok())
+    {
         Some(path) => path,
         None => {
             let cwd = env::current_dir()?;
@@ -113,7 +108,8 @@ fn run_server(opt: Opt) -> anyhow::Result<()> {
 
     let workspace_roots = workspace_folders
         .map(|workspace| {
-            workspace.into_iter()
+            workspace
+                .into_iter()
                 .filter_map(|folder| folder.uri.to_file_path().ok())
                 .map(patch_path_prefix)
                 .filter_map(|path| AbsPathBuf::try_from(path).ok())
@@ -122,26 +118,32 @@ fn run_server(opt: Opt) -> anyhow::Result<()> {
         .filter(|folders| !folders.is_empty())
         .unwrap_or_else(|| vec![root_path.clone()]);
 
-    let (user_config, detached_files, snippets) = initialization_options.map(|options| {
-        let (user_config, detached_files, snippets, errors) = config::parse_initialization_options(options);
-        if !errors.is_empty() {
-            use lsp_types::notification::{Notification, ShowMessage};
-            let errors_formatter = errors.iter().format_with("\n", |(key, err), f| {
-                let _ = f(key);
-                let _ = f(&": ");
-                f(err)
-            });
-            let noti = lsp_server::Notification::new(
-                ShowMessage::METHOD.to_string(),
-                ShowMessageParams {
-                    typ: MessageType::WARNING,
-                    message: format!("{}", errors_formatter),
-                },
-            );
-            connection.sender.send(lsp_server::Message::Notification(noti)).unwrap();
-        }
-        (user_config, detached_files, snippets)
-    }).unwrap_or(Default::default());
+    let (user_config, detached_files, snippets) = initialization_options
+        .map(|options| {
+            let (user_config, detached_files, snippets, errors) =
+                config::parse_initialization_options(options);
+            if !errors.is_empty() {
+                use lsp_types::notification::{Notification, ShowMessage};
+                let errors_formatter = errors.iter().format_with("\n", |(key, err), f| {
+                    let _ = f(key);
+                    let _ = f(&": ");
+                    f(err)
+                });
+                let noti = lsp_server::Notification::new(
+                    ShowMessage::METHOD.to_string(),
+                    ShowMessageParams {
+                        typ: MessageType::WARNING,
+                        message: format!("{}", errors_formatter),
+                    },
+                );
+                connection
+                    .sender
+                    .send(lsp_server::Message::Notification(noti))
+                    .unwrap();
+            }
+            (user_config, detached_files, snippets)
+        })
+        .unwrap_or(Default::default());
 
     let config = Config::new(
         opt,

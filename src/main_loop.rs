@@ -1,15 +1,17 @@
-use std::time::{Instant, Duration};
+use std::time::{Duration, Instant};
 
 use always_assert::always;
+use const_format::formatcp;
 use crossbeam_channel::{select, Receiver};
 use lsp_server::{Connection, Notification, Request, Response};
-use lsp_types::{notification::Notification as _};
+use lsp_types::notification::Notification as _;
+use project_model::project_manifest;
 use vfs::VfsPath;
 
 use crate::{
-    Config,
+    dispatcher::{NotifDispatcher, ReqDispatcher},
     global_state::{GlobalState, Progress},
-    dispatcher::{ReqDispatcher, NotifDispatcher},
+    Config,
 };
 
 #[derive(Debug)]
@@ -46,18 +48,57 @@ impl GlobalState {
         // TODO: check for status
         // TODO: fetch workspace
 
-        // if self.config.cli_completion_label_details_support
+        if self.config.cli_did_save_dyn_reg_support() {}
 
         while let Some(event) = self.next_event(&cli_inbox) {
             match &event {
                 Event::Lsp(lsp_server::Message::Notification(Notification { method, .. }))
-                    if method == lsp_types::notification::Exit::METHOD => {
-                        return Ok(());
-                    }
+                    if method == lsp_types::notification::Exit::METHOD =>
+                {
+                    return Ok(());
+                }
                 _ => self.handle_event(event)?,
             }
         }
-        anyhow::bail!("Server {} exited without proper shutdown sequence", &self.config.opt.process_name);
+        anyhow::bail!(
+            "Server {} exited without proper shutdown sequence",
+            &self.config.opt.process_name
+        );
+    }
+
+    fn register_did_save_capability(&mut self) {
+        let save_registration_options = lsp_types::TextDocumentSaveRegistrationOptions {
+            include_text: false.into(),
+            text_document_registration_options: lsp_types::TextDocumentRegistrationOptions {
+                document_selector: vec![
+                    lsp_types::DocumentFilter {
+                        language: None,
+                        scheme: None,
+                        pattern: Some("**/*.{v,sv}".into()),
+                    },
+                    lsp_types::DocumentFilter {
+                        language: None,
+                        scheme: None,
+                        pattern: Some(
+                            formatcp!("**/{}", project_manifest::MANIFEST_FILE_NAME).into(),
+                        ),
+                    },
+                ]
+                .into(),
+            },
+        };
+
+        let registration = lsp_types::Registration {
+            id: "textDocument/didSave".to_string(),
+            method: "textDocument/didSave".to_string(),
+            register_options: Some(serde_json::to_value(save_registration_options).unwrap()),
+        };
+        self.send_request::<lsp_types::request::RegisterCapability>(
+            lsp_types::RegistrationParams {
+                registrations: vec![registration],
+            },
+            |_, _| (),
+        );
     }
 
     fn next_event(&self, cli_inbox: &Receiver<lsp_server::Message>) -> Option<Event> {
@@ -72,7 +113,11 @@ impl GlobalState {
         let loop_start = Instant::now();
 
         let event_dbg_msg = format!("{event:?}");
-        tracing::debug!("{} [handle_event]: {}", format!("{loop_start:?}"), event_dbg_msg);
+        tracing::debug!(
+            "{} [handle_event]: {}",
+            format!("{loop_start:?}"),
+            event_dbg_msg
+        );
 
         // check if is quiescent when loading workspace
         match event {
@@ -80,7 +125,7 @@ impl GlobalState {
                 lsp_server::Message::Request(req) => self.handle_lsp_request(loop_start, req),
                 lsp_server::Message::Notification(notif) => self.handle_lsp_notification(notif)?,
                 lsp_server::Message::Response(res) => self.handle_response(res),
-            }
+            },
             Event::Task(task) => self.handle_task(task),
             Event::Vfs(msg) => self.handle_vfs_msg(msg),
         }
@@ -101,7 +146,10 @@ impl GlobalState {
     }
 
     fn dispatch_request(&mut self, req: Request) {
-        let mut dispatcher = ReqDispatcher { req: Some(req), global_state: self };
+        let mut dispatcher = ReqDispatcher {
+            req: Some(req),
+            global_state: self,
+        };
 
         // Handle shutdown req first
         dispatcher.on_sync_mut::<lsp_types::request::Shutdown>(|this, ()| {
@@ -110,7 +158,10 @@ impl GlobalState {
         });
 
         match &mut dispatcher {
-            ReqDispatcher { req: Some(req), global_state: this } if this.shutdown_requested => {
+            ReqDispatcher {
+                req: Some(req),
+                global_state: this,
+            } if this.shutdown_requested => {
                 this.respond(lsp_server::Response::new_err(
                     req.id.clone(),
                     lsp_server::ErrorCode::InvalidRequest as i32,
@@ -126,16 +177,21 @@ impl GlobalState {
     }
 
     fn handle_lsp_notification(&mut self, notif: Notification) -> anyhow::Result<()> {
-        NotifDispatcher { notif: Some(notif), global_state: self }
+        NotifDispatcher {
+            notif: Some(notif),
+            global_state: self,
+        }
         .finish();
 
         Ok(())
     }
 
     fn handle_response(&mut self, res: Response) {
-        let handler = self.req_queue.outgoing
-                                    .complete(res.id.clone())
-                                    .expect("Received response for unknown request");
+        let handler = self
+            .req_queue
+            .outgoing
+            .complete(res.id.clone())
+            .expect("Received response for unknown request");
         handler(self, res)
     }
 
@@ -172,7 +228,11 @@ impl GlobalState {
 
     fn process_vfs_msg(&mut self, msg: vfs::loader::Message) {
         match msg {
-            vfs::loader::Message::Progress { n_total, n_done, config_version } => {
+            vfs::loader::Message::Progress {
+                n_total,
+                n_done,
+                config_version,
+            } => {
                 always!(config_version <= self.vfs_config_version);
 
                 self.vfs_progress_config_version = config_version;

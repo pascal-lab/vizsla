@@ -65,18 +65,23 @@ impl Pool {
             handles.push(handle);
         }
 
-        Pool { _handles: handles, extant_tasks, job_sender }
+        Pool {
+            _handles: handles,
+            extant_tasks,
+            job_sender,
+        }
     }
 
     pub fn spawn<F>(&self, intent: ThreadIntent, f: F)
-        where
-            F: FnOnce() + Send + 'static,
+    where
+        F: FnOnce() + Send + 'static,
     {
-        let f = Box::new(move || {
-            f()
-        });
+        let f = Box::new(move || f());
 
-        let job = Job { requested_intent: intent, f };
+        let job = Job {
+            requested_intent: intent,
+            f,
+        };
         self.job_sender.send(job).unwrap();
     }
 
@@ -86,12 +91,14 @@ impl Pool {
 }
 
 pub fn spawn<F, T>(intent: ThreadIntent, f: F) -> JoinHandle<T>
-    where
-        F: FnOnce() -> T,
-        F: Send + 'static,
-        T: Send + 'static,
+where
+    F: FnOnce() -> T,
+    F: Send + 'static,
+    T: Send + 'static,
 {
-    Builder::new(intent).spawn(f).expect("failed to spawn thread")
+    Builder::new(intent)
+        .spawn(f)
+        .expect("failed to spawn thread")
 }
 
 pub struct Builder {
@@ -102,32 +109,46 @@ pub struct Builder {
 
 impl Builder {
     pub fn new(intent: ThreadIntent) -> Builder {
-        Builder { intent, inner: jod_thread::Builder::new(), allow_leak: false }
+        Builder {
+            intent,
+            inner: jod_thread::Builder::new(),
+            allow_leak: false,
+        }
     }
 
     pub fn name(self, name: String) -> Builder {
-        Builder { inner: self.inner.name(name), ..self }
+        Builder {
+            inner: self.inner.name(name),
+            ..self
+        }
     }
 
     pub fn stack_size(self, size: usize) -> Builder {
-        Builder { inner: self.inner.stack_size(size), ..self }
+        Builder {
+            inner: self.inner.stack_size(size),
+            ..self
+        }
     }
 
     pub fn allow_leak(self, b: bool) -> Builder {
-        Builder { allow_leak: b, ..self }
+        Builder {
+            allow_leak: b,
+            ..self
+        }
     }
 
     pub fn spawn<F, T>(self, f: F) -> std::io::Result<JoinHandle<T>>
-        where
-            F: FnOnce() -> T,
-            F: Send + 'static,
-            T: Send + 'static,
+    where
+        F: FnOnce() -> T,
+        F: Send + 'static,
+        T: Send + 'static,
     {
-        let inner_handle = self.inner.spawn(move || {
-            f()
-        })?;
+        let inner_handle = self.inner.spawn(move || f())?;
 
-        Ok(JoinHandle { inner: Some(inner_handle), allow_leak: self.allow_leak })
+        Ok(JoinHandle {
+            inner: Some(inner_handle),
+            allow_leak: self.allow_leak,
+        })
     }
 }
 

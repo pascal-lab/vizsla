@@ -1,8 +1,11 @@
 use rustc_hash::FxHashSet;
 use triomphe::Arc;
-use vfs::{FileId, AnchoredPath};
+use vfs::{AnchoredPath, FileId};
 
-use crate::{package_graph::{PackageId, PackageGraph}, source_root::{SourceRootId, SourceRoot}};
+use crate::{
+    package_graph::{PackageGraph, PackageId},
+    source_root::{SourceRoot, SourceRootId},
+};
 
 pub trait FileLoader {
     fn file_text(&self, file_id: FileId) -> Arc<str>;
@@ -43,9 +46,12 @@ pub trait SourceRootDb: SourceDb {
 
 fn package_id(db: &dyn SourceRootDb, id: SourceRootId) -> Arc<FxHashSet<PackageId>> {
     let graph = db.package_graph();
-    let res = graph.iter().filter(|&pack_id| {
-        let root_file = graph[pack_id].root_file_id;
-        db.source_root_id(root_file) == id
-    }).collect();
+    let res = graph
+        .iter()
+        .filter(|&pack_id| {
+            let root_file = graph[pack_id].root_file_id;
+            db.source_root_id(root_file) == id
+        })
+        .collect();
     Arc::new(res)
 }

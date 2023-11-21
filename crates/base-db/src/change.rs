@@ -3,7 +3,7 @@ use triomphe::Arc;
 
 use vfs::FileId;
 
-use crate::{source_root::SourceRoot, source_database::SourceRootDb, package_graph::{PackageGraph}};
+use crate::{package_graph::PackageGraph, source_database::SourceRootDb, source_root::SourceRoot};
 
 #[derive(Debug, Default)]
 pub struct Change {

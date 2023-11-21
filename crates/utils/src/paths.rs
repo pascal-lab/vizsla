@@ -3,10 +3,10 @@
 
 use std::{
     borrow::Borrow,
+    convert::{TryFrom, TryInto},
     ffi::OsStr,
     fmt, ops,
     path::{Component, Path, PathBuf, Prefix},
-    convert::{TryFrom, TryInto},
 };
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
@@ -241,13 +241,12 @@ impl RelPath {
 
 fn normalize(path: &Path) -> PathBuf {
     let mut components = path.components().peekable();
-    let mut ret =
-        if let Some(c @ Component::Prefix(..)) = components.peek().copied() {
-            components.next();
-            PathBuf::from(c.as_os_str())
-        } else {
-            PathBuf::new()
-        };
+    let mut ret = if let Some(c @ Component::Prefix(..)) = components.peek().copied() {
+        components.next();
+        PathBuf::from(c.as_os_str())
+    } else {
+        PathBuf::new()
+    };
 
     for component in components {
         match component {

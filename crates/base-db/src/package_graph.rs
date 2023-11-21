@@ -1,8 +1,11 @@
 use la_arena::{Arena, Idx};
 use rustc_hash::FxHashSet;
 use smol_str::SmolStr;
+use std::{
+    fmt,
+    ops::{self, Index},
+};
 use vfs::FileId;
-use std::{fmt, ops::{Index, self}};
 
 #[derive(Default)]
 pub struct PackageGraph {
@@ -14,10 +17,17 @@ impl PackageGraph {
         self.arena.alloc(package)
     }
 
-    pub fn add_dep(&mut self, from: PackageId, dep: PackageDependency) -> Result<(), CyclicDependenciesError> {
+    pub fn add_dep(
+        &mut self,
+        from: PackageId,
+        dep: PackageDependency,
+    ) -> Result<(), CyclicDependenciesError> {
         if let Some(path) = self.find_path(from, dep.package_id) {
             // &&* is used to make self immutable to make borrow checker happy
-            return Err(CyclicDependenciesError { graph: &&*self, path });
+            return Err(CyclicDependenciesError {
+                graph: &&*self,
+                path,
+            });
         }
 
         self.arena[from].add_dep(dep);
@@ -25,8 +35,12 @@ impl PackageGraph {
     }
 
     fn find_path(&self, from: PackageId, to: PackageId) -> Option<Vec<PackageId>> {
-        fn dfs(packs: &PackageGraph, visited: &mut FxHashSet<PackageId>,
-                    cur: PackageId, to: PackageId) -> Option<Vec<PackageId>> {
+        fn dfs(
+            packs: &PackageGraph,
+            visited: &mut FxHashSet<PackageId>,
+            cur: PackageId,
+            to: PackageId,
+        ) -> Option<Vec<PackageId>> {
             if cur == to {
                 return Some(vec![to]);
             }
@@ -69,7 +83,11 @@ impl PackageGraph {
 impl fmt::Debug for PackageGraph {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_map()
-            .entries(self.arena.iter().map(|(id, data)| (u32::from(id.into_raw()), data)))
+            .entries(
+                self.arena
+                    .iter()
+                    .map(|(id, data)| (u32::from(id.into_raw()), data)),
+            )
             .finish()
     }
 }
@@ -127,9 +145,11 @@ impl<'a> CyclicDependenciesError<'a> {
 
 impl<'a> fmt::Display for CyclicDependenciesError<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let path = self.path.iter()
-                            .map(|idx| self.get_pack_info(*idx).name.to_string())
-                            .collect::<Vec<String>>()
+        let path = self
+            .path
+            .iter()
+            .map(|idx| self.get_pack_info(*idx).name.to_string())
+            .collect::<Vec<String>>()
             .join(" -> ");
         write!(f, "{}", path)
     }

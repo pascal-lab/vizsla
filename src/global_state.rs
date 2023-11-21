@@ -1,17 +1,24 @@
-use std::time::Instant;
 use base_db::change::Change;
-use crossbeam_channel::{Sender, unbounded, Receiver};
+use crossbeam_channel::{unbounded, Receiver, Sender};
 use lsp_server::{Message, ReqQueue, Request};
-use lsp_types::{request, notification};
+use lsp_types::{notification, request};
 use nohash_hasher::IntMap;
-use parking_lot::{RwLock, RwLockWriteGuard, RwLockUpgradableReadGuard};
+use parking_lot::{RwLock, RwLockUpgradableReadGuard, RwLockWriteGuard};
+use project_model::workspace::ProjectWorkspace;
 use rustc_hash::FxHashMap;
+use std::time::Instant;
 use triomphe::Arc;
-use utils::thread::{Pool, ThreadIntent};
+use utils::{
+    op_queue::OpQueue,
+    thread::{Pool, ThreadIntent},
+};
 
-use crate::{config::Config, main_loop::Task, mem_docs::MemDocs, line_idx::LineEndings};
-use vfs::{self, FileId, ChangedFile};
-use ide::{self, analysis_host::{AnalysisHost, Analysis}};
+use crate::{config::Config, line_idx::LineEndings, main_loop::Task, mem_docs::MemDocs};
+use ide::{
+    self,
+    analysis_host::{Analysis, AnalysisHost},
+};
+use vfs::{self, ChangedFile, FileId};
 
 type ReqHandler = fn(&mut GlobalState, lsp_server::Response);
 
@@ -22,7 +29,10 @@ pub(crate) struct TaskPool<T> {
 
 impl<T> TaskPool<T> {
     pub(crate) fn new_with_threads_num(sender: Sender<T>, threads_num: usize) -> TaskPool<T> {
-        TaskPool { sender, pool: Pool::new(threads_num) }
+        TaskPool {
+            sender,
+            pool: Pool::new(threads_num),
+        }
     }
 
     pub(crate) fn spawn_and_send<F>(&mut self, intent: ThreadIntent, task: F)
@@ -91,7 +101,8 @@ impl GlobalState {
     pub(crate) fn new(sender: Sender<lsp_server::Message>, config: Config) -> GlobalState {
         let vfs_loader = {
             let (sender, receiver) = unbounded::<vfs::loader::Message>();
-            let handle: vfs_notify::NotifyHandle = vfs::loader::Handle::spawn(Box::new(move |msg| sender.send(msg).unwrap()));
+            let handle: vfs_notify::NotifyHandle =
+                vfs::loader::Handle::spawn(Box::new(move |msg| sender.send(msg).unwrap()));
             let handle = Box::new(handle) as Box<dyn vfs::loader::Handle>;
             Handle { handle, receiver }
         };
@@ -133,7 +144,9 @@ impl GlobalState {
     }
 
     pub(crate) fn register_request(&mut self, req_received: Instant, req: &Request) {
-        self.req_queue.incoming.register(req.id.clone(), (req.method.clone(), req_received));
+        self.req_queue
+            .incoming
+            .register(req.id.clone(), (req.method.clone(), req_received));
     }
 
     pub(crate) fn is_completed(&self, req: &Request) -> bool {
@@ -215,26 +228,33 @@ impl GlobalState {
 
         let mut file_changes = FxHashMap::default();
         for changed_file in vfs_changes {
-            file_changes.entry(changed_file.file_id)
-                        .and_modify(|(change, just_created)| {
-                            match (change, just_created, changed_file.change_kind) {
-                                (change, _, Delete) => *change = Delete,
-                                (Create, _, Create | Modify) => {}
-                                (Modify, _, Modify) => {}
-                                (change @ Delete, just_created, Create) => {
-                                    *change = Modify;
-                                    *just_created = true;
-                                }
-                                (Delete, _, Modify) | (Modify, _, Create) => unreachable!(),
-                            }
-                        })
-                        .or_insert((changed_file.change_kind, matches!(changed_file.change_kind, Create)));
-        };
+            file_changes
+                .entry(changed_file.file_id)
+                .and_modify(|(change, just_created)| {
+                    match (change, just_created, changed_file.change_kind) {
+                        (change, _, Delete) => *change = Delete,
+                        (Create, _, Create | Modify) => {}
+                        (Modify, _, Modify) => {}
+                        (change @ Delete, just_created, Create) => {
+                            *change = Modify;
+                            *just_created = true;
+                        }
+                        (Delete, _, Modify) | (Modify, _, Create) => unreachable!(),
+                    }
+                })
+                .or_insert((
+                    changed_file.change_kind,
+                    matches!(changed_file.change_kind, Create),
+                ));
+        }
 
         let changed_file = file_changes
             .into_iter()
-            .filter(|(_, ( kind, just_created))| !(*kind == Delete && *just_created))
-            .map(|(file_id, (change_kind, _))| vfs::ChangedFile { file_id, change_kind })
+            .filter(|(_, (kind, just_created))| !(*kind == Delete && *just_created))
+            .map(|(file_id, (change_kind, _))| vfs::ChangedFile {
+                file_id,
+                change_kind,
+            })
             .collect::<Vec<_>>();
 
         Some(changed_file)
@@ -266,8 +286,15 @@ impl GlobalState {
         self.send(notif.into());
     }
 
-    pub(crate) fn send_request<R: request::Request>(&mut self, params: R::Params, handler: ReqHandler) {
-        let request = self.req_queue.outgoing.register(R::METHOD.to_string(), params, handler);
+    pub(crate) fn send_request<R: request::Request>(
+        &mut self,
+        params: R::Params,
+        handler: ReqHandler,
+    ) {
+        let request = self
+            .req_queue
+            .outgoing
+            .register(R::METHOD.to_string(), params, handler);
         self.send(request.into());
     }
 
@@ -293,7 +320,7 @@ impl GlobalState {
         message: Option<String>,
         fraction: Option<f64>,
         cancel_token: Option<String>,
-    ){
+    ) {
         // TODO: check if work_down_progress enabled in config
         // if !self.config.work_done_progress() {
         //     return;
@@ -313,7 +340,9 @@ impl GlobalState {
         let work_done_progress = match state {
             Progress::Begin => {
                 self.send_request::<request::WorkDoneProgressCreate>(
-                    lsp_types::WorkDoneProgressCreateParams { token: token.clone() },
+                    lsp_types::WorkDoneProgressCreateParams {
+                        token: token.clone(),
+                    },
                     |_, _| (),
                 );
 

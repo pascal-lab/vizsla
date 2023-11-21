@@ -1,13 +1,18 @@
 use std::{fmt, mem::ManuallyDrop};
 
-use base_db::{self, salsa::{self, Durability}, source_database::{FileLoader, SourceDb, SourceRootDb}, package_graph::PackageId};
+use base_db::{
+    self,
+    package_graph::PackageId,
+    salsa::{self, Durability},
+    source_database::{FileLoader, SourceDb, SourceRootDb},
+};
 use rustc_hash::FxHashSet;
 use triomphe::Arc;
-use vfs::{FileId, AnchoredPath};
+use vfs::{AnchoredPath, FileId};
 
 #[salsa::database(
     base_db::source_database::SourceDbStorage,
-    base_db::source_database::SourceRootDbStorage,
+    base_db::source_database::SourceRootDbStorage
 )]
 
 pub struct RootDb {
@@ -51,7 +56,9 @@ pub const DEFAULT_PARSE_LRU_CAP: usize = 128;
 
 impl RootDb {
     pub fn new(lru_capacity: Option<usize>) -> RootDb {
-        let mut db = RootDb { storage: ManuallyDrop::new(salsa::Storage::default()) };
+        let mut db = RootDb {
+            storage: ManuallyDrop::new(salsa::Storage::default()),
+        };
         db.set_package_graph_with_durability(Default::default(), Durability::HIGH);
         db.update_parse_query_lru_capacity(lru_capacity);
         db
@@ -65,6 +72,8 @@ impl RootDb {
 
 impl salsa::ParallelDatabase for RootDb {
     fn snapshot(&self) -> salsa::Snapshot<RootDb> {
-        salsa::Snapshot::new(RootDb { storage: ManuallyDrop::new(self.storage.snapshot()) })
+        salsa::Snapshot::new(RootDb {
+            storage: ManuallyDrop::new(self.storage.snapshot()),
+        })
     }
 }

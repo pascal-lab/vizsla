@@ -1,11 +1,11 @@
-use std::{fs, collections::HashSet, ops::Not};
+use std::{collections::HashSet, fs, ops::Not};
 
 use crossbeam_channel::{never, select, unbounded, Receiver, Sender};
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 use utils::paths::{AbsPath, AbsPathBuf};
+use utils::thread;
 use vfs::loader;
 use walkdir::WalkDir;
-use utils::thread;
 
 #[derive(Debug)]
 pub struct NotifyHandle {
@@ -28,7 +28,10 @@ impl loader::Handle for NotifyHandle {
             .name("VfsLoader".to_owned())
             .spawn(move || actor.run(receiver))
             .expect("failed to spawn thread");
-        NotifyHandle { sender, thread_handler: thread }
+        NotifyHandle {
+            sender,
+            thread_handler: thread,
+        }
     }
 
     fn set_config(&mut self, config: loader::Config) {
@@ -61,12 +64,15 @@ enum Event {
 
 impl NotifyActor {
     fn new(sender: loader::Sender) -> NotifyActor {
-        NotifyActor { sender, watched_entries: Vec::new(), watcher: None }
+        NotifyActor {
+            sender,
+            watched_entries: Vec::new(),
+            watcher: None,
+        }
     }
 
     fn next_event(&self, receiver: &Receiver<ServerMsg>) -> Option<Event> {
-        let watcher_receiver = self.watcher.as_ref()
-                                           .map(|(_, receiver)| receiver);
+        let watcher_receiver = self.watcher.as_ref().map(|(_, receiver)| receiver);
         select! {
             recv(receiver) -> it => it.ok().map(Event::ServerMsg),
             recv(watcher_receiver.unwrap_or(&never())) -> it => Some(Event::FsEvent(it.unwrap())),
@@ -82,8 +88,10 @@ impl NotifyActor {
                         self.watcher = None;
                         if !config.to_watch.is_empty() {
                             let (watcher_sender, watcher_receiver) = unbounded();
-                            let watcher = log_notify_error(
-                                RecommendedWatcher::new(move |event| { watcher_sender.send(event).unwrap(); },
+                            let watcher = log_notify_error(RecommendedWatcher::new(
+                                move |event| {
+                                    watcher_sender.send(event).unwrap();
+                                },
                                 Config::default(),
                             ));
                             self.watcher = watcher.map(|it| (it, watcher_receiver));
@@ -92,7 +100,11 @@ impl NotifyActor {
                         let config_version = config.version;
 
                         let n_total = config.to_load.len();
-                        self.send(loader::Message::Progress { n_total, n_done: 0, config_version });
+                        self.send(loader::Message::Progress {
+                            n_total,
+                            n_done: 0,
+                            config_version,
+                        });
 
                         self.watched_entries.clear();
 
@@ -119,32 +131,46 @@ impl NotifyActor {
                 },
                 Event::FsEvent(event) => {
                     if let Some(event) = log_notify_error(event) {
-                        let abs_paths = event.paths.into_iter().map(|path| AbsPathBuf::try_from(path).unwrap());
-                        let files = abs_paths.filter_map(|path| {
-                            let meta = fs::metadata(&path).ok()?;
-                            let is_file = meta.file_type().is_dir();
-                            let is_dir = meta.file_type().is_file();
+                        let abs_paths = event
+                            .paths
+                            .into_iter()
+                            .map(|path| AbsPathBuf::try_from(path).unwrap());
+                        let files = abs_paths
+                            .filter_map(|path| {
+                                let meta = fs::metadata(&path).ok()?;
+                                let is_file = meta.file_type().is_dir();
+                                let is_dir = meta.file_type().is_file();
 
-                            if is_dir {
-                                if self.watched_entries.iter().any(|entry| entry.contains_dir(&path)) {
-                                    self.watch(path);
+                                if is_dir {
+                                    if self
+                                        .watched_entries
+                                        .iter()
+                                        .any(|entry| entry.contains_dir(&path))
+                                    {
+                                        self.watch(path);
+                                    }
+
+                                    return None;
                                 }
 
-                                return None;
-                            }
+                                if !is_file {
+                                    return None;
+                                }
 
-                            if !is_file {
-                                return None;
-                            }
+                                if self
+                                    .watched_entries
+                                    .iter()
+                                    .any(|entry| entry.contains_file(&path))
+                                    .not()
+                                {
+                                    return None;
+                                }
 
-                            if self.watched_entries.iter().any(|entry| entry.contains_file(&path)).not() {
-                                return None;
-                            }
+                                let contents = read(&path);
 
-                            let contents = read(&path);
-
-                            Some((path, contents))
-                        }).collect();
+                                Some((path, contents))
+                            })
+                            .collect();
 
                         self.send(loader::Message::Loaded { files });
                     }
@@ -153,26 +179,41 @@ impl NotifyActor {
         }
     }
 
-    fn load_entry(&mut self, entry: loader::Entry, watch: bool) -> Vec<(AbsPathBuf, Option<Vec<u8>>)> {
+    fn load_entry(
+        &mut self,
+        entry: loader::Entry,
+        watch: bool,
+    ) -> Vec<(AbsPathBuf, Option<Vec<u8>>)> {
         match entry {
-            loader::Entry::Files(files) => files.into_iter().map(|file| {
-                if watch {
-                    self.watch(file.clone());
-                }
-                let contents = read(file.as_path());
-                (file, contents)
-            }).collect::<Vec<_>>(),
+            loader::Entry::Files(files) => files
+                .into_iter()
+                .map(|file| {
+                    if watch {
+                        self.watch(file.clone());
+                    }
+                    let contents = read(file.as_path());
+                    (file, contents)
+                })
+                .collect::<Vec<_>>(),
             loader::Entry::Directories(dirs) => {
                 let mut res = Vec::new();
 
                 for root in &dirs.include {
-                    let walkdir = WalkDir::new(root).follow_links(true).into_iter().filter_entry(|entry| {
-                        if !entry.file_type().is_dir() {
-                            return true;
-                        }
-                        let path = AbsPath::assert(entry.path());
-                        root == path || dirs.exclude.iter().chain(&dirs.include).all(|it| it != path)
-                    });
+                    let walkdir = WalkDir::new(root)
+                        .follow_links(true)
+                        .into_iter()
+                        .filter_entry(|entry| {
+                            if !entry.file_type().is_dir() {
+                                return true;
+                            }
+                            let path = AbsPath::assert(entry.path());
+                            root == path
+                                || dirs
+                                    .exclude
+                                    .iter()
+                                    .chain(&dirs.include)
+                                    .all(|it| it != path)
+                        });
 
                     let files = walkdir.filter_map(|it| it.ok()).filter_map(|entry| {
                         let is_dir = entry.file_type().is_dir();
@@ -222,5 +263,6 @@ fn read(path: &AbsPath) -> Option<Vec<u8>> {
 }
 
 fn log_notify_error<T>(res: notify::Result<T>) -> Option<T> {
-    res.map_err(|err| tracing::warn!("notify error: {}", err)).ok()
+    res.map_err(|err| tracing::warn!("notify error: {}", err))
+        .ok()
 }

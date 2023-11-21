@@ -1,22 +1,23 @@
-use lsp_types::{
-    ClientCapabilities, CodeActionKind, CodeActionOptions, CodeLensOptions, CompletionOptions,
-    CompletionOptionsCompletionItem, DocumentOnTypeFormattingOptions, FileOperationFilter,
-    FileOperationPattern, FileOperationPatternKind, FileOperationRegistrationOptions,
-    InlayHintOptions, PositionEncodingKind, RenameOptions, SaveOptions, SemanticTokensFullOptions,
-    SemanticTokensLegend, SemanticTokensOptions, ServerCapabilities, SignatureHelpOptions,
-    TextDocumentSyncKind, TextDocumentSyncOptions, WorkDoneProgressOptions,
-    WorkspaceFileOperationsServerCapabilities, WorkspaceFoldersServerCapabilities,
-    WorkspaceServerCapabilities, OneOf, DeclarationCapability, InlayHintServerCapabilities,
-};
-use project_model::project_manifest::ProjectManifest;
-use serde::de::DeserializeOwned;
-use serde_json::Error;
-use utils::paths::AbsPathBuf;
-use std::{iter, path::PathBuf};
 use crate::{
     line_idx::{PositionEncoding, WideEncoding},
     Opt,
 };
+use lsp_types::{
+    ClientCapabilities, CodeActionKind, CodeActionOptions, CodeLensOptions, CompletionOptions,
+    CompletionOptionsCompletionItem, DeclarationCapability, DocumentOnTypeFormattingOptions,
+    FileOperationFilter, FileOperationPattern, FileOperationPatternKind,
+    FileOperationRegistrationOptions, InlayHintOptions, InlayHintServerCapabilities, OneOf,
+    PositionEncodingKind, RenameOptions, SaveOptions, SemanticTokensFullOptions,
+    SemanticTokensLegend, SemanticTokensOptions, ServerCapabilities, SignatureHelpOptions,
+    TextDocumentSyncKind, TextDocumentSyncOptions, WorkDoneProgressOptions,
+    WorkspaceFileOperationsServerCapabilities, WorkspaceFoldersServerCapabilities,
+    WorkspaceServerCapabilities,
+};
+use project_model::project_manifest::ProjectManifest;
+use serde::de::DeserializeOwned;
+use serde_json::Error;
+use std::{iter, path::PathBuf};
+use utils::paths::AbsPathBuf;
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -30,9 +31,7 @@ pub struct Config {
 }
 
 #[derive(Debug, Clone)]
-pub struct Snippet {
-
-}
+pub struct Snippet {}
 
 #[derive(Debug, Clone)]
 pub struct UserConfig {}
@@ -78,28 +77,43 @@ impl Config {
     }
 
     pub fn cli_completion_label_details_support(&self) -> bool {
-        try_!(self.client_caps
-              .text_document.as_ref()?
-              .completion.as_ref()?
-              .completion_item.as_ref()?
-              .label_details_support.as_ref()?
-        ).is_some()
+        try_!(self
+            .client_caps
+            .text_document
+            .as_ref()?
+            .completion
+            .as_ref()?
+            .completion_item
+            .as_ref()?
+            .label_details_support
+            .as_ref()?)
+        .is_some()
     }
 
     pub fn cli_completion_item_edit_resolve(&self) -> bool {
-        try_!(self.client_caps.text_document.as_ref()?
-              .completion.as_ref()?
-              .completion_item.as_ref()?
-              .resolve_support.as_ref()?
-              .properties.iter()
-              .any(|cap_string| cap_string.as_str() == "additionalTextEdits")
-        ) == Some(true)
+        try_!(self
+            .client_caps
+            .text_document
+            .as_ref()?
+            .completion
+            .as_ref()?
+            .completion_item
+            .as_ref()?
+            .resolve_support
+            .as_ref()?
+            .properties
+            .iter()
+            .any(|cap_string| cap_string.as_str() == "additionalTextEdits"))
+            == Some(true)
     }
 
     pub fn cli_did_save_dyn_reg_support(&self) -> bool {
-        let caps = try_or_default!(self.client_caps.text_document.as_ref()?
-                                   .synchronization.clone()?
-        );
+        let caps = try_or_default!(self
+            .client_caps
+            .text_document
+            .as_ref()?
+            .synchronization
+            .clone()?);
         caps.did_save == Some(true) && caps.dynamic_registration == Some(true)
     }
 
@@ -143,29 +157,39 @@ impl Config {
                     WideEncoding::Utf32 => Some(PositionEncodingKind::UTF32),
                 },
             },
-            text_document_sync: Some(TextDocumentSyncOptions {
-                open_close: true.into(),
-                change: TextDocumentSyncKind::INCREMENTAL.into(),
-                will_save: None,
-                will_save_wait_until: None,
-                save: Some(SaveOptions::default().into()),
-            }.into()),
+            text_document_sync: Some(
+                TextDocumentSyncOptions {
+                    open_close: true.into(),
+                    change: TextDocumentSyncKind::INCREMENTAL.into(),
+                    will_save: None,
+                    will_save_wait_until: None,
+                    save: Some(SaveOptions::default().into()),
+                }
+                .into(),
+            ),
             selection_range_provider: Some(true.into()),
             hover_provider: Some(true.into()),
             completion_provider: CompletionOptions {
                 resolve_provider: self.cli_completion_item_edit_resolve().into(),
                 trigger_characters: Some([":", ",", "'", "(", "`"].map(String::from).into()),
                 all_commit_characters: None,
-                completion_item: CompletionOptionsCompletionItem{
+                completion_item: CompletionOptionsCompletionItem {
                     label_details_support: self.cli_completion_label_details_support().into(),
-                }.into(),
-                work_done_progress_options: WorkDoneProgressOptions { work_done_progress: None },
-            }.into(),
+                }
+                .into(),
+                work_done_progress_options: WorkDoneProgressOptions {
+                    work_done_progress: None,
+                },
+            }
+            .into(),
             signature_help_provider: SignatureHelpOptions {
                 trigger_characters: Some(["(", ",", "`"].map(String::from).into()),
                 retrigger_characters: None,
-                work_done_progress_options: WorkDoneProgressOptions { work_done_progress: None },
-            }.into(),
+                work_done_progress_options: WorkDoneProgressOptions {
+                    work_done_progress: None,
+                },
+            }
+            .into(),
             declaration_provider: Some(DeclarationCapability::Simple(true)),
             definition_provider: OneOf::Left(true).into(),
             type_definition_provider: Some(true.into()),
@@ -175,11 +199,15 @@ impl Config {
             document_symbol_provider: OneOf::Left(true).into(),
             workspace_symbol_provider: OneOf::Left(true).into(),
             code_action_provider: Some({
-                try_!(self.client_caps
-                      .text_document.as_ref()?
-                      .code_action.as_ref()?
-                      .code_action_literal_support.as_ref()?
-                ).map_or(true.into(), |_| {
+                try_!(self
+                    .client_caps
+                    .text_document
+                    .as_ref()?
+                    .code_action
+                    .as_ref()?
+                    .code_action_literal_support
+                    .as_ref()?)
+                .map_or(true.into(), |_| {
                     CodeActionOptions {
                         code_action_kinds: vec![
                             CodeActionKind::EMPTY,
@@ -188,23 +216,32 @@ impl Config {
                             CodeActionKind::REFACTOR_EXTRACT,
                             CodeActionKind::REFACTOR_INLINE,
                             CodeActionKind::REFACTOR_REWRITE,
-                        ].into(),
+                        ]
+                        .into(),
                         resolve_provider: true.into(),
                         work_done_progress_options: Default::default(),
-                    }.into()
+                    }
+                    .into()
                 })
             }),
-            code_lens_provider: CodeLensOptions { resolve_provider: true.into() }.into(),
+            code_lens_provider: CodeLensOptions {
+                resolve_provider: true.into(),
+            }
+            .into(),
             document_formatting_provider: OneOf::Left(true).into(),
             document_range_formatting_provider: OneOf::Left(true).into(),
             document_on_type_formatting_provider: DocumentOnTypeFormattingOptions {
                 first_trigger_character: "=".to_string(),
                 more_trigger_character: Some([".", ">", "{", "(", "<"].map(String::from).into()),
-            }.into(),
+            }
+            .into(),
             rename_provider: OneOf::Right(RenameOptions {
                 prepare_provider: true.into(),
-                work_done_progress_options: WorkDoneProgressOptions { work_done_progress: None },
-            }).into(),
+                work_done_progress_options: WorkDoneProgressOptions {
+                    work_done_progress: None,
+                },
+            })
+            .into(),
             document_link_provider: None,
             color_provider: None,
             folding_range_provider: Some(true.into()),
@@ -213,7 +250,8 @@ impl Config {
                 workspace_folders: WorkspaceFoldersServerCapabilities {
                     supported: true.into(),
                     change_notifications: OneOf::Left(true).into(),
-                }.into(),
+                }
+                .into(),
                 file_operations: WorkspaceFileOperationsServerCapabilities {
                     did_create: None,
                     will_create: None,
@@ -237,34 +275,41 @@ impl Config {
                                 },
                             },
                         ],
-                    }.into(),
+                    }
+                    .into(),
                     did_delete: None,
                     will_delete: None,
-                }.into(),
-            }.into(),
-            // TODO:
+                }
+                .into(),
+            }
+            .into(),
             call_hierarchy_provider: Some(true.into()),
-            semantic_tokens_provider: Some(SemanticTokensOptions {
-                // TODO:
-                legend: SemanticTokensLegend::default(),
-                // {
-                //     token_types: SemanticTokensLegend::
-                //     token_modifiers: semantic_tokens::SUPPORTED_MODIFIERS.to_vec(),
-                // },
-                full: SemanticTokensFullOptions::Delta { delta: true.into() }.into(),
-                range: true.into(),
-                work_done_progress_options: Default::default(),
-            }.into()),
+            semantic_tokens_provider: Some(
+                SemanticTokensOptions {
+                    // TODO:
+                    legend: SemanticTokensLegend::default(),
+                    // {
+                    //     token_types: SemanticTokensLegend::
+                    //     token_modifiers: semantic_tokens::SUPPORTED_MODIFIERS.to_vec(),
+                    // },
+                    full: SemanticTokensFullOptions::Delta { delta: true.into() }.into(),
+                    range: true.into(),
+                    work_done_progress_options: Default::default(),
+                }
+                .into(),
+            ),
             moniker_provider: None,
             linked_editing_range_provider: None,
             inline_value_provider: None,
             inlay_hint_provider: OneOf::Right(InlayHintServerCapabilities::Options(
                 InlayHintOptions {
-                work_done_progress_options: Default::default(),
-                resolve_provider: true.into(),
-            })).into(),
+                    work_done_progress_options: Default::default(),
+                    resolve_provider: true.into(),
+                },
+            ))
+            .into(),
             diagnostic_provider: None,
-            experimental: None
+            experimental: None,
         }
     }
 }
@@ -301,8 +346,14 @@ pub fn get_field<T: DeserializeOwned>(
         })
 }
 
-pub fn parse_initialization_options(mut options: serde_json::Value)
-                                    -> (UserConfig, Vec<AbsPathBuf>, Vec<Snippet>, Vec<(String, Error)>){
+pub fn parse_initialization_options(
+    mut options: serde_json::Value,
+) -> (
+    UserConfig,
+    Vec<AbsPathBuf>,
+    Vec<Snippet>,
+    Vec<(String, Error)>,
+) {
     tracing::info!("Server initialized with options: {:#}", options);
     if options.is_null() || options.as_object().map_or(false, |obj| obj.is_empty()) {
         return Default::default();
@@ -313,10 +364,11 @@ pub fn parse_initialization_options(mut options: serde_json::Value)
     // TODO: user configuration in package.json
     let user_config: UserConfig = UserConfig {};
 
-    let detached_files = get_field::<Vec<PathBuf>>(&mut options, &mut errors, "detachedFiles", None, "[]")
-        .into_iter()
-        .map(AbsPathBuf::assert)
-        .collect::<Vec<AbsPathBuf>>();
+    let detached_files =
+        get_field::<Vec<PathBuf>>(&mut options, &mut errors, "detachedFiles", None, "[]")
+            .into_iter()
+            .map(AbsPathBuf::assert)
+            .collect::<Vec<AbsPathBuf>>();
 
     // TODO: user-defined snippets
     let snippets: Vec<Snippet> = Vec::new();
