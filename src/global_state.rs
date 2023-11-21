@@ -82,6 +82,9 @@ pub(crate) struct GlobalState {
     pub(crate) vfs_progress_config_version: u32,
     pub(crate) vfs_progress_n_total: usize,
     pub(crate) vfs_progress_n_done: usize,
+
+    pub(crate) fetch_workspaces_queue:
+        OpQueue<bool, Option<(Vec<anyhow::Result<ProjectWorkspace>>, bool)>>,
 }
 
 // immutable
@@ -130,6 +133,8 @@ impl GlobalState {
             vfs_progress_config_version: 0,
             vfs_progress_n_total: 0,
             vfs_progress_n_done: 0,
+
+            fetch_workspaces_queue: OpQueue::default(),
         }
     }
 
