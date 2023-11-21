@@ -4,7 +4,7 @@ use lsp_server::{Message, ReqQueue, Request};
 use lsp_types::{notification, request};
 use nohash_hasher::IntMap;
 use parking_lot::{RwLock, RwLockUpgradableReadGuard, RwLockWriteGuard};
-use project_model::workspace::ProjectWorkspace;
+use project_model::workspace::Workspace;
 use rustc_hash::FxHashMap;
 use std::time::Instant;
 use triomphe::Arc;

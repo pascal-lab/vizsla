@@ -2,12 +2,12 @@ use vfs::AbsPathBuf;
 
 use crate::project_manifest::ProjectManifest;
 
-pub struct ProjectWorkspace {
+pub struct Workspace {
     workspace_root: AbsPathBuf,
 }
 
-impl ProjectWorkspace {
-    pub fn load(manifest: ProjectManifest) -> anyhow::Result<ProjectWorkspace> {
+impl Workspace {
+    pub fn load(manifest: ProjectManifest) -> anyhow::Result<Workspace> {
         todo!()
     }
 }
