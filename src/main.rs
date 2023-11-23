@@ -15,6 +15,7 @@ use utils::{
     paths::{patch_path_prefix, AbsPathBuf},
 };
 
+mod caps;
 mod config;
 
 use config::Config;
