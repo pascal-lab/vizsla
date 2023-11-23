@@ -11,6 +11,7 @@ use vfs::VfsPath;
 use crate::{
     dispatcher::{NotifDispatcher, ReqDispatcher},
     global_state::{GlobalState, Progress},
+    reload::FetchWorkspaceProgress,
     Config,
 };
 
@@ -25,6 +26,7 @@ enum Event {
 pub(crate) enum Task {
     Response(lsp_server::Response),
     Retry(lsp_server::Request),
+    FetchWorkspace(FetchWorkspaceProgress),
     // Diagnostics(Vec<(FileId, Vec<lsp_types::Diagnostic>)>)
 }
 
@@ -46,9 +48,15 @@ pub fn main_loop(config: Config, connection: Connection) -> anyhow::Result<()> {
 impl GlobalState {
     pub(crate) fn run(&mut self, cli_inbox: Receiver<lsp_server::Message>) -> anyhow::Result<()> {
         // TODO: check for status
-        // TODO: fetch workspace
 
-        if self.config.cli_did_save_dyn_reg_support() {}
+        if self.config.cli_did_save_dyn_reg_support() {
+            self.register_did_save_cap();
+        }
+
+        self.fetch_workspace_task.request("Start".into(), ());
+        if let Some((cause, ())) = self.fetch_workspace_task.can_start() {
+            self.fetch_workspaces(cause);
+        }
 
         while let Some(event) = self.next_event(&cli_inbox) {
             match &event {
@@ -61,12 +69,12 @@ impl GlobalState {
             }
         }
         anyhow::bail!(
-            "Server {} exited without proper shutdown sequence",
+            "{} exited without proper shutdown sequence",
             &self.config.opt.process_name
         );
     }
 
-    fn register_did_save_capability(&mut self) {
+    fn register_did_save_cap(&mut self) {
         let save_registration_options = lsp_types::TextDocumentSaveRegistrationOptions {
             include_text: false.into(),
             text_document_registration_options: lsp_types::TextDocumentRegistrationOptions {
@@ -213,6 +221,25 @@ impl GlobalState {
                 if !self.is_completed(&req) {
                     self.dispatch_request(req);
                 }
+            }
+            Task::FetchWorkspace(process) => {
+                let state = match process {
+                    FetchWorkspaceProgress::Begin => Progress::Begin,
+                    FetchWorkspaceProgress::End(workspaces, errors) => {
+                        self.fetch_workspace_task
+                            .complete(Some((workspaces, errors)));
+
+                        if let Err(e) = self.fetch_workspace_error_stringify() {
+                            tracing::error!("Fetch workspace error: \n{e}");
+                        }
+
+                        self.switch_workspaces("fetched new workspaces".into());
+
+                        Progress::End
+                    }
+                };
+
+                self.report_progress("Fetching Workspaces", state, None, None, None);
             }
         }
     }
