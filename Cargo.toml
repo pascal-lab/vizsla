@@ -43,6 +43,7 @@ parking_lot = "0.12.1"
 triomphe = "0.1.9"
 la-arena = "0.3.1"
 smol_str = "0.2.0"
+either = "1.9.0"
 
 
 [workspace.dependencies]
