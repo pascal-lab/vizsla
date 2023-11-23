@@ -18,6 +18,7 @@ use utils::{
 mod caps;
 mod config;
 mod reload;
+mod user_config;
 
 use config::Config;
 

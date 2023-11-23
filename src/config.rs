@@ -1,10 +1,10 @@
-use crate::Opt;
+use crate::{user_config::UserConfig, Opt};
 use lsp_types::ClientCapabilities;
 use project_model::project_manifest::ProjectManifest;
 use serde::de::DeserializeOwned;
 use serde_json::Error;
 use std::{iter, path::PathBuf};
-use utils::paths::AbsPathBuf;
+use utils::{json::get_field, paths::AbsPathBuf};
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -19,15 +19,6 @@ pub struct Config {
 
 #[derive(Debug, Clone)]
 pub struct Snippet {}
-
-#[derive(Debug, Clone)]
-pub struct UserConfig {}
-
-impl Default for UserConfig {
-    fn default() -> Self {
-        UserConfig {}
-    }
-}
 
 impl Config {
     pub fn new(
@@ -65,38 +56,6 @@ impl Config {
     }
 }
 
-fn get_field<T: DeserializeOwned>(
-    json: &mut serde_json::Value,
-    error_sink: &mut Vec<(String, serde_json::Error)>,
-    field: &'static str,
-    alias: Option<&'static str>,
-    default: &str,
-) -> T {
-    // check alias first, to work around the VS Code where it pre-fills the
-    // defaults instead of sending an empty object.
-    alias
-        .into_iter()
-        .chain(iter::once(field))
-        .filter_map(move |field| {
-            let mut pointer = field.replace('_', "/");
-            pointer.insert(0, '/');
-            json.pointer_mut(&pointer)
-                .map(|it| serde_json::from_value(it.take()).map_err(|e| (e, pointer)))
-        })
-        .find(Result::is_ok)
-        .and_then(|res| match res {
-            Ok(it) => Some(it),
-            Err((e, pointer)) => {
-                tracing::warn!("Failed to deserialize config field at {}: {:?}", pointer, e);
-                error_sink.push((pointer, e));
-                None
-            }
-        })
-        .unwrap_or_else(|| {
-            serde_json::from_str(default).unwrap_or_else(|e| panic!("{e} on: `{default}`"))
-        })
-}
-
 pub fn parse_initialization_options(
     mut options: serde_json::Value,
 ) -> (UserConfig, Vec<AbsPathBuf>, Vec<Snippet>, Vec<(String, Error)>) {
@@ -107,17 +66,16 @@ pub fn parse_initialization_options(
 
     let mut errors = Vec::new();
 
-    // TODO: user configuration in package.json
-    let user_config: UserConfig = UserConfig {};
-
     let detached_files =
-        get_field::<Vec<PathBuf>>(&mut options, &mut errors, "detachedFiles", None, "[]")
+        get_field::<Vec<PathBuf>>(&mut options, &mut errors, "detachedFiles", "[]")
             .into_iter()
             .map(AbsPathBuf::assert)
             .collect::<Vec<AbsPathBuf>>();
 
     // TODO: user-defined snippets
     let snippets: Vec<Snippet> = Vec::new();
+
+    let user_config = UserConfig::from_json(options, &mut errors);
 
     (user_config, detached_files, snippets, errors)
 }
