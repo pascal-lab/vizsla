@@ -9,7 +9,7 @@ use lsp_types::{
     WorkspaceFileOperationsServerCapabilities, WorkspaceFoldersServerCapabilities,
     WorkspaceServerCapabilities,
 };
-use utils::{try_, try_or_default};
+use utils::{try_, try_or_def, try_or_default};
 
 use crate::{
     config::Config,
@@ -54,6 +54,37 @@ impl Config {
         caps.did_save == Some(true) && caps.dynamic_registration == Some(true)
     }
 
+    pub fn cli_did_change_watched_files_dyn_reg(&self) -> bool {
+        try_or_def!(
+            self.client_caps
+                .workspace
+                .as_ref()?
+                .did_change_watched_files
+                .as_ref()?
+                .dynamic_registration?
+        )
+    }
+
+    fn negotiated_encoding(&self) -> PositionEncoding {
+        let client_encodings = match &self.client_caps.general {
+            Some(general) => general.position_encodings.as_deref().unwrap_or_default(),
+            None => &[],
+        };
+
+        for enc in client_encodings {
+            if enc == &PositionEncodingKind::UTF8 {
+                return PositionEncoding::Utf8;
+            } else if enc == &PositionEncodingKind::UTF32 {
+                return PositionEncoding::Wide(WideEncoding::Utf32);
+            }
+            // NB: intentionally prefer just about anything else to utf-16.
+        }
+
+        PositionEncoding::Wide(WideEncoding::Utf16)
+    }
+}
+
+impl Config {
     pub fn get_server_capabilities(&self) -> ServerCapabilities {
         ServerCapabilities {
             position_encoding: match self.negotiated_encoding() {
@@ -208,23 +239,5 @@ impl Config {
             diagnostic_provider: None,
             experimental: None,
         }
-    }
-
-    fn negotiated_encoding(&self) -> PositionEncoding {
-        let client_encodings = match &self.client_caps.general {
-            Some(general) => general.position_encodings.as_deref().unwrap_or_default(),
-            None => &[],
-        };
-
-        for enc in client_encodings {
-            if enc == &PositionEncodingKind::UTF8 {
-                return PositionEncoding::Utf8;
-            } else if enc == &PositionEncodingKind::UTF32 {
-                return PositionEncoding::Wide(WideEncoding::Utf32);
-            }
-            // NB: intentionally prefer just about anything else to utf-16.
-        }
-
-        PositionEncoding::Wide(WideEncoding::Utf16)
     }
 }

@@ -1,10 +1,22 @@
-use crate::{user_config::UserConfig, Opt};
+use crate::{user_config::{UserConfig, FilesWatcherDef}, Opt};
 use lsp_types::ClientCapabilities;
 use project_model::project_manifest::ProjectManifest;
 use serde::de::DeserializeOwned;
 use serde_json::Error;
 use std::{iter, path::PathBuf};
 use utils::{json::get_field, paths::AbsPathBuf};
+
+#[derive(Debug, Clone)]
+pub struct FilesConfig {
+    pub watcher: FilesWatcher,
+    pub exclude: Vec<AbsPathBuf>,
+}
+
+#[derive(Debug, Clone)]
+pub enum FilesWatcher {
+    Client,
+    Server,
+}
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -21,7 +33,7 @@ pub struct Config {
 pub struct Snippet {}
 
 impl Config {
-    pub fn new(
+    pub(crate) fn new(
         opt: Opt,
         root_path: AbsPathBuf,
         client_caps: ClientCapabilities,
@@ -42,6 +54,30 @@ impl Config {
         }
     }
 
+    pub(crate) fn parse_initialization_options(
+        mut options: serde_json::Value,
+    ) -> (UserConfig, Vec<AbsPathBuf>, Vec<Snippet>, Vec<(String, Error)>) {
+        tracing::info!("Server initialized with options: {:#}", options);
+        if options.is_null() || options.as_object().map_or(false, |obj| obj.is_empty()) {
+            return Default::default();
+        }
+
+        let mut errors = Vec::new();
+
+        let detached_files =
+            get_field::<Vec<PathBuf>>(&mut options, &mut errors, "detachedFiles", "[]")
+                .into_iter()
+                .map(AbsPathBuf::assert)
+                .collect::<Vec<AbsPathBuf>>();
+
+        // TODO: user-defined snippets
+        let snippets: Vec<Snippet> = Vec::new();
+
+        let user_config = UserConfig::from_json(options, &mut errors);
+
+        (user_config, detached_files, snippets, errors)
+    }
+
     pub fn discover_workspaces(roots: &Vec<AbsPathBuf>) -> Vec<ProjectManifest> {
         let workspaces = ProjectManifest::discover_all(roots);
         tracing::info!("discovered workspaces: {workspaces:?}");
@@ -54,28 +90,21 @@ impl Config {
     pub fn main_loop_threads_num(&self) -> usize {
         num_cpus::get_physical().try_into().unwrap_or(1)
     }
-}
 
-pub fn parse_initialization_options(
-    mut options: serde_json::Value,
-) -> (UserConfig, Vec<AbsPathBuf>, Vec<Snippet>, Vec<(String, Error)>) {
-    tracing::info!("Server initialized with options: {:#}", options);
-    if options.is_null() || options.as_object().map_or(false, |obj| obj.is_empty()) {
-        return Default::default();
+    pub fn files(&self) -> FilesConfig {
+        FilesConfig {
+            watcher: match self.user_config.files_watcher {
+                FilesWatcherDef::Client if self.cli_did_change_watched_files_dyn_reg() => {
+                    FilesWatcher::Client
+                }
+                _ => FilesWatcher::Server,
+            },
+            exclude: self
+                .user_config
+                .files_excludeDirs
+                .iter()
+                .map(|it| self.root_path.join(it))
+                .collect(),
+        }
     }
-
-    let mut errors = Vec::new();
-
-    let detached_files =
-        get_field::<Vec<PathBuf>>(&mut options, &mut errors, "detachedFiles", "[]")
-            .into_iter()
-            .map(AbsPathBuf::assert)
-            .collect::<Vec<AbsPathBuf>>();
-
-    // TODO: user-defined snippets
-    let snippets: Vec<Snippet> = Vec::new();
-
-    let user_config = UserConfig::from_json(options, &mut errors);
-
-    (user_config, detached_files, snippets, errors)
 }

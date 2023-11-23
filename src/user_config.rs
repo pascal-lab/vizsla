@@ -4,7 +4,7 @@ use utils::json::get_field;
 
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "snake_case")]
-enum FilesWatcher {
+pub(crate) enum FilesWatcherDef {
     Client,
     Notify,
     Server,
@@ -40,7 +40,7 @@ fn field_props(field: &str, ty: &str, default: &str) -> serde_json::Value {
             "type": "array",
             "items": { "type": "string" },
         },
-        "FilesWatcher" => set! {
+        "FilesWatcherDef" => set! {
             "type": "string",
             "enum": ["client", "server"],
             "enumDescriptions": [
@@ -61,7 +61,9 @@ macro_rules! config_data {
     }) => {
         #[allow(non_snake_case)]
         #[derive(Debug, Clone)]
-        $sv struct $name { $($field: $ty,)* }
+        $sv struct $name {
+            $($sv $field: $ty,)*
+        }
         impl $name {
             $sv fn from_json(mut json: serde_json::Value, error_sink: &mut Vec<(String, serde_json::Error)>) -> $name {
                 $name {
@@ -70,11 +72,11 @@ macro_rules! config_data {
             }
 
             $sv fn json_schema() -> serde_json::Value {
-                schema(&[
-                    $( {
+                schema(&[ $(
+                    {
                         (stringify!($field), stringify!($ty), $default)
-                    }, )*
-                ])
+                    },
+                )* ])
             }
 
         }
@@ -82,13 +84,13 @@ macro_rules! config_data {
 }
 
 config_data! {
-    pub struct UserConfig {
+    pub(crate) struct UserConfig {
         /// These directories will be ignored. They are relative to the workspace
         /// root, and globs are not supported. You may also need to add the
         /// folders to Code's `files.watcherExclude`.
         files_excludeDirs: Vec<PathBuf> = "[]",
         /// Controls file watching.
-        files_watcher: FilesWatcher = "\"client\"",
+        files_watcher: FilesWatcherDef = "\"client\"",
     }
 }
 

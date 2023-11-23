@@ -116,7 +116,7 @@ fn run_server(opt: Opt) -> anyhow::Result<()> {
     let (user_config, detached_files, snippets) = initialization_options
         .map(|options| {
             let (user_config, detached_files, snippets, errors) =
-                config::parse_initialization_options(options);
+                Config::parse_initialization_options(options);
             if !errors.is_empty() {
                 use lsp_types::notification::{Notification, ShowMessage};
                 let errors_formatter = errors.iter().format_with("\n", |(key, err), f| {
