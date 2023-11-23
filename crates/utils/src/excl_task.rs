@@ -1,18 +1,18 @@
-pub type Cause = String;
+// Exclusive task, make sure only one long-running operation is being executed
 
 #[derive(Debug, Default)]
-pub struct OpQueue<Args = (), Output = ()> {
+pub struct ExclTask<Args, Output, Cause = String> {
     requested: Option<(Cause, Args)>,
     in_process: bool,
-    last_op_result: Output,
+    last_result: Output,
 }
 
-impl<Args, Output> OpQueue<Args, Output> {
+impl<Args, Output, Cause> ExclTask<Args, Output, Cause> {
     pub fn request(&mut self, reason: Cause, args: Args) {
         self.requested = Some((reason, args));
     }
 
-    pub fn should_start(&mut self) -> Option<(Cause, Args)> {
+    pub fn can_start(&mut self) -> Option<(Cause, Args)> {
         if self.in_process {
             return None;
         }
@@ -23,11 +23,11 @@ impl<Args, Output> OpQueue<Args, Output> {
     pub fn complete(&mut self, result: Output) {
         assert!(self.in_process);
         self.in_process = false;
-        self.last_op_result = result;
+        self.last_result = result;
     }
 
     pub fn last_op_result(&self) -> &Output {
-        &self.last_op_result
+        &self.last_result
     }
 
     pub fn in_process(&self) -> bool {

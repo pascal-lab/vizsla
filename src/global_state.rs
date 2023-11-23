@@ -9,7 +9,7 @@ use rustc_hash::FxHashMap;
 use std::time::Instant;
 use triomphe::Arc;
 use utils::{
-    op_queue::OpQueue,
+    excl_task::ExclTask,
     thread::{Pool, ThreadIntent},
 };
 
@@ -83,8 +83,9 @@ pub(crate) struct GlobalState {
     pub(crate) vfs_progress_n_total: usize,
     pub(crate) vfs_progress_n_done: usize,
 
-    pub(crate) fetch_workspaces_queue:
-        OpQueue<bool, Option<(Vec<anyhow::Result<ProjectWorkspace>>, bool)>>,
+    // workspaces
+    pub(crate) workspaces: Arc<Vec<Workspace>>,
+    pub(crate) fetch_workspace_task: ExclTask<(), Option<(Vec<Workspace>, Vec<anyhow::Error>)>>,
 }
 
 // immutable
@@ -134,7 +135,8 @@ impl GlobalState {
             vfs_progress_n_total: 0,
             vfs_progress_n_done: 0,
 
-            fetch_workspaces_queue: OpQueue::default(),
+            workspaces: Arc::new(Vec::new()),
+            fetch_workspace_task: ExclTask::default(),
         }
     }
 
