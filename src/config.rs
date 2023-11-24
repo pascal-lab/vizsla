@@ -31,7 +31,7 @@ pub struct Config {
     pub(crate) root_path: AbsPathBuf,
     pub(crate) user_config: UserConfig,
     pub(crate) detached_files: Arc<Vec<AbsPathBuf>>,
-    pub(crate) discovered_workspaces: Arc<Vec<ProjectManifest>>,
+    pub(crate) discovered_manifests: Arc<Vec<ProjectManifest>>,
 }
 
 #[derive(Debug, Clone)]
@@ -47,7 +47,7 @@ impl Config {
         detached_files: Arc<Vec<AbsPathBuf>>,
         snippets: Vec<Snippet>,
     ) -> Self {
-        let discovered_workspaces = Arc::new(Self::discover_workspaces(&workspace_roots));
+        let discovered_manifests = Arc::new(Self::discover_manifest(&workspace_roots));
         Config {
             opt,
             workspace_roots,
@@ -55,7 +55,7 @@ impl Config {
             root_path,
             user_config,
             detached_files,
-            discovered_workspaces,
+            discovered_manifests,
         }
     }
 
@@ -83,13 +83,13 @@ impl Config {
         (user_config, detached_files, snippets, errors)
     }
 
-    pub fn discover_workspaces(roots: &Vec<AbsPathBuf>) -> Vec<ProjectManifest> {
-        let workspaces = ProjectManifest::discover_all(roots);
-        tracing::info!("discovered workspaces: {workspaces:?}");
-        if workspaces.is_empty() {
-            tracing::info!("no workspaces discovered in {:?}", &roots);
+    pub fn discover_manifest(roots: &Vec<AbsPathBuf>) -> Vec<ProjectManifest> {
+        let manifests = ProjectManifest::discover_all(roots);
+        tracing::info!("discovered manifests: {manifests:?}");
+        if manifests.is_empty() {
+            tracing::info!("no manifests discovered in {:?}", &roots);
         }
-        return workspaces;
+        return manifests;
     }
 
     pub fn main_loop_threads_num(&self) -> usize {

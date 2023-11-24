@@ -25,13 +25,13 @@ impl GlobalState {
         tracing::info!(%cause, "will fetch workspaces");
 
         self.task_pool.handle.spawn_and_send_cps(ThreadIntent::Worker, {
-            let projects = self.config.discovered_workspaces.clone();
+            let manifests = self.config.discovered_manifests.clone();
             let detached_files = self.config.detached_files.clone();
 
             move |sender| {
                 sender.send(FetchWorkspaceProgress::Begin.into()).unwrap();
 
-                let workspaces = projects.iter().map(Workspace::load);
+                let workspaces = manifests.iter().map(Workspace::load);
 
                 let (workspaces, errors): (Vec<_>, Vec<_>) = if detached_files.is_empty() {
                     workspaces.partition_result()
