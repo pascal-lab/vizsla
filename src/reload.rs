@@ -36,7 +36,7 @@ impl GlobalState {
                 let (workspaces, errors): (Vec<_>, Vec<_>) = if detached_files.is_empty() {
                     workspaces.partition_result()
                 } else {
-                    let detached_workspace = Workspace::load_detached_files(&detached_files);
+                    let detached_workspace = Workspace::load_detached_files(detached_files);
                     workspaces.chain(iter::once(detached_workspace)).partition_result()
                 };
 

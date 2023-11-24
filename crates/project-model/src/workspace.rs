@@ -1,15 +1,15 @@
 use anyhow::Context;
+use triomphe::Arc;
 use vfs::AbsPathBuf;
 
 use crate::{
-    project_manifest::ProjectManifest,
-    toml_workspace::{TomlWorkspace},
+    macro_def::MacroDef, project_manifest::ProjectManifest, toml_workspace::TomlWorkspace,
 };
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Workspace {
     Project(TomlWorkspace),
-    DetachedFiles { files: Vec<AbsPathBuf> },
+    DetachedFiles(Arc<Vec<AbsPathBuf>>),
 }
 
 impl Workspace {
@@ -31,7 +31,7 @@ impl Workspace {
         }
     }
 
-    pub fn load_detached_files(files: &Vec<AbsPathBuf>) -> anyhow::Result<Workspace> {
-        todo!()
+    pub fn load_detached_files(files: Arc<Vec<AbsPathBuf>>) -> anyhow::Result<Workspace> {
+        Ok(Workspace::DetachedFiles(files))
     }
 }
