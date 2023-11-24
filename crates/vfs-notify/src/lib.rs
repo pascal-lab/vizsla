@@ -135,7 +135,7 @@ impl NotifyActor {
                                         .iter()
                                         .any(|entry| entry.contains_dir(&path))
                                     {
-                                        self.watch(path);
+                                        self.watch(&path);
                                     }
 
                                     return None;
@@ -177,7 +177,7 @@ impl NotifyActor {
                 .into_iter()
                 .map(|file| {
                     if watch {
-                        self.watch(file.clone());
+                        self.watch(&file);
                     }
                     let contents = read(file.as_path());
                     (file, contents)
@@ -203,7 +203,7 @@ impl NotifyActor {
                         let abs_path = AbsPathBuf::assert(entry.into_path());
 
                         if is_dir && watch {
-                            self.watch(abs_path.clone());
+                            self.watch(&abs_path);
                         }
 
                         if !is_file {
@@ -228,7 +228,7 @@ impl NotifyActor {
         }
     }
 
-    fn watch(&mut self, path: AbsPathBuf) {
+    fn watch(&mut self, path: &AbsPathBuf) {
         if let Some((watcher, _)) = &mut self.watcher {
             log_notify_error(watcher.watch(path.as_ref(), RecursiveMode::NonRecursive));
         }
