@@ -1,11 +1,11 @@
 use anyhow::Context;
 use vfs::AbsPathBuf;
 
-use crate::project_manifest::ProjectManifest;
+use crate::{macro_def::MacroDef, project_manifest::ProjectManifest};
 
-#[derive(Debug, Hash, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Workspace {
-    Project { workspace_root: AbsPathBuf },
+    Project { workspace_root: AbsPathBuf, macro_defs: MacroDef },
     DetachedFiles { files: Vec<AbsPathBuf> },
 }
 
