@@ -1,4 +1,4 @@
-use std::{env, fs, io, path::PathBuf, sync::Arc};
+use std::{env, fs, io, path::PathBuf};
 
 use anyhow::Context;
 use clap::Parser;
@@ -10,6 +10,7 @@ use tracing_subscriber::{
     filter::Targets, fmt::writer::BoxMakeWriter, layer::SubscriberExt, util::SubscriberInitExt,
     Registry,
 };
+use triomphe::Arc;
 use utils::{
     json::from_json,
     paths::{patch_path_prefix, AbsPathBuf},
@@ -60,7 +61,7 @@ fn setup_logging(opt: &Opt) -> anyhow::Result<()> {
             }
             let file = fs::File::create(path)
                 .with_context(|| format!("could not create log file: {}", path.display()))?;
-            BoxMakeWriter::new(Arc::new(file))
+            BoxMakeWriter::new(std::sync::Arc::new(file))
         }
         None => BoxMakeWriter::new(io::stderr),
     };
@@ -113,29 +114,29 @@ fn run_server(opt: Opt) -> anyhow::Result<()> {
         .filter(|folders| !folders.is_empty())
         .unwrap_or_else(|| vec![root_path.clone()]);
 
-    let (user_config, detached_files, snippets) = initialization_options
-        .map(|options| {
-            let (user_config, detached_files, snippets, errors) =
-                Config::parse_initialization_options(options);
-            if !errors.is_empty() {
-                use lsp_types::notification::{Notification, ShowMessage};
-                let errors_formatter = errors.iter().format_with("\n", |(key, err), f| {
-                    let _ = f(key);
-                    let _ = f(&": ");
-                    f(err)
-                });
-                let noti = lsp_server::Notification::new(
-                    ShowMessage::METHOD.to_string(),
-                    ShowMessageParams {
-                        typ: MessageType::WARNING,
-                        message: format!("{}", errors_formatter),
-                    },
-                );
-                connection.sender.send(lsp_server::Message::Notification(noti)).unwrap();
-            }
-            (user_config, detached_files, snippets)
-        })
-        .unwrap_or(Default::default());
+    let (user_config, detached_files, snippets) = if initialization_options.is_some() {
+        let (user_config, detached_files, snippets, errors) =
+            Config::parse_initialization_options(initialization_options.unwrap());
+        if !errors.is_empty() {
+            use lsp_types::notification::{Notification, ShowMessage};
+            let errors_formatter = errors.iter().format_with("\n", |(key, err), f| {
+                let _ = f(key);
+                let _ = f(&": ");
+                f(err)
+            });
+            let noti = lsp_server::Notification::new(
+                ShowMessage::METHOD.to_string(),
+                ShowMessageParams {
+                    typ: MessageType::WARNING,
+                    message: format!("{}", errors_formatter),
+                },
+            );
+            connection.sender.send(lsp_server::Message::Notification(noti)).unwrap();
+        }
+        (user_config, Arc::new(detached_files), snippets)
+    } else {
+        Default::default()
+    };
 
     let config = Config::new(
         opt,

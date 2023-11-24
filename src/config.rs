@@ -7,6 +7,7 @@ use lsp_types::ClientCapabilities;
 use project_model::project_manifest::ProjectManifest;
 use serde::de::DeserializeOwned;
 use serde_json::Error;
+use triomphe::Arc;
 use std::{iter, path::PathBuf};
 use utils::{json::get_field, paths::AbsPathBuf};
 
@@ -29,8 +30,8 @@ pub struct Config {
     pub(crate) client_caps: lsp_types::ClientCapabilities,
     pub(crate) root_path: AbsPathBuf,
     pub(crate) user_config: UserConfig,
-    pub(crate) detached_files: Vec<AbsPathBuf>,
-    pub(crate) discovered_workspaces: Vec<ProjectManifest>,
+    pub(crate) detached_files: Arc<Vec<AbsPathBuf>>,
+    pub(crate) discovered_workspaces: Arc<Vec<ProjectManifest>>,
 }
 
 #[derive(Debug, Clone)]
@@ -43,10 +44,10 @@ impl Config {
         client_caps: ClientCapabilities,
         workspace_roots: Vec<AbsPathBuf>,
         user_config: UserConfig,
-        detached_files: Vec<AbsPathBuf>,
+        detached_files: Arc<Vec<AbsPathBuf>>,
         snippets: Vec<Snippet>,
     ) -> Self {
-        let discovered_workspaces = Self::discover_workspaces(&workspace_roots);
+        let discovered_workspaces = Arc::new(Self::discover_workspaces(&workspace_roots));
         Config {
             opt,
             workspace_roots,
