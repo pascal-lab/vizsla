@@ -7,41 +7,36 @@ use vfs::AbsPathBuf;
 pub const MANIFEST_FILE_NAME: &str = formatcp!("vizsla_config.toml");
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
-pub struct ProjectManifest(AbsPathBuf);
-
-impl TryFrom<AbsPathBuf> for ProjectManifest {
-    type Error = String;
-
-    fn try_from(path: AbsPathBuf) -> Result<Self, Self::Error> {
-        ProjectManifest::validate_manifest(&path).and_then(|_| Ok(ProjectManifest(path)))
-    }
-}
-
-impl TryFrom<&AbsPathBuf> for ProjectManifest {
-    type Error = String;
-
-    fn try_from(path: &AbsPathBuf) -> Result<Self, Self::Error> {
-        ProjectManifest::validate_manifest(path).and_then(|_| Ok(ProjectManifest(path.clone())))
-    }
+pub enum ProjectManifest {
+    Toml(AbsPathBuf),
+    Discover(AbsPathBuf),
 }
 
 impl ProjectManifest {
-    fn validate_manifest(path: &AbsPathBuf) -> Result<(), String> {
+    fn validate_toml(path: &AbsPathBuf) -> Result<(), String> {
         if path.parent() == None {
             return Err(String::from("Bad manifest path: {path}"));
         }
 
         if path.file_name().unwrap_or_default() != MANIFEST_FILE_NAME {
-            return Err(String::from(
-                "Project root must point to {MANIFEST_FILE_NAME}.toml: {path}",
-            ));
+            return Err(String::from("Project root must point to {MANIFEST_FILE_NAME}: {path}"));
         }
 
         Ok(())
     }
 
+    fn from_toml(path: AbsPathBuf) -> Result<Self, String> {
+        Self::validate_toml(&path)?;
+        Ok(Self::Toml(path))
+    }
+
+    fn from_toml_ref(path: &AbsPathBuf) -> Result<Self, String> {
+        Self::validate_toml(path)?;
+        Ok(Self::Toml(path.clone()))
+    }
+
     pub fn discover(path: &AbsPathBuf) -> anyhow::Result<Vec<ProjectManifest>> {
-        if let Ok(manifest) = ProjectManifest::try_from(path) {
+        if let Ok(manifest) = Self::from_toml_ref(path) {
             return Ok(vec![manifest]);
         }
 
@@ -51,7 +46,7 @@ impl ProjectManifest {
             let candidate = path.join(MANIFEST_FILE_NAME);
 
             if fs::metadata(&candidate).is_ok() {
-                if let Ok(manifest) = ProjectManifest::try_from(candidate) {
+                if let Ok(manifest) = Self::from_toml(candidate) {
                     return Ok(vec![manifest]);
                 }
             }
@@ -64,8 +59,12 @@ impl ProjectManifest {
             .filter_map(Result::ok)
             .map(|it| it.path().join(MANIFEST_FILE_NAME))
             .filter(|x| x.exists())
-            .filter_map(|x| ProjectManifest::try_from(AbsPathBuf::assert(x)).ok())
+            .filter_map(|x| Self::from_toml(AbsPathBuf::assert(x)).ok())
             .collect_vec();
+
+        if entities.is_empty() {
+            return Ok(vec![Self::Discover(path.clone())]);
+        }
 
         Ok(entities)
     }
