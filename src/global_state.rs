@@ -2,7 +2,6 @@ use base_db::change::Change;
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use itertools::Itertools;
 use lsp_server::{Message, ReqQueue, Request};
-use lsp_types::{notification, request};
 use nohash_hasher::IntMap;
 use parking_lot::{RwLock, RwLockUpgradableReadGuard, RwLockWriteGuard};
 use project_model::workspace::Workspace;

@@ -2,9 +2,7 @@ use anyhow::Context;
 use triomphe::Arc;
 use vfs::AbsPathBuf;
 
-use crate::{
-    macro_def::MacroDef, project_manifest::ProjectManifest, toml_workspace::TomlWorkspace,
-};
+use crate::{project_manifest::ProjectManifest, toml_workspace::TomlWorkspace};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Workspace {

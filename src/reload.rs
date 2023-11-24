@@ -2,10 +2,9 @@ use std::iter;
 
 use itertools::Itertools;
 use project_model::workspace::Workspace;
-use triomphe::Arc;
 use utils::thread::ThreadIntent;
 
-use crate::{config::FilesWatcher, global_state::GlobalState, main_loop::Task};
+use crate::{global_state::GlobalState, main_loop::Task};
 
 #[derive(Debug)]
 pub(crate) enum FetchWorkspaceProgress {

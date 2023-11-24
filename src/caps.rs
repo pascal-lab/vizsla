@@ -1,5 +1,5 @@
 use lsp_types::{
-    ClientCapabilities, CodeActionKind, CodeActionOptions, CodeLensOptions, CompletionOptions,
+    CodeActionKind, CodeActionOptions, CodeLensOptions, CompletionOptions,
     CompletionOptionsCompletionItem, DeclarationCapability, DocumentOnTypeFormattingOptions,
     FileOperationFilter, FileOperationPattern, FileOperationPatternKind,
     FileOperationRegistrationOptions, InlayHintOptions, InlayHintServerCapabilities, OneOf,

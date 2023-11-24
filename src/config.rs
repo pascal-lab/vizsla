@@ -5,9 +5,8 @@ use crate::{
 use itertools::Itertools;
 use lsp_types::ClientCapabilities;
 use project_model::project_manifest::ProjectManifest;
-use serde::de::DeserializeOwned;
 use serde_json::Error;
-use std::{iter, path::PathBuf};
+use std::path::PathBuf;
 use triomphe::Arc;
 use utils::{json::get_field, paths::AbsPathBuf};
 
