@@ -57,10 +57,10 @@ where
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct TomlWorkspace {
-    workspace_root: AbsPathBuf,
-    macro_defs: MacroDef,
-    included_files: Vec<AbsPathBuf>,
-    excluded_files: Vec<AbsPathBuf>,
+    pub workspace_root: AbsPathBuf,
+    pub macro_defs: MacroDef,
+    pub included_files: Vec<AbsPathBuf>,
+    pub excluded_files: Vec<AbsPathBuf>,
 }
 
 impl TomlWorkspace {
@@ -73,18 +73,24 @@ impl TomlWorkspace {
 
         let workspace_root = toml.parent().unwrap().to_path_buf();
 
-        let included_files = toml_schema
-            .included_files
-            .map(|included_files| {
-                included_files.into_iter().map(|path| workspace_root.absolutize(path)).collect_vec()
-            })
-            .unwrap_or_else(|| vec![workspace_root.clone()]);
-
         let excluded_files = toml_schema
             .excluded_files
             .into_iter()
             .map(|path| workspace_root.absolutize(path))
             .collect_vec();
+
+        let included_files = toml_schema.included_files.map_or_else(
+            || vec![workspace_root.clone()],
+            |included_files| {
+                included_files
+                    .into_iter()
+                    .map(|path| workspace_root.absolutize(path))
+                    .filter(|path| {
+                        excluded_files.iter().all(|excluded| !path.starts_with(excluded))
+                    })
+                    .collect_vec()
+            },
+        );
 
         Ok(TomlWorkspace {
             workspace_root,
