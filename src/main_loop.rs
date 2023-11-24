@@ -11,8 +11,9 @@ use vfs::VfsPath;
 
 use crate::{
     dispatcher::{NotifDispatcher, ReqDispatcher},
-    global_state::{GlobalState, Progress},
+    global_state::GlobalState,
     reload::FetchWorkspaceProgress,
+    respond::Progress,
     Config,
 };
 
@@ -50,7 +51,7 @@ impl GlobalState {
     pub(crate) fn run(&mut self, cli_inbox: Receiver<lsp_server::Message>) -> anyhow::Result<()> {
         // TODO: check for status
 
-        if self.config.cli_did_save_dyn_reg_support() {
+        if self.config.cli_did_save_dyn_reg() {
             self.register_did_save_cap();
         }
 

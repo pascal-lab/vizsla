@@ -48,7 +48,7 @@ impl Config {
             == Some(true)
     }
 
-    pub fn cli_did_save_dyn_reg_support(&self) -> bool {
+    pub fn cli_did_save_dyn_reg(&self) -> bool {
         let caps =
             try_or_default!(self.client_caps.text_document.as_ref()?.synchronization.clone()?);
         caps.did_save == Some(true) && caps.dynamic_registration == Some(true)
@@ -63,6 +63,10 @@ impl Config {
                 .as_ref()?
                 .dynamic_registration?
         )
+    }
+
+    pub fn cli_work_done_progress(&self) -> bool {
+        try_or_def!(self.client_caps.window.as_ref()?.work_done_progress?)
     }
 
     fn negotiated_encoding(&self) -> PositionEncoding {

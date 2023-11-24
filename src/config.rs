@@ -7,8 +7,8 @@ use lsp_types::ClientCapabilities;
 use project_model::project_manifest::ProjectManifest;
 use serde::de::DeserializeOwned;
 use serde_json::Error;
-use triomphe::Arc;
 use std::{iter, path::PathBuf};
+use triomphe::Arc;
 use utils::{json::get_field, paths::AbsPathBuf};
 
 #[derive(Debug, Clone)]
