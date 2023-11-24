@@ -5,7 +5,7 @@ use project_model::workspace::Workspace;
 use triomphe::Arc;
 use utils::thread::ThreadIntent;
 
-use crate::{global_state::GlobalState, main_loop::Task};
+use crate::{config::FilesWatcher, global_state::GlobalState, main_loop::Task};
 
 #[derive(Debug)]
 pub(crate) enum FetchWorkspaceProgress {
@@ -73,7 +73,7 @@ impl GlobalState {
             return;
         }
 
-        self.workspaces = Arc::new(workspaces.clone());
+        self.workspaces = workspaces.clone();
 
         // file_watcher
         todo!();

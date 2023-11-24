@@ -1,5 +1,6 @@
 use base_db::change::Change;
 use crossbeam_channel::{unbounded, Receiver, Sender};
+use itertools::Itertools;
 use lsp_server::{Message, ReqQueue, Request};
 use lsp_types::{notification, request};
 use nohash_hasher::IntMap;
@@ -82,7 +83,8 @@ pub(crate) struct GlobalState {
 
     // workspaces
     pub(crate) workspaces: Arc<Vec<Workspace>>,
-    pub(crate) fetch_workspace_task: ExclTask<(), Option<(Vec<Workspace>, Vec<anyhow::Error>)>>,
+    pub(crate) fetch_workspace_task:
+        ExclTask<(), Option<(Arc<Vec<Workspace>>, Vec<anyhow::Error>)>>,
 }
 
 // immutable
@@ -120,7 +122,7 @@ impl GlobalState {
             sender,
             req_queue: ReqQueue::default(),
             task_pool,
-            config: Arc::new(config.clone()),
+            config: Arc::new(config),
             analysis_host,
             mem_docs: MemDocs::default(),
             shutdown_requested: false,

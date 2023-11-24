@@ -6,6 +6,7 @@ use crossbeam_channel::{select, Receiver};
 use lsp_server::{Connection, Notification, Request, Response};
 use lsp_types::notification::Notification as _;
 use project_model::project_manifest;
+use triomphe::Arc;
 use vfs::VfsPath;
 
 use crate::{
@@ -207,7 +208,7 @@ impl GlobalState {
                 let state = match process {
                     FetchWorkspaceProgress::Begin => Progress::Begin,
                     FetchWorkspaceProgress::End(workspaces, errors) => {
-                        self.fetch_workspace_task.complete(Some((workspaces, errors)));
+                        self.fetch_workspace_task.complete(Some((Arc::new(workspaces), errors)));
 
                         if let Err(e) = self.fetch_workspace_error_stringify() {
                             tracing::error!("Fetch workspace error: \n{e}");
