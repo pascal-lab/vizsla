@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use la_arena::{Arena, Idx};
 use rustc_hash::FxHashSet;
 use smol_str::SmolStr;
@@ -142,7 +143,7 @@ impl<'a> fmt::Display for CyclicDependenciesError<'a> {
             .path
             .iter()
             .map(|idx| self.get_pack_info(*idx).name.to_string())
-            .collect::<Vec<String>>()
+            .collect_vec()
             .join(" -> ");
         write!(f, "{}", path)
     }

@@ -12,3 +12,4 @@ triomphe.workspace = true
 la-arena.workspace = true
 smol_str.workspace = true
 rustc-hash.workspace = true
+itertools.workspace = true

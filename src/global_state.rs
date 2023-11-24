@@ -251,7 +251,7 @@ impl GlobalState {
             .into_iter()
             .filter(|(_, (kind, just_created))| !(*kind == Delete && *just_created))
             .map(|(file_id, (change_kind, _))| vfs::ChangedFile { file_id, change_kind })
-            .collect::<Vec<_>>();
+            .collect_vec();
 
         Some(changed_file)
     }

@@ -10,3 +10,4 @@ vfs.workspace = true
 anyhow.workspace = true
 const_format.workspace = true
 rustc-hash.workspace = true
+itertools.workspace = true

@@ -108,7 +108,7 @@ fn run_server(opt: Opt) -> anyhow::Result<()> {
                 .filter_map(|folder| folder.uri.to_file_path().ok())
                 .map(patch_path_prefix)
                 .filter_map(|path| AbsPathBuf::try_from(path).ok())
-                .collect::<Vec<_>>()
+                .collect_vec()
         })
         .filter(|folders| !folders.is_empty())
         .unwrap_or_else(|| vec![root_path.clone()]);

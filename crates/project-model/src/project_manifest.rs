@@ -1,6 +1,7 @@
 use std::{collections::BTreeSet, fs};
 
 use const_format::formatcp;
+use itertools::Itertools;
 use vfs::AbsPathBuf;
 
 pub const MANIFEST_FILE_NAME: &str = formatcp!("vizsla_config.toml");
@@ -64,7 +65,7 @@ impl ProjectManifest {
             .map(|it| it.path().join(MANIFEST_FILE_NAME))
             .filter(|x| x.exists())
             .filter_map(|x| ProjectManifest::try_from(AbsPathBuf::assert(x)).ok())
-            .collect::<Vec<_>>();
+            .collect_vec();
 
         Ok(entities)
     }
@@ -76,6 +77,6 @@ impl ProjectManifest {
             .flatten()
             .collect::<BTreeSet<_>>()
             .into_iter()
-            .collect::<Vec<_>>()
+            .collect_vec()
     }
 }

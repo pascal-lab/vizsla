@@ -1,6 +1,7 @@
 use std::{collections::HashSet, fs, ops::Not};
 
 use crossbeam_channel::{never, select, unbounded, Receiver, Sender};
+use itertools::Itertools;
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 use utils::paths::{AbsPath, AbsPathBuf};
 use utils::thread;
@@ -181,7 +182,7 @@ impl NotifyActor {
                     let contents = read(file.as_path());
                     (file, contents)
                 })
-                .collect::<Vec<_>>(),
+                .collect_vec(),
             loader::Entry::Directories(dirs) => {
                 let mut res = Vec::new();
 

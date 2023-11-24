@@ -1,4 +1,8 @@
-use crate::{user_config::{UserConfig, FilesWatcherDef}, Opt};
+use crate::{
+    user_config::{FilesWatcherDef, UserConfig},
+    Opt,
+};
+use itertools::Itertools;
 use lsp_types::ClientCapabilities;
 use project_model::project_manifest::ProjectManifest;
 use serde::de::DeserializeOwned;
@@ -68,7 +72,7 @@ impl Config {
             get_field::<Vec<PathBuf>>(&mut options, &mut errors, "detachedFiles", "[]")
                 .into_iter()
                 .map(AbsPathBuf::assert)
-                .collect::<Vec<AbsPathBuf>>();
+                .collect_vec();
 
         // TODO: user-defined snippets
         let snippets: Vec<Snippet> = Vec::new();

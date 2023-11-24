@@ -12,3 +12,4 @@ utils.workspace = true
 notify.workspace = true
 tracing.workspace = true
 walkdir = "2.4.0"
+itertools.workspace = true

@@ -66,3 +66,4 @@ la-arena = { package = "la-arena" }
 smol_str = { package = "smol_str" }
 rustc-hash = { package = "rustc-hash" }
 const_format = { package = "const_format" }
+itertools = { package = "itertools" }
