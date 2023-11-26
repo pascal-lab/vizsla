@@ -88,8 +88,6 @@ impl VfsPath {
         }
     }
 
-    /// **Don't make this `pub`**
-    ///
     /// Encode the path in the given buffer.
     ///
     /// The encoding will be `0` if [`AbsPathBuf`], `1` if [`VirtualPath`], followed
