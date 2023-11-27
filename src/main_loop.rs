@@ -118,7 +118,8 @@ impl GlobalState {
         let event_dbg_msg = format!("{event:?}");
         tracing::debug!("{} [handle_event]: {}", format!("{loop_start:?}"), event_dbg_msg);
 
-        // check if is quiescent when loading workspace
+        let was_quiescent = self.is_quiescent();
+
         match event {
             Event::Lsp(msg) => match msg {
                 Message::Request(req) => self.handle_lsp_request(loop_start, req),
@@ -131,8 +132,18 @@ impl GlobalState {
 
         let event_handling_duration = loop_start.elapsed();
 
+        let state_changed = self.process_changes();
+
+        if self.config.user_config.workspace_auto_reload
+            && let Some((cause, ())) = self.fetch_workspaces_task.should_start()
+        {
+            self.fetch_workspaces(cause);
+        }
+
+        if !self.fetch_workspaces_task.in_process() {}
+
         let loop_duration = loop_start.elapsed();
-        if loop_duration > Duration::from_millis(100) {
+        if loop_duration > Duration::from_millis(100) && was_quiescent {
             tracing::warn!("overly long loop turn took {loop_duration:?} (event handling took {event_handling_duration:?}): {event_dbg_msg}");
         }
 

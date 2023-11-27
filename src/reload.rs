@@ -22,6 +22,12 @@ impl From<FetchWorkspaceProgress> for Task {
 }
 
 impl GlobalState {
+    pub(crate) fn is_quiescent(&self) -> bool {
+        !(self.fetch_workspaces_task.in_process()
+            || self.vfs_progress_config_version < self.vfs_config_version
+            || self.vfs_progress_n_done < self.vfs_progress_n_total)
+    }
+
     pub(crate) fn fetch_workspaces(&mut self, cause: String) {
         tracing::info!(%cause, "will fetch workspaces");
 
