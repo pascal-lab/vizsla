@@ -1,4 +1,4 @@
-use base_db::change::Change;
+use base_db::{change::Change, source_root::SourceRootConfig};
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use itertools::Itertools;
 use lsp_server::{Message, ReqQueue, Request};
@@ -70,6 +70,7 @@ pub(crate) struct GlobalState {
     pub(crate) task_pool: Handle<TaskPool<Task>, Receiver<Task>>,
 
     pub(crate) config: Arc<Config>,
+    pub(crate) source_root_config: SourceRootConfig,
 
     pub(crate) analysis_host: AnalysisHost,
     pub(crate) mem_docs: MemDocs,
@@ -128,6 +129,7 @@ impl GlobalState {
             analysis_host,
             mem_docs: MemDocs::default(),
             shutdown_requested: false,
+            source_root_config: SourceRootConfig::default(),
 
             vfs_loader: vfs_loader,
             vfs: Arc::new(RwLock::new((vfs::vfs::Vfs::default(), IntMap::default()))),

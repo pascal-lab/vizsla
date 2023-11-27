@@ -1,11 +1,14 @@
 use std::{collections::VecDeque, iter};
 
 use itertools::Itertools;
-use project_model::{project_manifest::ProjectManifest, workspace::Workspace};
+use project_model::{
+    project_manifest::{ProjectManifest, MANIFEST_FILE_NAME},
+    workspace::{get_workspace_folder, Workspace},
+};
 use rustc_hash::FxHashSet;
 use utils::thread::ThreadIntent;
 
-use crate::{global_state::GlobalState, main_loop::Task};
+use crate::{config::FilesWatcher, global_state::GlobalState, main_loop::Task};
 
 #[derive(Debug)]
 pub(crate) enum FetchWorkspaceProgress {
@@ -50,7 +53,7 @@ impl GlobalState {
                     let (lib_manifests, errors): (Vec<_>, Vec<_>) = workspaces
                         .iter()
                         .filter_map(|it| match it {
-                            Workspace::Project(it) => Some(&it.package_files),
+                            Workspace::Project(it) => Some(&it.package),
                             Workspace::DetachedFiles(_) => None,
                         })
                         .flatten()
@@ -113,7 +116,60 @@ impl GlobalState {
 
         self.workspaces = workspaces.clone();
 
-        todo!("switch workspaces");
+        if let FilesWatcher::Client = self.config.files().watcher {
+            let registration_options = lsp_types::DidChangeWatchedFilesRegistrationOptions {
+                watchers: self
+                    .workspaces
+                    .iter()
+                    .flat_map(|ws| ws.to_roots())
+                    .filter(|it| !it.is_lib)
+                    .flat_map(|root| {
+                        root.include.clone().into_iter().flat_map(|it| {
+                            [
+                                format!("{it}/**/*.v"),
+                                format!("{it}/**/*.sv"),
+                                format!("{it}/**/{}", MANIFEST_FILE_NAME),
+                            ]
+                        })
+                    })
+                    .map(|glob_pattern| lsp_types::FileSystemWatcher {
+                        glob_pattern: lsp_types::GlobPattern::String(glob_pattern),
+                        kind: None,
+                    })
+                    .collect(),
+            };
+
+            let registration = lsp_types::Registration {
+                id: "workspace/didChangeWatchedFiles".to_string(),
+                method: "workspace/didChangeWatchedFiles".to_string(),
+                register_options: Some(serde_json::to_value(registration_options).unwrap()),
+            };
+
+            self.send_request::<lsp_types::request::RegisterCapability>(
+                lsp_types::RegistrationParams { registrations: vec![registration] },
+                |_, _| (),
+            );
+        }
+
+        let files_config = self.config.files();
+        let (to_load, to_watch, source_root_config) =
+            get_workspace_folder(&self.workspaces, &files_config.exclude);
+
+        let to_watch = match files_config.watcher {
+            FilesWatcher::Client => vec![],
+            FilesWatcher::Server => to_watch,
+        };
+
+        self.vfs_config_version += 1;
+
+        self.vfs_loader.handle.set_config(vfs::loader::Config {
+            to_load,
+            to_watch,
+            version: self.vfs_config_version,
+        });
+
+        self.source_root_config = source_root_config;
+
         tracing::info!("did switch workspaces");
     }
 }

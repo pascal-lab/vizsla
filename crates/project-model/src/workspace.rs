@@ -1,6 +1,12 @@
+use std::mem;
+
 use anyhow::Context;
+use base_db::source_root::SourceRootConfig;
+use itertools::Itertools;
+use rustc_hash::FxHashMap;
 use triomphe::Arc;
 use utils::paths::AbsPathBuf;
+use vfs::{file_set::FileSetConfig, vfs::VfsPath};
 
 use crate::{project_manifest::ProjectManifest, toml_workspace::TomlWorkspace};
 
@@ -8,6 +14,13 @@ use crate::{project_manifest::ProjectManifest, toml_workspace::TomlWorkspace};
 pub enum Workspace {
     Project(TomlWorkspace),
     DetachedFiles(Arc<Vec<AbsPathBuf>>),
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub struct WorkspaceRoot {
+    pub is_lib: bool,
+    pub include: Vec<AbsPathBuf>,
+    pub exclude: Vec<AbsPathBuf>,
 }
 
 impl Workspace {
@@ -36,7 +49,70 @@ impl Workspace {
         Ok(Workspace::DetachedFiles(files))
     }
 
-    pub fn to_roots(&self) -> Vec<AbsPathBuf> {
-        todo!()
+    pub fn to_roots(&self) -> Vec<WorkspaceRoot> {
+        match self {
+            Workspace::Project(TomlWorkspace { include, exclude, is_lib, .. }) => {
+                vec![WorkspaceRoot {
+                    is_lib: *is_lib,
+                    include: include.iter().cloned().collect(),
+                    exclude: exclude.iter().cloned().collect(),
+                }]
+            }
+            Workspace::DetachedFiles(files) => files
+                .iter()
+                .map(|it| WorkspaceRoot {
+                    is_lib: false,
+                    include: vec![it.clone()],
+                    exclude: vec![],
+                })
+                .collect(),
+        }
     }
+}
+
+pub fn get_workspace_folder(
+    workspaces: &[Workspace],
+    global_excludes: &[AbsPathBuf],
+) -> (Vec<vfs::loader::Entry>, Vec<usize>, SourceRootConfig) {
+    let roots = workspaces.iter().flat_map(|ws| ws.to_roots()).collect_vec();
+
+    let mut watch = Vec::new();
+    let mut load = Vec::new();
+    let mut fsc = FileSetConfig::builder();
+    let mut local_filesets = Vec::new();
+
+    for root in roots.into_iter().filter(|it| !it.include.is_empty()) {
+        let root_file_set = root.include.iter().cloned().map(VfsPath::from).collect_vec();
+
+        let entry = {
+            let mut dirs = vfs::loader::Directories {
+                extensions: ["v", "sv"].map(String::from).into(),
+                include: root.include,
+                exclude: root.exclude,
+            };
+            for excl in global_excludes {
+                if dirs.include.iter().any(|incl| incl.starts_with(excl) || excl.starts_with(incl))
+                {
+                    dirs.exclude.push(excl.clone());
+                }
+            }
+
+            vfs::loader::Entry::Directories(dirs)
+        };
+
+        if !root.is_lib {
+            local_filesets.push(fsc.len());
+        }
+
+        fsc.add_file_set(root_file_set);
+
+        if !root.is_lib {
+            watch.push(load.len());
+        }
+        load.push(entry);
+    }
+
+    let fileset_config = fsc.build();
+
+    (load, watch, SourceRootConfig { fileset_config, local_filesets })
 }

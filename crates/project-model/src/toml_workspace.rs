@@ -22,9 +22,9 @@ struct TomlManifestSchema {
     #[serde(deserialize_with = "de_macros", default)]
     pub macros: MacroDef,
     #[serde(default)]
-    pub included_files: Option<Vec<PathBuf>>,
+    pub include: Option<Vec<PathBuf>>,
     #[serde(default)]
-    pub excluded_files: Vec<PathBuf>,
+    pub exclude: Vec<PathBuf>,
 }
 
 fn de_macros<'de, D>(deserializer: D) -> Result<MacroDef, D::Error>
@@ -59,9 +59,9 @@ where
 pub struct TomlWorkspace {
     pub workspace_root: AbsPathBuf,
     pub macro_defs: MacroDef,
-    pub included_files: Vec<AbsPathBuf>,
-    pub excluded_files: Vec<AbsPathBuf>,
-    pub package_files: Vec<AbsPathBuf>,
+    pub include: Vec<AbsPathBuf>,
+    pub exclude: Vec<AbsPathBuf>,
+    pub package: Vec<AbsPathBuf>,
     pub is_lib: bool,
 }
 
@@ -75,37 +75,37 @@ impl TomlWorkspace {
 
         let workspace_root = toml.parent().unwrap().to_path_buf();
 
-        let mut excluded_files = toml_schema
-            .excluded_files
+        let mut exclude = toml_schema
+            .exclude
             .into_iter()
             .map(|path| workspace_root.absolutize(path))
             .collect_vec();
-        sort_and_remove_subfolders(&mut excluded_files);
+        sort_and_remove_subfolders(&mut exclude);
 
-        let mut included_files = Vec::new();
-        let mut package_files = Vec::new();
-        for path in toml_schema.included_files.unwrap_or_default().into_iter() {
+        let mut include = Vec::new();
+        let mut package = Vec::new();
+        for path in toml_schema.include.unwrap_or_default().into_iter() {
             let path = workspace_root.absolutize(path);
-            if excluded_files.iter().all(|excluded| !path.starts_with(excluded)) {
+            if exclude.iter().all(|excluded| !path.starts_with(excluded)) {
                 if path.starts_with(&workspace_root) {
-                    included_files.push(path);
+                    include.push(path);
                 } else {
-                    package_files.push(path);
+                    package.push(path);
                 }
             }
         }
-        sort_and_remove_subfolders(&mut included_files);
+        sort_and_remove_subfolders(&mut include);
 
-        if included_files.is_empty() {
-            included_files.push(workspace_root.clone());
+        if include.is_empty() {
+            include.push(workspace_root.clone());
         }
 
         Ok(TomlWorkspace {
             workspace_root,
             macro_defs: toml_schema.macros,
-            included_files,
-            excluded_files,
-            package_files,
+            include,
+            exclude,
+            package,
             is_lib,
         })
     }
@@ -114,9 +114,9 @@ impl TomlWorkspace {
         Self {
             workspace_root: path.clone(),
             macro_defs: MacroDef::default(),
-            included_files: vec![path.clone()],
-            excluded_files: vec![],
-            package_files: vec![],
+            include: vec![path.clone()],
+            exclude: vec![],
+            package: vec![],
             is_lib: false,
         }
     }
