@@ -86,7 +86,7 @@ pub(crate) struct GlobalState {
 
     // workspaces
     pub(crate) workspaces: Arc<Vec<Workspace>>,
-    pub(crate) fetch_workspace_task:
+    pub(crate) fetch_workspaces_task:
         ExclTask<(), Option<(Arc<Vec<Workspace>>, Vec<anyhow::Error>)>>,
 }
 
@@ -139,7 +139,7 @@ impl GlobalState {
             vfs_progress_n_done: 0,
 
             workspaces: Arc::new(Vec::new()),
-            fetch_workspace_task: ExclTask::default(),
+            fetch_workspaces_task: ExclTask::default(),
         }
     }
 

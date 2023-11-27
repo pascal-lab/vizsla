@@ -12,7 +12,7 @@ impl<Args, Output, Cause> ExclTask<Args, Output, Cause> {
         self.requested = Some((reason, args));
     }
 
-    pub fn can_start(&mut self) -> Option<(Cause, Args)> {
+    pub fn should_start(&mut self) -> Option<(Cause, Args)> {
         if self.in_process {
             return None;
         }

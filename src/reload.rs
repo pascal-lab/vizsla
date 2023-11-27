@@ -91,7 +91,7 @@ impl GlobalState {
     }
 
     pub(crate) fn fetch_workspace_error_stringify(&self) -> Result<(), String> {
-        match self.fetch_workspace_task.last_op_result() {
+        match self.fetch_workspaces_task.last_op_result() {
             Some((workspaces, _)) if workspaces.is_empty() => Err("no workspace fetched".into()),
             Some((_, errors)) if !errors.is_empty() => Err(errors
                 .iter()
@@ -104,7 +104,7 @@ impl GlobalState {
     pub(crate) fn switch_workspaces(&mut self, cause: String) {
         tracing::info!(%cause, "start switching workspaces");
 
-        let Some((workspaces, errors)) = self.fetch_workspace_task.last_op_result() else {
+        let Some((workspaces, errors)) = self.fetch_workspaces_task.last_op_result() else {
             return;
         };
 

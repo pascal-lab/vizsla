@@ -55,8 +55,8 @@ impl GlobalState {
             self.register_did_save_cap();
         }
 
-        self.fetch_workspace_task.request("Start".into(), ());
-        if let Some((cause, ())) = self.fetch_workspace_task.can_start() {
+        self.fetch_workspaces_task.request("Start".into(), ());
+        if let Some((cause, ())) = self.fetch_workspaces_task.should_start() {
             self.fetch_workspaces(cause);
         }
 
@@ -209,7 +209,7 @@ impl GlobalState {
                 let state = match process {
                     FetchWorkspaceProgress::Begin => Progress::Begin,
                     FetchWorkspaceProgress::End(workspaces, errors) => {
-                        self.fetch_workspace_task.complete(Some((Arc::new(workspaces), errors)));
+                        self.fetch_workspaces_task.complete(Some((Arc::new(workspaces), errors)));
 
                         if let Err(e) = self.fetch_workspace_error_stringify() {
                             tracing::error!("Fetch workspace error: \n{e}");
