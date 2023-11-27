@@ -92,7 +92,6 @@ pub(crate) struct GlobalState {
 }
 
 // immutable
-// TODO:
 pub(crate) struct GlobalStateSnapshot {
     pub(crate) config: Arc<Config>,
     pub(crate) analysis: Analysis,
@@ -198,7 +197,7 @@ impl GlobalState {
                 let contents = vfs.file_contents(changed_file.file_id).unwrap().to_vec();
 
                 String::from_utf8(contents).ok().and_then(|text| {
-                    // FIXME: Consider doing normalization in the `vfs` instead to get rid of some locking
+                    // TODO: Consider doing normalization in the `vfs` instead to get rid of some locking?
                     let (text, line_endings) = LineEndings::normalize(text);
                     Some((Arc::<str>::from(text), line_endings))
                 })

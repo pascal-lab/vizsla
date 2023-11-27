@@ -2,7 +2,11 @@ use salsa::Durability;
 use triomphe::Arc;
 use vfs::vfs::FileId;
 
-use crate::{package_graph::PackageGraph, source_database::SourceRootDb, source_root::SourceRoot};
+use crate::{
+    package_graph::PackageGraph,
+    source_database::SourceRootDb,
+    source_root::{SourceRoot, SourceRootId},
+};
 
 #[derive(Debug, Default)]
 pub struct Change {
@@ -25,7 +29,17 @@ impl Change {
     }
 
     pub fn apply(self, db: &mut dyn SourceRootDb) {
-        // TODO: handle roots
+        if let Some(roots) = self.roots {
+            for (idx, root) in roots.into_iter().enumerate() {
+                let root_id = SourceRootId(idx as u32);
+                let durability = durability(&root);
+                for file_id in root.iter() {
+                    db.set_source_root_id_with_durability(file_id, root_id, durability);
+                }
+                db.set_source_root_with_durability(root_id, Arc::new(root), durability);
+            }
+        }
+
         for (file_id, new_text) in self.changed_files {
             let source_root_id = db.source_root_id(file_id);
             let source_root = db.source_root(source_root_id);
