@@ -1,5 +1,3 @@
-use std::{collections::VecDeque, iter};
-
 use itertools::Itertools;
 use project_model::{
     project_manifest::{ProjectManifest, MANIFEST_FILE_NAME},
