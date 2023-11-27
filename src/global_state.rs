@@ -13,14 +13,14 @@ use utils::{
     thread::{Pool, ThreadIntent},
 };
 
-use crate::{config::Config, line_idx::LineEndings, main_loop::Task, mem_docs::MemDocs};
+use crate::{config::Config, line_idx::LineEndings, main_loop::Task, mem_docs::MemDocs, reload};
 use ide::{
     self,
     analysis_host::{Analysis, AnalysisHost},
 };
 use vfs::{
     self,
-    vfs::{ChangedFile, FileId},
+    vfs::{ChangedFile, FileId, Vfs},
 };
 
 pub(crate) type ReqHandler = fn(&mut GlobalState, lsp_server::Response);
@@ -78,7 +78,7 @@ pub(crate) struct GlobalState {
     pub(crate) shutdown_requested: bool,
 
     pub(crate) vfs_loader: Handle<Box<dyn vfs::loader::Handle>, Receiver<vfs::loader::Message>>,
-    pub(crate) vfs: Arc<RwLock<(vfs::vfs::Vfs, IntMap<FileId, LineEndings>)>>,
+    pub(crate) vfs: Arc<RwLock<(Vfs, IntMap<FileId, LineEndings>)>>,
     pub(crate) vfs_config_version: u32,
     pub(crate) vfs_progress_config_version: u32,
     pub(crate) vfs_progress_n_total: usize,
@@ -97,7 +97,7 @@ pub(crate) struct GlobalStateSnapshot {
     pub(crate) analysis: Analysis,
     // pub(crate) check_fixes: CheckFixes,
     mem_docs: MemDocs,
-    vfs: Arc<RwLock<(vfs::vfs::Vfs, IntMap<FileId, LineEndings>)>>,
+    vfs: Arc<RwLock<(Vfs, IntMap<FileId, LineEndings>)>>,
     pub(crate) workspaces: Arc<Vec<Workspace>>,
 }
 
@@ -132,7 +132,7 @@ impl GlobalState {
             source_root_config: SourceRootConfig::default(),
 
             vfs_loader: vfs_loader,
-            vfs: Arc::new(RwLock::new((vfs::vfs::Vfs::default(), IntMap::default()))),
+            vfs: Arc::new(RwLock::new((Vfs::default(), IntMap::default()))),
             vfs_config_version: 0,
             vfs_progress_config_version: 0,
             vfs_progress_n_total: 0,
@@ -166,26 +166,38 @@ impl GlobalState {
 impl GlobalState {
     pub(crate) fn process_changes(&mut self) -> bool {
         let mut write_guard = self.vfs.write();
-        let changed_files = match Self::collapse_modifications(write_guard.0.take_changes()) {
+        let changed_files = write_guard.0.take_changes();
+        // downgrade earlier to allow more reader
+        let read_guard = RwLockWriteGuard::downgrade_to_upgradable(write_guard);
+        let vfs = &read_guard.0;
+
+        // collect changes
+        let changed_files = match Self::colease_modifications(changed_files) {
             Some(changed_files) => changed_files,
             None => return false,
         };
 
-        // collect changes
-        // allow more reader
-        let read_guard = RwLockWriteGuard::downgrade_to_upgradable(write_guard);
-        let vfs = &read_guard.0;
+        let mut workspace_structure_change = None;
+        // A file was added or deleted
+        let mut has_structure_changes = false;
         let mut bytes = vec![];
-        for changed_file in &changed_files {
+        for changed_file in changed_files {
             let path = vfs.file_path(changed_file.file_id);
-            // TODO: detect workspace change
+            if let Some(path) = path.as_path().map(|apath| apath.to_path_buf()) {
+                if changed_file.is_created_or_deleted() {
+                    has_structure_changes = true;
+                    workspace_structure_change = Some(path);
+                } else if reload::should_refresh_for_change(&path, changed_file.change_kind) {
+                    workspace_structure_change = Some(path);
+                }
+            }
 
             // Collect changes
             let text = if changed_file.exists() {
                 let contents = vfs.file_contents(changed_file.file_id).unwrap().to_vec();
 
                 String::from_utf8(contents).ok().and_then(|text| {
-                    // FIXME: Consider doing normalization in the `vfs` instead to rid of some locking
+                    // FIXME: Consider doing normalization in the `vfs` instead to get rid of some locking
                     let (text, line_endings) = LineEndings::normalize(text);
                     Some((Arc::<str>::from(text), line_endings))
                 })
@@ -198,20 +210,25 @@ impl GlobalState {
 
         let mut write_guard = RwLockUpgradableReadGuard::upgrade(read_guard);
         let (vfs, line_endings_map) = &mut *write_guard;
-        let change = Self::collect_changes(bytes, line_endings_map);
+        let change = self.collect_changes(bytes, line_endings_map, vfs, has_structure_changes);
 
         std::mem::drop(write_guard);
 
         self.analysis_host.apply_change(change);
 
-        // TODO: Apply workspace changes
+        if let Some(path) = workspace_structure_change {
+            self.fetch_workspaces_task.request(format!("workspace vfs change: {:?}", path), ());
+        }
 
         true
     }
 
     fn collect_changes(
+        &self,
         bytes: Vec<(FileId, Option<(Arc<str>, LineEndings)>)>,
         line_ending_map: &mut IntMap<FileId, LineEndings>,
+        vfs: &mut Vfs,
+        has_structure_changes: bool,
     ) -> Change {
         let mut change = Change::new();
         for (file_id, text_endings) in bytes {
@@ -223,10 +240,14 @@ impl GlobalState {
                 }
             }
         }
+        if has_structure_changes {
+            let roots = self.source_root_config.partition(vfs);
+            change.set_roots(roots);
+        }
         change
     }
 
-    fn collapse_modifications(vfs_changes: Vec<ChangedFile>) -> Option<Vec<ChangedFile>> {
+    fn colease_modifications(vfs_changes: Vec<ChangedFile>) -> Option<Vec<ChangedFile>> {
         if vfs_changes.is_empty() {
             return None;
         }
@@ -250,7 +271,7 @@ impl GlobalState {
                         (Delete, _, Modify) | (Modify, _, Create) => unreachable!(),
                     }
                 })
-                .or_insert((changed_file.change_kind, matches!(changed_file.change_kind, Create)));
+                .or_insert((changed_file.change_kind, changed_file.change_kind == Create));
         }
 
         let changed_file = file_changes
