@@ -73,3 +73,7 @@ itertools = { package = "itertools" }
 toml = { package = "toml" }
 regex = { package = "regex" }
 once_cell = { package = "once_cell" }
+
+[toolchain]
+channel = "nightly"
+

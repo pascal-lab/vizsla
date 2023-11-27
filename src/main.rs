@@ -1,3 +1,4 @@
+#![feature(let_chains)]
 use std::{env, fs, io, path::PathBuf};
 
 use anyhow::Context;

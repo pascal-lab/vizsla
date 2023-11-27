@@ -45,10 +45,10 @@ impl ProjectManifest {
         while let Some(path) = cur {
             let candidate = path.join(MANIFEST_FILE_NAME);
 
-            if fs::metadata(&candidate).is_ok() {
-                if let Ok(manifest) = Self::from_toml(candidate) {
-                    return Ok(vec![manifest]);
-                }
+            if fs::metadata(&candidate).is_ok()
+                && let Ok(manifest) = Self::from_toml(candidate)
+            {
+                return Ok(vec![manifest]);
             }
 
             cur = path.parent();

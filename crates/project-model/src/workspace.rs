@@ -1,9 +1,6 @@
-use std::mem;
-
 use anyhow::Context;
 use base_db::source_root::SourceRootConfig;
 use itertools::Itertools;
-use rustc_hash::FxHashMap;
 use triomphe::Arc;
 use utils::paths::AbsPathBuf;
 use vfs::{file_set::FileSetConfig, vfs::VfsPath};

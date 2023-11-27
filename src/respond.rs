@@ -38,11 +38,11 @@ impl GlobalState {
 
     pub(crate) fn respond(&mut self, response: lsp_server::Response) {
         if let Some((method, start)) = self.req_queue.incoming.complete(response.id.clone()) {
-            if let Some(err) = &response.error {
-                // TODO: less msg to be more `resilient'?
-                if err.message.starts_with("server panicked") {
-                    tracing::error!("{:?}", err);
-                }
+            // TODO: less msg to be more `resilient'?
+            if let Some(err) = &response.error
+                && err.message.starts_with("server panicked")
+            {
+                tracing::error!("{:?}", err);
             }
 
             let duration = start.elapsed();

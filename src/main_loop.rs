@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 use always_assert::always;
 use const_format::formatcp;
 use crossbeam_channel::{select, Receiver};
-use lsp_server::{Connection, Notification, Request, Response};
+use lsp_server::{Connection, Message, Notification, Request, Response};
 use lsp_types::notification::Notification as _;
 use project_model::project_manifest;
 use triomphe::Arc;
@@ -19,7 +19,7 @@ use crate::{
 
 #[derive(Debug)]
 enum Event {
-    Lsp(lsp_server::Message),
+    Lsp(Message),
     Task(Task),
     Vfs(vfs::loader::Message),
 }
@@ -48,7 +48,7 @@ pub fn main_loop(config: Config, connection: Connection) -> anyhow::Result<()> {
 }
 
 impl GlobalState {
-    pub(crate) fn run(&mut self, cli_inbox: Receiver<lsp_server::Message>) -> anyhow::Result<()> {
+    pub(crate) fn run(&mut self, cli_inbox: Receiver<Message>) -> anyhow::Result<()> {
         // TODO: check for status
 
         if self.config.cli_did_save_dyn_reg() {
@@ -61,14 +61,12 @@ impl GlobalState {
         }
 
         while let Some(event) = self.next_event(&cli_inbox) {
-            match &event {
-                Event::Lsp(lsp_server::Message::Notification(Notification { method, .. }))
-                    if method == lsp_types::notification::Exit::METHOD =>
-                {
-                    return Ok(());
-                }
-                _ => self.handle_event(event)?,
+            if let Event::Lsp(Message::Notification(Notification { method, .. })) = &event
+                && method == lsp_types::notification::Exit::METHOD
+            {
+                return Ok(());
             }
+            self.handle_event(event)?;
         }
         anyhow::bail!("{} exited without proper shutdown sequence", &self.config.opt.process_name);
     }
@@ -96,8 +94,8 @@ impl GlobalState {
         };
 
         let registration = lsp_types::Registration {
-            id: "textDocument/didSave".to_string(),
-            method: "textDocument/didSave".to_string(),
+            id: "textDocument/didSave".into(),
+            method: "textDocument/didSave".into(),
             register_options: Some(serde_json::to_value(save_registration_options).unwrap()),
         };
         self.send_request::<lsp_types::request::RegisterCapability>(
@@ -106,7 +104,7 @@ impl GlobalState {
         );
     }
 
-    fn next_event(&self, cli_inbox: &Receiver<lsp_server::Message>) -> Option<Event> {
+    fn next_event(&self, cli_inbox: &Receiver<Message>) -> Option<Event> {
         select! {
             recv(cli_inbox) -> cli_msg => cli_msg.ok().map(Event::Lsp),
             recv(self.task_pool.receiver) -> task => Some(Event::Task(task.unwrap())),
@@ -123,9 +121,9 @@ impl GlobalState {
         // check if is quiescent when loading workspace
         match event {
             Event::Lsp(msg) => match msg {
-                lsp_server::Message::Request(req) => self.handle_lsp_request(loop_start, req),
-                lsp_server::Message::Notification(notif) => self.handle_lsp_notification(notif)?,
-                lsp_server::Message::Response(res) => self.handle_response(res),
+                Message::Request(req) => self.handle_lsp_request(loop_start, req),
+                Message::Notification(notif) => self.handle_lsp_notification(notif)?,
+                Message::Response(res) => self.handle_response(res),
             },
             Event::Task(task) => self.handle_task(task),
             Event::Vfs(msg) => self.handle_vfs_msg(msg),
