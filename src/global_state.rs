@@ -98,7 +98,7 @@ pub(crate) struct GlobalStateSnapshot {
     // pub(crate) check_fixes: CheckFixes,
     mem_docs: MemDocs,
     vfs: Arc<RwLock<(vfs::vfs::Vfs, IntMap<FileId, LineEndings>)>>,
-    // pub(crate) workspaces: Arc<Vec<ProjectWorkspace>>,
+    pub(crate) workspaces: Arc<Vec<Workspace>>,
 }
 
 impl std::panic::UnwindSafe for GlobalStateSnapshot {}
@@ -146,7 +146,7 @@ impl GlobalState {
     pub(crate) fn make_snapshot(&self) -> GlobalStateSnapshot {
         GlobalStateSnapshot {
             config: Arc::clone(&self.config),
-            // workspaces: Arc::clone(&self.workspaces),
+            workspaces: Arc::clone(&self.workspaces),
             analysis: self.analysis_host.make_analysis(),
             vfs: Arc::clone(&self.vfs),
             mem_docs: self.mem_docs.clone(),
