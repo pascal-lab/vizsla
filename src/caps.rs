@@ -193,7 +193,7 @@ impl Config {
                             FileOperationFilter {
                                 scheme: String::from("file").into(),
                                 pattern: FileOperationPattern {
-                                    glob: String::from("**/*.rs"),
+                                    glob: String::from("**/*.{v,sv}"),
                                     matches: FileOperationPatternKind::File.into(),
                                     options: None,
                                 },
