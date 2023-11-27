@@ -10,10 +10,11 @@ use std::time::Instant;
 use triomphe::Arc;
 use utils::{
     excl_task::ExclTask,
+    lines::LineEndings,
     thread::{Pool, ThreadIntent},
 };
 
-use crate::{config::Config, line_idx::LineEndings, main_loop::Task, mem_docs::MemDocs, reload};
+use crate::{config::Config, main_loop::Task, mem_docs::MemDocs, reload};
 use ide::{
     self,
     analysis_host::{Analysis, AnalysisHost},

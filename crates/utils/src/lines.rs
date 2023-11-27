@@ -13,14 +13,14 @@ pub enum WideEncoding {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub(crate) enum LineEndings {
+pub enum LineEndings {
     Unix,
     Dos,
 }
 
 impl LineEndings {
     /// Replaces `\r\n` with `\n` in-place in `src`.
-    pub(crate) fn normalize(src: String) -> (String, LineEndings) {
+    pub fn normalize(src: String) -> (String, LineEndings) {
         // We replace `\r\n` with `\n` in-place, which doesn't break utf-8 encoding.
         // While we *can* call `as_mut_vec` and do surgery on the live string
         // directly, let's rather steal the contents of `src`. This makes the code

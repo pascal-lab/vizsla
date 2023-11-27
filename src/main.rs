@@ -27,7 +27,6 @@ use config::Config;
 
 mod dispatcher;
 mod global_state;
-mod line_idx;
 mod lsp_ext;
 mod main_loop;
 mod mem_docs;

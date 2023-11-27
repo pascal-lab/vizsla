@@ -9,12 +9,12 @@ use lsp_types::{
     WorkspaceFileOperationsServerCapabilities, WorkspaceFoldersServerCapabilities,
     WorkspaceServerCapabilities,
 };
-use utils::{try_, try_or_def, try_or_default};
-
-use crate::{
-    config::Config,
-    line_idx::{PositionEncoding, WideEncoding},
+use utils::{
+    lines::{PositionEncoding, WideEncoding},
+    try_, try_or_def, try_or_default,
 };
+
+use crate::config::Config;
 
 impl Config {
     pub fn cli_completion_label_details_support(&self) -> bool {
@@ -96,6 +96,7 @@ impl Config {
                 PositionEncoding::Wide(wide) => match wide {
                     WideEncoding::Utf16 => Some(PositionEncodingKind::UTF16),
                     WideEncoding::Utf32 => Some(PositionEncodingKind::UTF32),
+                    _ => todo!(),
                 },
             },
             text_document_sync: Some(
