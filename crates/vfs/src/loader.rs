@@ -86,9 +86,8 @@ impl Directories {
             }
         }
 
-        let longest_incl = match longest_incl {
-            Some(it) => it,
-            None => return false,
+        let Some(longest_incl) = longest_incl else {
+            return false;
         };
 
         !self.exclude.iter().any(|excl| path.starts_with(excl) && excl.starts_with(longest_incl))

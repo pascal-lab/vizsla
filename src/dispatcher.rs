@@ -65,9 +65,8 @@ impl ReqDispatcher<'_> {
         R::Params: DeserializeOwned + UnwindSafe + fmt::Debug,
         R::Result: Serialize,
     {
-        let (req, params, panic_context) = match self.parse::<R>() {
-            Some(it) => it,
-            None => return self,
+        let Some((req, params, panic_context)) = self.parse::<R>() else {
+            return self;
         };
 
         let result = {
@@ -88,9 +87,8 @@ impl ReqDispatcher<'_> {
         R::Params: DeserializeOwned + UnwindSafe + fmt::Debug,
         R::Result: Serialize,
     {
-        let (req, params, panic_context) = match self.parse::<R>() {
-            Some(it) => it,
-            None => return self,
+        let Some((req, params, panic_context)) = self.parse::<R>() else {
+            return self;
         };
 
         let global_state_snapshot = self.global_state.make_snapshot();
@@ -133,9 +131,8 @@ impl ReqDispatcher<'_> {
         R::Params: DeserializeOwned + UnwindSafe + Send + fmt::Debug,
         R::Result: Serialize,
     {
-        let (req, params, panic_context) = match self.parse::<R>() {
-            Some(it) => it,
-            None => return self,
+        let Some((req, params, panic_context)) = self.parse::<R>() else {
+            return self;
         };
 
         let world = self.global_state.make_snapshot();
