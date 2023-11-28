@@ -1,7 +1,10 @@
 use base_db::{
     change::Change,
     salsa::{Database, Durability},
+    source_root::SourceRootId,
 };
+use itertools::{Either, Itertools};
+use rustc_hash::FxHashSet;
 
 use crate::root_db::RootDb;
 
@@ -16,7 +19,19 @@ impl RootDb {
         self.request_cancellation();
         tracing::trace!("apply_change {:?}", change);
 
-        // TODO: handle root
+        if let Some(roots) = &change.roots {
+            let (lib_roots, local_roots): (FxHashSet<_>, FxHashSet<_>) =
+                roots.iter().enumerate().partition_map(|(idx, root)| {
+                    let source_root_id = SourceRootId(idx as u32);
+                    if root.is_lib {
+                        Either::Left(source_root_id)
+                    } else {
+                        Either::Right(source_root_id)
+                    }
+                });
+
+            // TODO: set roots
+        }
         change.apply(self);
     }
 }
