@@ -12,6 +12,7 @@ use utils::paths::{sort_and_remove_subfolders, AbsPathBuf};
 
 use crate::macro_def::{MacroAtom, MacroDef};
 
+const DEFAULT_TOP_MODULE: &str = "main";
 const IDENTIFIER_RE: &str = r"[a-zA-Z_][a-zA-Z0-9$_]*|\\\S* ";
 static IDENT_RE: Lazy<Regex> = Lazy::new(|| Regex::new(formatcp!("^({IDENTIFIER_RE})$")).unwrap());
 static KV_RE: Lazy<Regex> =
@@ -19,6 +20,7 @@ static KV_RE: Lazy<Regex> =
 
 #[derive(Debug, Deserialize)]
 struct TomlManifestSchema {
+    pub top_module: String,
     #[serde(deserialize_with = "de_macros", default)]
     pub macros: MacroDef,
     #[serde(default)]
@@ -57,6 +59,7 @@ where
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct TomlWorkspace {
+    pub top_module: String,
     pub workspace_root: AbsPathBuf,
     pub macro_defs: MacroDef,
     pub include: Vec<AbsPathBuf>,
@@ -73,6 +76,7 @@ impl TomlWorkspace {
         let toml_schema: TomlManifestSchema =
             toml::from_str(&toml_file).with_context(|| format!("failed to parse {:?}", toml))?;
 
+        let top_module = toml_schema.top_module;
         let workspace_root = toml.parent().unwrap().to_path_buf();
 
         let mut exclude = toml_schema
@@ -101,6 +105,7 @@ impl TomlWorkspace {
         }
 
         Ok(TomlWorkspace {
+            top_module,
             workspace_root,
             macro_defs: toml_schema.macros,
             include,
@@ -112,6 +117,7 @@ impl TomlWorkspace {
 
     pub fn default_from_path(path: &AbsPathBuf) -> Self {
         Self {
+            top_module: String::from(DEFAULT_TOP_MODULE),
             workspace_root: path.clone(),
             macro_defs: MacroDef::default(),
             include: vec![path.clone()],
