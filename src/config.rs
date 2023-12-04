@@ -1,7 +1,7 @@
-use crate::{
-    user_config::{FilesWatcherDef, UserConfig},
-    Opt,
-};
+pub mod caps;
+pub mod user_config;
+
+use crate::Opt;
 use itertools::Itertools;
 use lsp_types::ClientCapabilities;
 use project_model::project_manifest::ProjectManifest;
@@ -9,6 +9,8 @@ use serde_json::Error;
 use std::path::PathBuf;
 use triomphe::Arc;
 use utils::{json::get_field, paths::AbsPathBuf};
+
+use self::user_config::{FilesWatcherDef, UserConfig};
 
 #[derive(Debug, Clone)]
 pub struct FilesConfig {

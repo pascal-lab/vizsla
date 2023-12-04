@@ -11,8 +11,9 @@ use utils::{json::from_json, thread::ThreadIntent};
 use crate::{
     global_state::{GlobalState, GlobalStateSnapshot},
     lsp_ext::LspError,
-    main_loop::Task,
 };
+
+use super::main_loop::Task;
 
 pub(crate) struct ReqDispatcher<'a> {
     pub(crate) req: Option<Request>,

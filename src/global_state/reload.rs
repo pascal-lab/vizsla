@@ -7,7 +7,9 @@ use rustc_hash::FxHashSet;
 use utils::{paths::AbsPath, thread::ThreadIntent};
 use vfs::vfs::ChangeKind;
 
-use crate::{config::FilesWatcher, global_state::GlobalState, main_loop::Task};
+use crate::{config::FilesWatcher, global_state::GlobalState};
+
+use super::main_loop::Task;
 
 #[derive(Debug)]
 pub(crate) enum FetchWorkspaceProgress {

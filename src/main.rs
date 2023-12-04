@@ -3,6 +3,7 @@ use std::{env, fs, io, path::PathBuf};
 
 use anyhow::Context;
 use clap::Parser;
+use config::Config;
 use const_format::formatcp;
 use itertools::Itertools;
 use lsp_server::Connection;
@@ -17,18 +18,11 @@ use utils::{
     paths::{patch_path_prefix, AbsPathBuf},
 };
 
-mod caps;
+use crate::global_state::main_loop;
+
 mod config;
-mod reload;
-mod respond;
-mod user_config;
-
-use config::Config;
-
-mod dispatcher;
 mod global_state;
 mod lsp_ext;
-mod main_loop;
 mod mem_docs;
 
 const DEFAULT_PROCESS_NAME: &str = "vizsla";

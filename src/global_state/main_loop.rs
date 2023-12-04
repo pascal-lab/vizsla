@@ -9,12 +9,13 @@ use project_model::project_manifest;
 use triomphe::Arc;
 use vfs::vfs::VfsPath;
 
-use crate::{
+use crate::config::Config;
+
+use super::{
     dispatcher::{NotifDispatcher, ReqDispatcher},
-    global_state::GlobalState,
     reload::FetchWorkspaceProgress,
     respond::Progress,
-    Config,
+    GlobalState,
 };
 
 #[derive(Debug)]
