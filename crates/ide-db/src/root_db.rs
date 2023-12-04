@@ -11,10 +11,9 @@ use triomphe::Arc;
 use vfs::vfs::{AnchoredPath, FileId};
 
 #[salsa::database(
-    base_db::source_database::SourceDbStorage,
-    base_db::source_database::SourceRootDbStorage
+    base_db::source_db::SourceDbStorage,
+    base_db::source_db::SourceRootDbStorage
 )]
-
 pub struct RootDb {
     // `ManuallyDrop` is used to avoid duplicating drop glue like `Weak::drop'
     // for improved compile times and performance.
