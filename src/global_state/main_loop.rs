@@ -7,7 +7,7 @@ use lsp_server::{Connection, Message, Notification, Request, Response};
 use lsp_types::notification::Notification as _;
 use project_model::project_manifest;
 use triomphe::Arc;
-use vfs::vfs::VfsPath;
+use vfs::vfs_path::VfsPath;
 
 use crate::config::Config;
 

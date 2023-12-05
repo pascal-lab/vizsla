@@ -1,6 +1,8 @@
 use vfs::{
+    anchored_path::AnchoredPath,
     file_set::{FileSet, FileSetConfig},
-    vfs::{AnchoredPath, FileId, Vfs, VfsPath},
+    vfs::{FileId, Vfs},
+    vfs_path::VfsPath,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]

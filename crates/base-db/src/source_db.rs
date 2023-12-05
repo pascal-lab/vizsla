@@ -1,6 +1,6 @@
 use rustc_hash::FxHashSet;
 use triomphe::Arc;
-use vfs::vfs::{AnchoredPath, FileId};
+use vfs::{anchored_path::AnchoredPath, vfs::FileId};
 
 use crate::{
     package_graph::{PackageGraph, PackageId},
