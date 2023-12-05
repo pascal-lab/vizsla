@@ -13,6 +13,7 @@ use crate::config::Config;
 
 use super::{
     dispatcher::{NotifDispatcher, ReqDispatcher},
+    handlers,
     reload::FetchWorkspaceProgress,
     respond::Progress,
     GlobalState,
@@ -123,8 +124,8 @@ impl GlobalState {
 
         match event {
             Event::Lsp(msg) => match msg {
-                Message::Request(req) => self.handle_lsp_request(loop_start, req),
-                Message::Notification(notif) => self.handle_lsp_notification(notif)?,
+                Message::Request(req) => self.handle_request(loop_start, req),
+                Message::Notification(notif) => self.handle_notification(notif)?,
                 Message::Response(res) => self.handle_response(res),
             },
             Event::Task(task) => self.handle_task(task),
@@ -149,7 +150,7 @@ impl GlobalState {
         Ok(())
     }
 
-    fn handle_lsp_request(&mut self, req_received: Instant, req: Request) {
+    fn handle_request(&mut self, req_received: Instant, req: Request) {
         self.register_request(req_received, &req);
         self.dispatch_request(req);
     }
@@ -179,8 +180,14 @@ impl GlobalState {
         dispatcher.finish();
     }
 
-    fn handle_lsp_notification(&mut self, notif: Notification) -> anyhow::Result<()> {
-        NotifDispatcher { notif: Some(notif), global_state: self }.finish();
+    fn handle_notification(&mut self, notif: Notification) -> anyhow::Result<()> {
+        use handlers::notification::*;
+        use lsp_types::notification::*;
+
+        NotifDispatcher { notif: Some(notif), global_state: self }
+            .on_sync_mut::<Cancel>(handle_cancel)?
+            .on_sync_mut::<DidOpenTextDocument>(handle_did_open_text_document)?
+            .finish();
 
         Ok(())
     }

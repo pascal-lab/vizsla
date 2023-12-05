@@ -1,10 +1,11 @@
 mod apply_changes;
 pub mod dispatcher;
+mod handlers;
 pub mod main_loop;
 pub mod reload;
 pub mod respond;
 
-use base_db::{source_root::SourceRootConfig};
+use base_db::source_root::SourceRootConfig;
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use lsp_server::{Message, ReqQueue, Request};
 use nohash_hasher::IntMap;
@@ -158,12 +159,21 @@ impl GlobalState {
             mem_docs: self.mem_docs.clone(),
         }
     }
+}
 
+// handle request
+impl GlobalState {
     pub(crate) fn register_request(&mut self, req_received: Instant, req: &Request) {
         self.req_queue.incoming.register(req.id.clone(), (req.method.clone(), req_received));
     }
 
     pub(crate) fn is_completed(&self, req: &Request) -> bool {
         self.req_queue.incoming.is_completed(&req.id)
+    }
+
+    pub(crate) fn cancel(&mut self, req_id: lsp_server::RequestId) {
+        if let Some(response) = self.req_queue.incoming.cancel(req_id) {
+            self.send(response.into());
+        }
     }
 }

@@ -18,7 +18,7 @@ impl Progress {
 }
 
 impl GlobalState {
-    fn send(&self, message: lsp_server::Message) {
+    pub(crate) fn send(&self, message: lsp_server::Message) {
         self.sender.send(message).unwrap()
     }
 

@@ -1,16 +1,13 @@
 use base_db::change::Change;
 use itertools::Itertools;
 use nohash_hasher::IntMap;
-use parking_lot::{RwLockWriteGuard, RwLockUpgradableReadGuard};
+use parking_lot::{RwLockUpgradableReadGuard, RwLockWriteGuard};
 use rustc_hash::FxHashMap;
 use triomphe::Arc;
 use utils::lines::LineEndings;
-use vfs::vfs::{FileId, Vfs, ChangedFile};
+use vfs::vfs::{ChangedFile, FileId, Vfs};
 
-use super::{
-    reload::{should_refresh_for_change},
-    GlobalState,
-};
+use super::{reload::should_refresh_for_change, GlobalState};
 
 // Apply changes
 impl GlobalState {
