@@ -141,8 +141,6 @@ impl GlobalState {
             self.fetch_workspaces(cause);
         }
 
-        if !self.fetch_workspaces_task.in_process() {}
-
         let loop_duration = loop_start.elapsed();
         if loop_duration > Duration::from_millis(100) && was_quiescent {
             tracing::warn!("overly long loop turn took {loop_duration:?} (event handling took {event_handling_duration:?}): {event_dbg_msg}");

@@ -31,6 +31,5 @@ impl<'a> Iterator for SyntaxChildren<'a> {
     }
 }
 
-
 #[cfg(test)]
 mod tests;
