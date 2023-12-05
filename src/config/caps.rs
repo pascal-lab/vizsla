@@ -69,7 +69,7 @@ impl Config {
         try_or_def!(self.client_caps.window.as_ref()?.work_done_progress?)
     }
 
-    fn negotiated_encoding(&self) -> PositionEncoding {
+    pub(crate) fn negotiated_encoding(&self) -> PositionEncoding {
         let client_encodings = match &self.client_caps.general {
             Some(general) => general.position_encodings.as_deref().unwrap_or_default(),
             None => &[],

@@ -8,7 +8,7 @@ use project_model::project_manifest::ProjectManifest;
 use serde_json::Error;
 use std::path::PathBuf;
 use triomphe::Arc;
-use utils::{json::get_field, paths::AbsPathBuf};
+use utils::{json::get_field, lines::PositionEncoding, paths::AbsPathBuf};
 
 use self::user_config::{FilesWatcherDef, UserConfig};
 
@@ -112,5 +112,9 @@ impl Config {
                 .map(|it| self.root_path.join(it))
                 .collect(),
         }
+    }
+
+    pub fn position_encoding(&self) -> PositionEncoding {
+        self.negotiated_encoding()
     }
 }
