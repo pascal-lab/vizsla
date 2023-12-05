@@ -10,7 +10,7 @@ use utils::{json::from_json, thread::ThreadIntent};
 
 use crate::{
     global_state::{GlobalState, GlobalStateSnapshot},
-    lsp_ext::LspError,
+    lsp_ext::lsp_error::LspError,
 };
 
 use super::main_loop::Task;
