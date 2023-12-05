@@ -1,0 +1,8 @@
+[package]
+name = "hir"
+version = "0.0.0"
+edition.workspace = true
+
+[dependencies]
+salsa.workspace = true
+smol_str.Workspace = true
