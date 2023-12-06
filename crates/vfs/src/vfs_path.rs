@@ -73,11 +73,7 @@ impl VfsPath {
     /// Returns [`None`] if the path is a root or prefix.
     pub fn parent(&self) -> Option<VfsPath> {
         let mut parent = self.clone();
-        if parent.pop() {
-            Some(parent)
-        } else {
-            None
-        }
+        parent.pop().then_some(parent)
     }
 
     /// Returns `self`'s base name and file extension.
@@ -278,10 +274,10 @@ impl VirtualPath {
     }
 
     fn pop(&mut self) -> bool {
-        let pos = match self.0.rfind('/') {
-            Some(pos) => pos,
-            None => return false,
+        let Some(pos) = self.0.rfind('/') else {
+            return false;
         };
+
         self.0 = self.0[..pos].to_string();
         true
     }

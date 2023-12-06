@@ -172,9 +172,8 @@ impl GlobalState {
         let vfs = &read_guard.0;
 
         // collect changes
-        let changed_files = match Self::colease_modifications(changed_files) {
-            Some(changed_files) => changed_files,
-            None => return false,
+        let Some(changed_files) = Self::colease_modifications(changed_files) else {
+            return false;
         };
 
         let mut workspace_structure_change = None;
