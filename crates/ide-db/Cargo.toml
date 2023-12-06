@@ -7,8 +7,8 @@ edition.workspace = true
 
 [dependencies]
 base-db.workspace = true
-vfs.workspace = true
-rustc-hash.workspace = true
-triomphe.workspace = true
-tracing.workspace = true
 itertools.workspace = true
+rustc-hash.workspace = true
+tracing.workspace = true
+triomphe.workspace = true
+vfs.workspace = true

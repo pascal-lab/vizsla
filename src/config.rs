@@ -92,7 +92,7 @@ impl Config {
         }
     }
 
-    pub(crate) fn update(&mut self, mut json: serde_json::Value) -> Result<(), ConfigError> {
+    pub(crate) fn update(&mut self, json: serde_json::Value) -> Result<(), ConfigError> {
         let (user_config, detached_files, snippets, errors) =
             Self::parse_initialization_options(json);
         self.user_config = user_config;

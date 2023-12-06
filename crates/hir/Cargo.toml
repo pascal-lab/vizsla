@@ -5,4 +5,3 @@ edition.workspace = true
 
 [dependencies]
 salsa.workspace = true
-smol_str.Workspace = true

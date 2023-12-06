@@ -6,10 +6,10 @@ description = "A impl for watching file system changes"
 edition.workspace = true
 
 [dependencies]
-vfs.workspace = true
 crossbeam-channel.workspace = true
-utils.workspace = true
-notify.workspace = true
-tracing.workspace = true
-walkdir = "2.4.0"
 itertools.workspace = true
+notify = "6.1.1"
+tracing.workspace = true
+utils.workspace = true
+vfs.workspace = true
+walkdir = "2.4.0"

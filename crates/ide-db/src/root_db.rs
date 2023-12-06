@@ -10,10 +10,7 @@ use rustc_hash::FxHashSet;
 use triomphe::Arc;
 use vfs::{anchored_path::AnchoredPath, vfs::FileId};
 
-#[salsa::database(
-    base_db::source_db::SourceDbStorage,
-    base_db::source_db::SourceRootDbStorage
-)]
+#[salsa::database(base_db::source_db::SourceDbStorage, base_db::source_db::SourceRootDbStorage)]
 pub struct RootDb {
     // `ManuallyDrop` is used to avoid duplicating drop glue like `Weak::drop'
     // for improved compile times and performance.

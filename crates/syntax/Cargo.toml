@@ -8,9 +8,8 @@ edition.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-serde = { workspace = true, features = ["derive"] }
+serde.workspace = true
 tree-sitter = "0.20"
-tree-sitter-verilog.workspace = true
 
 [build-dependencies]
 quote = "1.0.20"

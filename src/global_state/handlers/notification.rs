@@ -2,15 +2,12 @@ use std::ops::Range;
 
 use line_index::LineIndex;
 use lsp_types::{
-    DidChangeConfigurationParams, DidChangeTextDocumentParams, DidChangeWorkspaceFoldersParams,
-    DidCloseTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams, DidChangeWatchedFilesParams,
+    DidChangeConfigurationParams, DidChangeTextDocumentParams, DidChangeWatchedFilesParams,
+    DidChangeWorkspaceFoldersParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
+    DidSaveTextDocumentParams,
 };
 use triomphe::Arc;
-use utils::{
-    lines::{LineEndings, LineIndexEnding, PositionEncoding},
-    paths::AbsPathBuf,
-    try_,
-};
+use utils::lines::{LineEndings, LineIndexEnding, PositionEncoding};
 use vfs::vfs::ChangeKind;
 
 use crate::{
@@ -236,7 +233,7 @@ pub(crate) fn handle_did_change_workspace_folders(
 pub(crate) fn handle_did_change_watched_files(
     state: &mut GlobalState,
     params: DidChangeWatchedFilesParams,
-)-> anyhow::Result<()> {
+) -> anyhow::Result<()> {
     for change in params.changes {
         if let Ok(path) = from_proto::abs_path(&change.uri) {
             // invalidate the file in the VFS so that it's reloaded later

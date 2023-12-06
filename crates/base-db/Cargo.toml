@@ -6,10 +6,10 @@ description = "Indexing database"
 edition.workspace = true
 
 [dependencies]
-salsa.workspace = true
-vfs.workspace = true
-triomphe.workspace = true
-la-arena.workspace = true
-smol_str.workspace = true
-rustc-hash.workspace = true
 itertools.workspace = true
+la-arena.workspace = true
+rustc-hash.workspace = true
+salsa.workspace = true
+smol_str.workspace = true
+triomphe.workspace = true
+vfs.workspace = true
