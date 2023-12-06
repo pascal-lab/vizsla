@@ -9,6 +9,8 @@ use std::{
     path::{Component, Path, PathBuf, Prefix},
 };
 
+use lsp_types::Url;
+
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct AbsPathBuf(PathBuf);
 
@@ -57,6 +59,13 @@ impl TryFrom<&str> for AbsPathBuf {
     type Error = PathBuf;
     fn try_from(path: &str) -> Result<AbsPathBuf, PathBuf> {
         AbsPathBuf::try_from(PathBuf::from(path))
+    }
+}
+
+impl TryFrom<Url> for AbsPathBuf {
+    type Error = PathBuf;
+    fn try_from(url: Url) -> Result<AbsPathBuf, PathBuf> {
+        AbsPathBuf::try_from(url.to_file_path().map_err(|()| PathBuf::from(url.as_str()))?)
     }
 }
 

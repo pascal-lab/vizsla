@@ -82,6 +82,7 @@ regex = { package = "regex" }
 once_cell = { package = "once_cell" }
 salsa = { package = "salsa" }
 line-index = { package = "line-index" }
+lsp-types = { package = "lsp-types" }
 
 [toolchain]
 channel = "nightly"
