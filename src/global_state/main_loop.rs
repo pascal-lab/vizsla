@@ -187,6 +187,11 @@ impl GlobalState {
         NotifDispatcher { notif: Some(notif), global_state: self }
             .on_sync_mut::<Cancel>(handle_cancel)?
             .on_sync_mut::<DidOpenTextDocument>(handle_did_open_text_document)?
+            .on_sync_mut::<DidChangeTextDocument>(handle_did_change_text_document)?
+            .on_sync_mut::<DidCloseTextDocument>(handle_did_close_text_document)?
+            .on_sync_mut::<DidSaveTextDocument>(handle_did_save_text_document)?
+            .on_sync_mut::<DidChangeConfiguration>(handle_did_change_configuration)?
+            .on_sync_mut::<DidChangeWorkspaceFolders>(handle_did_change_workspace_folders)?
             .finish();
 
         Ok(())

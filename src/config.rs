@@ -7,7 +7,11 @@ use lsp_types::ClientCapabilities;
 use project_model::project_manifest::ProjectManifest;
 use std::{fmt, path::PathBuf};
 use triomphe::Arc;
-use utils::{json::get_field, lines::PositionEncoding, paths::AbsPathBuf};
+use utils::{
+    json::get_field,
+    lines::PositionEncoding,
+    paths::{AbsPath, AbsPathBuf},
+};
 
 use self::user_config::{FilesWatcherDef, UserConfig};
 
@@ -125,7 +129,7 @@ impl Config {
         (user_config, detached_files, snippets, ConfigError { errors })
     }
 
-    pub fn discover_manifest(roots: &Vec<AbsPathBuf>) -> Vec<ProjectManifest> {
+    fn discover_manifest(roots: &Vec<AbsPathBuf>) -> Vec<ProjectManifest> {
         let manifests = ProjectManifest::discover_all(roots);
         tracing::info!("discovered manifests: {manifests:?}");
         if manifests.is_empty() {
@@ -157,5 +161,19 @@ impl Config {
 
     pub fn position_encoding(&self) -> PositionEncoding {
         self.negotiated_encoding()
+    }
+
+    pub fn remove_workspace(&mut self, path: &AbsPath) {
+        if let Some(position) = self.workspace_roots.iter().position(|it| it == path) {
+            self.workspace_roots.remove(position);
+        }
+    }
+
+    pub fn add_workspaces(&mut self, paths: impl Iterator<Item = AbsPathBuf>) {
+        self.workspace_roots.extend(paths);
+    }
+
+    pub fn rediscover_manifest(&mut self) {
+        self.discovered_manifests = Self::discover_manifest(&self.workspace_roots);
     }
 }

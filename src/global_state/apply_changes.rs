@@ -29,7 +29,7 @@ impl GlobalState {
         let mut bytes = vec![];
         for changed_file in changed_files {
             let path = vfs.file_path(changed_file.file_id);
-            if let Some(path) = path.as_path().map(|apath| apath.to_path_buf()) {
+            if let Some(path) = path.as_abs_path().map(|apath| apath.to_path_buf()) {
                 if changed_file.is_created_or_deleted() {
                     has_structure_changes = true;
                     workspace_structure_change = Some(path);

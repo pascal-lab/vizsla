@@ -4,10 +4,14 @@ use project_model::{
     workspace::{get_workspace_folder, Workspace},
 };
 use rustc_hash::FxHashSet;
+use triomphe::Arc;
 use utils::{paths::AbsPath, thread::ThreadIntent};
 use vfs::vfs::ChangeKind;
 
-use crate::{config::FilesWatcher, global_state::GlobalState};
+use crate::{
+    config::{Config, FilesWatcher},
+    global_state::GlobalState,
+};
 
 use super::main_loop::Task;
 
@@ -178,6 +182,11 @@ impl GlobalState {
         self.source_root_config = source_root_config;
 
         tracing::info!("did switch workspaces");
+    }
+
+    pub(crate) fn update_configuration(&mut self, config: Config) {
+        let old_config = std::mem::replace(&mut self.config, Arc::new(config));
+        // TODO: update LRU capacity
     }
 }
 
