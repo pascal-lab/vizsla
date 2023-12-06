@@ -16,7 +16,7 @@ impl VfsPath {
         VfsPath::from(AbsPathBuf::assert(path.into()))
     }
 
-    pub fn as_path(&self) -> Option<&AbsPath> {
+    pub fn as_abs_path(&self) -> Option<&AbsPath> {
         match &self.0 {
             VfsPathKinds::RealPath(it) => Some(it.as_path()),
             VfsPathKinds::VirtualPath(_) => None,
