@@ -10,7 +10,7 @@ use lsp_types::{
     WorkspaceFileOperationsServerCapabilities, WorkspaceFoldersServerCapabilities,
     WorkspaceServerCapabilities,
 };
-use utils::{lines::PositionEncoding, try_, try_or_def, try_or_default};
+use utils::{lines::PositionEncoding, try_, try_or_default};
 
 use crate::config::Config;
 
@@ -53,7 +53,7 @@ impl Config {
     }
 
     pub fn cli_did_change_watched_files_dyn_reg(&self) -> bool {
-        try_or_def!(
+        try_or_default!(
             self.client_caps
                 .workspace
                 .as_ref()?
@@ -64,7 +64,7 @@ impl Config {
     }
 
     pub fn cli_work_done_progress(&self) -> bool {
-        try_or_def!(self.client_caps.window.as_ref()?.work_done_progress?)
+        try_or_default!(self.client_caps.window.as_ref()?.work_done_progress?)
     }
 
     pub(crate) fn negotiated_encoding(&self) -> PositionEncoding {
