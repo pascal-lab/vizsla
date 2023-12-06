@@ -19,7 +19,10 @@ use utils::{
     thread::{Pool, ThreadIntent},
 };
 
-use crate::{config::Config, mem_docs::MemDocs};
+use crate::{
+    config::{Config, ConfigError},
+    mem_docs::MemDocs,
+};
 use ide::{
     self,
     analysis_host::{Analysis, AnalysisHost},
@@ -78,6 +81,7 @@ pub(crate) struct GlobalState {
     pub(crate) task_pool: Handle<TaskPool<Task>, Receiver<Task>>,
 
     pub(crate) config: Arc<Config>,
+    pub(crate) config_errors: Option<ConfigError>,
     pub(crate) source_root_config: SourceRootConfig,
 
     pub(crate) analysis_host: AnalysisHost,
@@ -133,6 +137,7 @@ impl GlobalState {
             req_queue: ReqQueue::default(),
             task_pool,
             config: Arc::new(config),
+            config_errors: None,
             analysis_host,
             mem_docs: MemDocs::default(),
             shutdown_requested: false,

@@ -114,17 +114,9 @@ fn run_server(opt: Opt) -> anyhow::Result<()> {
             Config::parse_initialization_options(initialization_options.unwrap());
         if !errors.is_empty() {
             use lsp_types::notification::{Notification, ShowMessage};
-            let errors_formatter = errors.iter().format_with("\n", |(key, err), f| {
-                let _ = f(key);
-                let _ = f(&": ");
-                f(err)
-            });
             let noti = lsp_server::Notification::new(
                 ShowMessage::METHOD.to_string(),
-                ShowMessageParams {
-                    typ: MessageType::WARNING,
-                    message: format!("{}", errors_formatter),
-                },
+                ShowMessageParams { typ: MessageType::WARNING, message: errors.to_string() },
             );
             connection.sender.send(lsp_server::Message::Notification(noti)).unwrap();
         }

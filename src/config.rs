@@ -5,8 +5,7 @@ use crate::Opt;
 use itertools::Itertools;
 use lsp_types::ClientCapabilities;
 use project_model::project_manifest::ProjectManifest;
-use serde_json::Error;
-use std::path::PathBuf;
+use std::{fmt, path::PathBuf};
 use triomphe::Arc;
 use utils::{json::get_field, lines::PositionEncoding, paths::AbsPathBuf};
 
@@ -22,6 +21,35 @@ pub struct FilesConfig {
 pub enum FilesWatcher {
     Client,
     Server,
+}
+
+#[derive(Debug, Default)]
+pub struct ConfigError {
+    errors: Vec<(String, serde_json::Error)>,
+}
+
+impl std::error::Error for ConfigError {}
+
+impl fmt::Display for ConfigError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let errors = self.errors.iter().format_with("\n", |(key, e), f| {
+            f(key)?;
+            f(&": ")?;
+            f(e)
+        });
+        write!(
+            f,
+            "invalid config value{}:\n{}",
+            if self.errors.len() == 1 { "" } else { "s" },
+            errors
+        )
+    }
+}
+
+impl ConfigError {
+    pub fn is_empty(&self) -> bool {
+        self.errors.is_empty()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -60,10 +88,23 @@ impl Config {
         }
     }
 
+    pub(crate) fn update(&mut self, mut json: serde_json::Value) -> Result<(), ConfigError> {
+        let (user_config, detached_files, snippets, errors) =
+            Self::parse_initialization_options(json);
+        self.user_config = user_config;
+        self.detached_files = Arc::new(detached_files);
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+
     pub(crate) fn parse_initialization_options(
         mut options: serde_json::Value,
-    ) -> (UserConfig, Vec<AbsPathBuf>, Vec<Snippet>, Vec<(String, Error)>) {
-        tracing::info!("Server initialized with options: {:#}", options);
+    ) -> (UserConfig, Vec<AbsPathBuf>, Vec<Snippet>, ConfigError) {
+        tracing::info!("Config updating from JSON: {:#}", options);
         if options.is_null() || options.as_object().map_or(false, |obj| obj.is_empty()) {
             return Default::default();
         }
@@ -81,7 +122,7 @@ impl Config {
 
         let user_config = UserConfig::from_json(options, &mut errors);
 
-        (user_config, detached_files, snippets, errors)
+        (user_config, detached_files, snippets, ConfigError { errors })
     }
 
     pub fn discover_manifest(roots: &Vec<AbsPathBuf>) -> Vec<ProjectManifest> {
