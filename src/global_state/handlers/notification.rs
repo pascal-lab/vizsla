@@ -3,7 +3,7 @@ use std::ops::Range;
 use line_index::LineIndex;
 use lsp_types::{
     DidChangeConfigurationParams, DidChangeTextDocumentParams, DidChangeWorkspaceFoldersParams,
-    DidCloseTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
+    DidCloseTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams, DidChangeWatchedFilesParams,
 };
 use triomphe::Arc;
 use utils::{
@@ -217,12 +217,12 @@ pub(crate) fn handle_did_change_workspace_folders(
     let config = Arc::make_mut(&mut state.config);
 
     for workspace in params.event.removed {
-        if let Ok(path) = AbsPathBuf::try_from(workspace.uri) {
+        if let Ok(path) = from_proto::abs_path(&workspace.uri) {
             config.remove_workspace(&path);
         }
     }
 
-    let added = params.event.added.into_iter().filter_map(|it| AbsPathBuf::try_from(it.uri).ok());
+    let added = params.event.added.into_iter().filter_map(|it| from_proto::abs_path(&it.uri).ok());
     config.add_workspaces(added);
 
     if config.detached_files.is_empty() {
@@ -230,5 +230,18 @@ pub(crate) fn handle_did_change_workspace_folders(
         state.fetch_workspaces_task.request("client workspaces changed".to_string(), ())
     }
 
+    Ok(())
+}
+
+pub(crate) fn handle_did_change_watched_files(
+    state: &mut GlobalState,
+    params: DidChangeWatchedFilesParams,
+)-> anyhow::Result<()> {
+    for change in params.changes {
+        if let Ok(path) = from_proto::abs_path(&change.uri) {
+            // invalidate the file in the VFS so that it's reloaded later
+            state.vfs_loader.handle.invalidate(path);
+        }
+    }
     Ok(())
 }
