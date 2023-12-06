@@ -10,6 +10,11 @@ pub(crate) fn vfs_path(url: &lsp_types::Url) -> anyhow::Result<vfs::vfs::VfsPath
     Ok(VfsPath::from(AbsPathBuf::try_from(path).unwrap()))
 }
 
+pub(crate) fn abs_path(url: &lsp_types::Url) -> anyhow::Result<AbsPathBuf> {
+    let path = url.to_file_path().map_err(|()| anyhow::format_err!("url is not a file"))?;
+    Ok(AbsPathBuf::try_from(path).unwrap())
+}
+
 // convert position (line, col) to Offset
 pub(crate) fn offset(
     line_index: &LineIndexEnding,
