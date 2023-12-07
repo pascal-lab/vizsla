@@ -33,11 +33,18 @@ pub fn sourcegen_ast() {
         sourcegen::project_root().join("crates/syntax/src/ast/symbol/generated.rs");
     mkdir_and_write(ast_symbols_file.as_path(), &ast_symbols)
         .expect("Failed to write symbols file");
+
+    let ast_symbol_ptrs = generate_node_ptrs(&grammar);
+    let ast_symbol_ptrs_file =
+        sourcegen::project_root().join("crates/syntax/src/ast/ptr/generated.rs");
+    mkdir_and_write(ast_symbol_ptrs_file.as_path(), &ast_symbol_ptrs)
+        .expect("Failed to write symbol ptrs file");
 }
 
 fn generate_nodes(grammar: &Grammar) -> String {
     let symbol_defs = grammar.symbols.iter().map(|symbol| {
-        let type_name = format_ident!("{}", symbol.type_name);
+        let node_type_name = format_ident!("{}", symbol.type_name);
+        let ptr_type_name = format_ident!("{}Ptr", symbol.type_name);
         let methods = symbol.fields.values().map(|field| match field.symbol_or_token {
             SymbolOrToken::Symbol { ref method_name, ref type_name } => {
                 let type_name = format_ident!("{}", type_name);
@@ -72,31 +79,30 @@ fn generate_nodes(grammar: &Grammar) -> String {
         });
         quote! {
             #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-            pub struct #type_name<'a> {
+            pub struct #node_type_name<'a> {
                 syntax: SyntaxNode<'a>
             }
 
-            impl<'a> #type_name<'a> {
+            impl<'a> #node_type_name<'a> {
+                pub fn to_ptr(&self) -> ptr::#ptr_type_name {
+                    ptr::#ptr_type_name::from_node(self)
+                }
                 #(#methods)*
             }
         }
     });
 
     let any_node_defs = grammar.symbols.iter().map(|symbol| {
-        let type_name = format_ident!("{}", symbol.type_name);
+        let node_type_name = format_ident!("{}", symbol.type_name);
         let syntax_kind_name = format_ident!("{}", symbol.type_name.to_screaming_snake_case());
         quote! {
-            impl<'a> AstNode<'a> for #type_name<'a> {
-                fn can_cast(syntax: SyntaxNode<'a>) -> bool {
+            impl<'a> AstNode<'a> for #node_type_name<'a> {
+                fn can_cast(syntax: &SyntaxNode<'a>) -> bool {
                     syntax.kind() == syntax_kind::#syntax_kind_name
                 }
 
                 fn cast(syntax: SyntaxNode<'a>) -> Option<Self> {
-                    if Self::can_cast(syntax) {
-                        Some(#type_name { syntax })
-                    } else {
-                        None
-                    }
+                    Self::can_cast(&syntax).then_some(#node_type_name { syntax })
                 }
 
                 fn syntax(&self) -> &SyntaxNode {
@@ -106,14 +112,15 @@ fn generate_nodes(grammar: &Grammar) -> String {
         }
     });
     let res = quote! {
+        #![allow(unused)]
         #![allow(non_snake_case)]
 
         use crate::{
-            syntax_kind,
             ast::{
-                AstNode, SyntaxNode,
                 support::{self, AstChildren},
-            }
+                AstNode, ptr
+            },
+            syntax_kind, SyntaxNode,
         };
 
         #(#symbol_defs)*
@@ -142,6 +149,7 @@ fn generate_syntax_kinds(grammar: &Grammar) -> String {
     });
 
     let res = quote! {
+        #![allow(unused)]
         #![allow(non_upper_case_globals)]
 
         #(#symbol_kind_defs)*
@@ -149,6 +157,64 @@ fn generate_syntax_kinds(grammar: &Grammar) -> String {
     }
     .to_string();
     sourcegen::add_preamble("sourcegen_ast", sourcegen::reformat(res))
+}
+
+fn generate_node_ptrs(grammar: &Grammar) -> String {
+    let ptr_defs = grammar.symbols.iter().map(|symbol| {
+        let node_type_name = format_ident!("{}", symbol.type_name);
+        let ptr_type_name = format_ident!("{}Ptr", symbol.type_name);
+        quote! {
+            #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+            pub struct #ptr_type_name {
+                syntax: SyntaxNodePtr
+            }
+
+            impl #ptr_type_name {
+                pub fn from_node(node: &ast::#node_type_name) -> #ptr_type_name {
+                    #ptr_type_name { syntax: SyntaxNodePtr::from_node(node.syntax()) }
+                }
+
+                pub fn to_node<'a>(&self, tree: &'a tree_sitter::Tree) -> Option<ast::#node_type_name<'a>> {
+                    self.syntax.to_node(tree).and_then(ast::#node_type_name::cast)
+                }
+            }
+        }
+    });
+
+    let any_node_defs = grammar.symbols.iter().map(|symbol| {
+        let ptr_type_name = format_ident!("{}Ptr", symbol.type_name);
+        let syntax_kind_name = format_ident!("{}", symbol.type_name.to_screaming_snake_case());
+        quote! {
+            impl AstNodePtr for #ptr_type_name {
+                fn can_cast(syntax: &SyntaxNodePtr) -> bool {
+                    syntax.kind() == syntax_kind::#syntax_kind_name
+                }
+
+                fn cast(syntax: SyntaxNodePtr) -> Option<Self> {
+                    Self::can_cast(&syntax).then_some(#ptr_type_name { syntax })
+                }
+
+                fn syntax(&self) -> &SyntaxNodePtr {
+                    &self.syntax
+                }
+            }
+        }
+    });
+    let res = quote! {
+        #![allow(unused)]
+        #![allow(non_snake_case)]
+
+        use crate::{
+            syntax_kind, SyntaxNodePtr,
+            ast::{self, AstNode, ptr::AstNodePtr}
+        };
+
+        #(#ptr_defs)*
+        #(#any_node_defs)*
+    }
+    .to_string();
+    sourcegen::add_preamble("sourcegen_ast", sourcegen::reformat(res))
+        .replace("#[derive", "\n#[derive")
 }
 
 fn get_fields_and_tokens(grammar_json: &serde_json::Value) -> Grammar {
@@ -211,6 +277,8 @@ fn get_fields(
             } else {
                 let method_name = kind.replace('$', "dollar_");
                 let type_name = method_name.to_class_case();
+                let method_name =
+                    if method_name == "cast" { "cast_".to_string() } else { method_name };
                 let mut fields = BTreeMap::new();
                 fields.insert(
                     kind.to_string(),

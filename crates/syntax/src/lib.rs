@@ -31,5 +31,30 @@ impl<'a> Iterator for SyntaxChildren<'a> {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct SyntaxNodePtr {
+    kind: &'static str,
+    range: std::ops::Range<usize>,
+}
+
+impl SyntaxNodePtr {
+    pub fn kind(&self) -> &'static str {
+        self.kind
+    }
+
+    pub fn from_node(node: &SyntaxNode) -> Self {
+        let kind = node.kind();
+        let range = node.byte_range();
+        SyntaxNodePtr { kind, range }
+    }
+
+    pub fn to_node<'a>(&self, tree: &'a tree_sitter::Tree) -> Option<SyntaxNode<'a>> {
+        let range = &self.range;
+        tree.root_node()
+            .descendant_for_byte_range(range.start, range.end)
+            .filter(|node| node.kind() == self.kind)
+    }
+}
+
 #[cfg(test)]
 mod tests;

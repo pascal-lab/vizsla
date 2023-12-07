@@ -10,6 +10,7 @@ edition.workspace = true
 [dependencies]
 serde.workspace = true
 tree-sitter = "0.20"
+tree-sitter-verilog.workspace = true
 
 [build-dependencies]
 quote = "1.0.20"

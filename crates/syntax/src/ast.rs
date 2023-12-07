@@ -1,3 +1,4 @@
+mod ptr;
 mod support;
 mod symbol;
 
@@ -6,7 +7,7 @@ pub use symbol::*;
 use crate::SyntaxNode;
 
 pub trait AstNode<'a> {
-    fn can_cast(syntax: SyntaxNode<'a>) -> bool
+    fn can_cast(syntax: &SyntaxNode<'a>) -> bool
     where
         Self: Sized;
 
