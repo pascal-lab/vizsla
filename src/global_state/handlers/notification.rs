@@ -242,3 +242,8 @@ pub(crate) fn handle_did_change_watched_files(
     }
     Ok(())
 }
+
+pub(crate) fn handle_workspace_reload(state: &mut GlobalState, _: ()) -> anyhow::Result<()> {
+    state.fetch_workspaces_task.request("reload workspace request".to_string(), ());
+    Ok(())
+}

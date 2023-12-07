@@ -176,11 +176,13 @@ impl GlobalState {
             _ => (),
         }
 
-        // TODO: Add handlers
+        use handlers::request::*;
+        use lsp_types::request::*;
         dispatcher.finish();
     }
 
     fn handle_notification(&mut self, notif: Notification) -> anyhow::Result<()> {
+        use crate::lsp_ext::ext::*;
         use handlers::notification::*;
         use lsp_types::notification::*;
 
@@ -193,6 +195,7 @@ impl GlobalState {
             .on_sync_mut::<DidChangeConfiguration>(handle_did_change_configuration)?
             .on_sync_mut::<DidChangeWorkspaceFolders>(handle_did_change_workspace_folders)?
             .on_sync_mut::<DidChangeWatchedFiles>(handle_did_change_watched_files)?
+            .on_sync_mut::<ReloadWorkspace>(handle_workspace_reload)?
             .finish();
 
         Ok(())
