@@ -3,5 +3,6 @@ pub mod json;
 pub mod lines;
 pub mod panic_context;
 pub mod paths;
+pub mod text_edit;
 pub mod thread;
 pub mod utry;
