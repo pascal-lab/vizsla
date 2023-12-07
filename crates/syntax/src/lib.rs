@@ -17,6 +17,13 @@ impl<'a> SyntaxChildren<'a> {
         let cursor = cursor.goto_first_child().then_some(cursor);
         SyntaxChildren { cursor, ph: PhantomData }
     }
+
+    pub fn new_from_node(parent: SyntaxNode<'a>) -> Self {
+        let mut cursor = parent.walk();
+        cursor.reset(parent);
+        let cursor = cursor.goto_first_child().then_some(cursor);
+        SyntaxChildren { cursor, ph: PhantomData }
+    }
 }
 
 impl<'a> Iterator for SyntaxChildren<'a> {
@@ -28,6 +35,29 @@ impl<'a> Iterator for SyntaxChildren<'a> {
             self.cursor = None;
         }
         Some(cur_node)
+    }
+}
+
+pub struct SyntaxAncestors<'a> {
+    node: Option<SyntaxNode<'a>>,
+}
+
+impl<'a> SyntaxAncestors<'a> {
+    pub fn new(node: &'a SyntaxNode) -> Self {
+        Self::new_from_node(node.clone())
+    }
+
+    pub fn new_from_node(node: SyntaxNode<'a>) -> Self {
+        SyntaxAncestors { node: node.parent() }
+    }
+}
+
+impl<'a> Iterator for SyntaxAncestors<'a> {
+    type Item = SyntaxNode<'a>;
+    fn next(&mut self) -> Option<SyntaxNode<'a>> {
+        let node = self.node.take()?;
+        self.node = node.parent();
+        Some(node)
     }
 }
 
@@ -50,9 +80,20 @@ impl SyntaxNodePtr {
 
     pub fn to_node<'a>(&self, tree: &'a tree_sitter::Tree) -> Option<SyntaxNode<'a>> {
         let range = &self.range;
-        tree.root_node()
-            .descendant_for_byte_range(range.start, range.end)
-            .filter(|node| node.kind() == self.kind)
+        let candidate = tree.root_node().descendant_for_byte_range(range.start, range.end)?;
+        if candidate.kind() == self.kind {
+            return Some(candidate);
+        }
+        let mut ancestors = SyntaxAncestors::new_from_node(candidate);
+
+        while let Some(ancestor) = ancestors.next() {
+            if ancestor.byte_range() != *range {
+                break;
+            } else if ancestor.kind() == self.kind {
+                return Some(ancestor);
+            }
+        }
+        None
     }
 }
 
