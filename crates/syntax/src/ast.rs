@@ -1,7 +1,6 @@
-mod ptr;
-mod support;
+pub mod ptr;
+pub mod support;
 mod symbol;
-
 pub use symbol::*;
 
 use crate::SyntaxNode;
