@@ -1,4 +1,4 @@
-use crate::{ast::AstNode, SyntaxChildren, SyntaxNode};
+use crate::{ast::AstNode, syntax_kind, SyntaxChildren, SyntaxNode};
 use std::marker::PhantomData;
 
 pub struct AstChildren<'a, N> {
@@ -27,6 +27,9 @@ pub(crate) fn children<'a, N: AstNode<'a>>(parent: &'a SyntaxNode) -> AstChildre
     AstChildren::new(parent)
 }
 
-pub(crate) fn token<'a>(parent: &'a SyntaxNode, kind: &str) -> Option<SyntaxNode<'a>> {
-    SyntaxChildren::new(parent).find(|it| it.kind() == kind)
+pub(crate) fn token<'a>(
+    parent: &'a SyntaxNode,
+    kind_id: syntax_kind::SyntaxKindId,
+) -> Option<SyntaxNode<'a>> {
+    SyntaxChildren::new(parent).find(|it| it.kind_id() == kind_id)
 }

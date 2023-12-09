@@ -3,10 +3,10 @@ pub mod support;
 mod symbol;
 pub use symbol::*;
 
-use crate::SyntaxNode;
+use crate::{syntax_kind, SyntaxNode};
 
 pub trait AstNode<'a> {
-    fn can_cast(syntax: &SyntaxNode<'a>) -> bool
+    fn can_cast(kind_id: syntax_kind::SyntaxKindId) -> bool
     where
         Self: Sized;
 

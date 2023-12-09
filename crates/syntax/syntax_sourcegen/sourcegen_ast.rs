@@ -9,6 +9,7 @@ use std::{fs, path::Path};
 struct Grammar {
     symbols: Vec<Symbol>,
     tokens: BTreeMap<String, String>,
+    syntax_kinds: BTreeMap<String, u16>,
 }
 
 fn mkdir_and_write(file: &Path, contents: &str) -> Result<(), std::io::Error> {
@@ -97,12 +98,12 @@ fn generate_nodes(grammar: &Grammar) -> String {
         let syntax_kind_name = format_ident!("{}", symbol.type_name.to_screaming_snake_case());
         quote! {
             impl<'a> AstNode<'a> for #node_type_name<'a> {
-                fn can_cast(syntax: &SyntaxNode<'a>) -> bool {
-                    syntax.kind() == syntax_kind::#syntax_kind_name
+                fn can_cast(kind: syntax_kind::SyntaxKindId) -> bool {
+                    kind == syntax_kind::#syntax_kind_name
                 }
 
                 fn cast(syntax: SyntaxNode<'a>) -> Option<Self> {
-                    Self::can_cast(&syntax).then_some(#node_type_name { syntax })
+                    Self::can_cast(syntax.kind_id()).then_some(#node_type_name { syntax })
                 }
 
                 fn syntax(&self) -> &SyntaxNode {
@@ -135,16 +136,17 @@ fn generate_syntax_kinds(grammar: &Grammar) -> String {
     let symbol_kind_defs = grammar.symbols.iter().map(|symbol| {
         let kind_name = format_ident!("{}", symbol.type_name.to_screaming_snake_case());
         let kind = symbol.kind.to_string();
+        let kind = grammar.syntax_kinds.get(&kind).unwrap();
         quote! {
-            pub const #kind_name: &str = #kind;
+            pub const #kind_name: u16 = #kind;
         }
     });
 
     let token_kind_defs = grammar.tokens.iter().map(|(token_name, kind)| {
         let token_name = format_ident!("{}", token_name);
-        let kind = kind.to_string();
+        let kind = grammar.syntax_kinds.get(kind).unwrap();
         quote! {
-            pub const #token_name: &str = #kind;
+            pub const #token_name: SyntaxKindId = #kind;
         }
     });
 
@@ -152,6 +154,9 @@ fn generate_syntax_kinds(grammar: &Grammar) -> String {
         #![allow(unused)]
         #![allow(non_upper_case_globals)]
 
+        use crate::syntax_kind::SyntaxKindId;
+
+        pub const ERROR: SyntaxKindId = u16::MAX;
         #(#symbol_kind_defs)*
         #(#token_kind_defs)*
     }
@@ -186,12 +191,12 @@ fn generate_node_ptrs(grammar: &Grammar) -> String {
         let syntax_kind_name = format_ident!("{}", symbol.type_name.to_screaming_snake_case());
         quote! {
             impl AstNodePtr for #ptr_type_name {
-                fn can_cast(syntax: &SyntaxNodePtr) -> bool {
-                    syntax.kind() == syntax_kind::#syntax_kind_name
+                fn can_cast(kind_id: syntax_kind::SyntaxKindId) -> bool {
+                    kind_id == syntax_kind::#syntax_kind_name
                 }
 
                 fn cast(syntax: SyntaxNodePtr) -> Option<Self> {
-                    Self::can_cast(&syntax).then_some(#ptr_type_name { syntax })
+                    Self::can_cast(syntax.kind_id()).then_some(#ptr_type_name { syntax })
                 }
 
                 fn syntax(&self) -> &SyntaxNodePtr {
@@ -218,6 +223,8 @@ fn generate_node_ptrs(grammar: &Grammar) -> String {
 }
 
 fn get_fields_and_tokens(grammar_json: &serde_json::Value) -> Grammar {
+    let language = tree_sitter_verilog::language();
+
     let inlined_symbols: BTreeSet<_> = grammar_json["inline"]
         .as_array()
         .unwrap()
@@ -230,8 +237,10 @@ fn get_fields_and_tokens(grammar_json: &serde_json::Value) -> Grammar {
     let mut symbol_fields: BTreeMap<String, Fields> = BTreeMap::new();
     let mut tokens: BTreeMap<String, String> = BTreeMap::new();
 
-    let symbols = symbols
-        .filter(|kind| !inlined_symbols.contains(*kind))
+    let named_symbols: Vec<_> = symbols.filter(|kind| !inlined_symbols.contains(*kind)).collect();
+
+    let symbols = named_symbols
+        .iter()
         .map(|kind| {
             let fields =
                 get_rule_fields(kind, &inlined_symbols, &rules, &mut symbol_fields, &mut tokens);
@@ -242,7 +251,24 @@ fn get_fields_and_tokens(grammar_json: &serde_json::Value) -> Grammar {
         })
         .collect();
 
-    Grammar { symbols, tokens }
+    let mut syntax_kinds: Vec<_> = named_symbols
+        .iter()
+        .map(|kind| {
+            let kind = kind.to_string();
+            let id = language.id_for_node_kind(kind.as_str(), true);
+            (kind, id)
+        })
+        .collect();
+
+    syntax_kinds.extend(tokens.values().map(|kind| {
+        let kind = kind.to_string();
+        let id = language.id_for_node_kind(kind.as_str(), false);
+        (kind, id)
+    }));
+
+    let syntax_kinds: BTreeMap<_, _> = syntax_kinds.into_iter().collect();
+
+    Grammar { symbols, tokens, syntax_kinds }
 }
 
 fn get_rule_fields(

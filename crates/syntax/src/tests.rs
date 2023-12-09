@@ -24,6 +24,7 @@ endmodule
         let module_nonansi_header = module_declaration.module_nonansi_header().unwrap();
         let identifier = module_nonansi_header.identifier().unwrap();
         assert_eq!(identifier.syntax().byte_range(), std::ops::Range { start: 8, end: 9 });
+        assert_eq!(identifier.syntax().utf8_text(source_code.as_bytes()).unwrap(), "A");
     }
 
     #[test]

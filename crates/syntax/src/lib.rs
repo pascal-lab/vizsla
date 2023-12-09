@@ -12,7 +12,7 @@ pub struct SyntaxChildren<'a> {
 
 impl<'a> SyntaxChildren<'a> {
     pub fn new(parent: &'a SyntaxNode) -> Self {
-        Self::new_from_node(parent.clone())
+        Self::new_from_node(*parent)
     }
 
     pub fn new_from_node(parent: SyntaxNode<'a>) -> Self {
@@ -41,7 +41,7 @@ pub struct SyntaxAncestors<'a> {
 
 impl<'a> SyntaxAncestors<'a> {
     pub fn new(node: &'a SyntaxNode) -> Self {
-        Self::new_from_node(node.clone())
+        Self::new_from_node(*node)
     }
 
     pub fn new_from_node(node: SyntaxNode<'a>) -> Self {
@@ -66,7 +66,7 @@ pub struct SyntaxPreorder<'a> {
 
 impl<'a> SyntaxPreorder<'a> {
     pub fn new(root: &'a SyntaxNode) -> Self {
-        Self::new_from_node(root.clone())
+        Self::new_from_node(*root)
     }
 
     pub fn new_from_node(root: SyntaxNode<'a>) -> Self {
@@ -100,33 +100,32 @@ impl<'a> Iterator for SyntaxPreorder<'a> {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SyntaxNodePtr {
-    kind: &'static str,
+    kind_id: syntax_kind::SyntaxKindId,
     range: std::ops::Range<usize>,
 }
 
 impl SyntaxNodePtr {
-    pub fn kind(&self) -> &'static str {
-        self.kind
+    pub fn kind_id(&self) -> syntax_kind::SyntaxKindId {
+        self.kind_id
     }
 
     pub fn from_node(node: &SyntaxNode) -> Self {
-        let kind = node.kind();
+        let kind_id = node.kind_id();
         let range = node.byte_range();
-        SyntaxNodePtr { kind, range }
+        SyntaxNodePtr { kind_id, range }
     }
 
     pub fn to_node<'a>(&self, tree: &'a tree_sitter::Tree) -> Option<SyntaxNode<'a>> {
         let range = &self.range;
         let candidate = tree.root_node().descendant_for_byte_range(range.start, range.end)?;
-        if candidate.kind() == self.kind {
+        if candidate.kind_id() == self.kind_id {
             return Some(candidate);
         }
-        let mut ancestors = SyntaxAncestors::new_from_node(candidate);
 
-        while let Some(ancestor) = ancestors.next() {
+        for ancestor in SyntaxAncestors::new_from_node(candidate) {
             if ancestor.byte_range() != *range {
                 break;
-            } else if ancestor.kind() == self.kind {
+            } else if ancestor.kind_id() == self.kind_id {
                 return Some(ancestor);
             }
         }

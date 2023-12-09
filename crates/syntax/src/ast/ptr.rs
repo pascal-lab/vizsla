@@ -1,10 +1,10 @@
 mod generated;
 pub use generated::*;
 
-use crate::SyntaxNodePtr;
+use crate::{syntax_kind, SyntaxNodePtr};
 
 pub trait AstNodePtr {
-    fn can_cast(syntax: &SyntaxNodePtr) -> bool
+    fn can_cast(kind_id: syntax_kind::SyntaxKindId) -> bool
     where
         Self: Sized;
 

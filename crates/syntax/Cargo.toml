@@ -9,7 +9,7 @@ edition.workspace = true
 
 [dependencies]
 serde.workspace = true
-tree-sitter = "0.20"
+tree-sitter.workspace = true
 tree-sitter-verilog.workspace = true
 
 [build-dependencies]
@@ -17,5 +17,7 @@ quote = "1.0.20"
 Inflector = "0.11.4"
 serde_json.workspace = true
 sourcegen.workspace = true
+tree-sitter.workspace = true
+tree-sitter-verilog.workspace = true
 
 [features]
