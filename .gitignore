@@ -17,3 +17,5 @@ tags
 
 # generated files
 generated.rs
+
+.DS_Store

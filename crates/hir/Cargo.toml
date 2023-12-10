@@ -4,4 +4,11 @@ version = "0.0.0"
 edition.workspace = true
 
 [dependencies]
+rustc-hash = "1.1.0"
 salsa.workspace = true
+la-arena.workspace = true
+hashbrown.workspace = true
+smol_str.workspace = true
+syntax.workspace = true
+base-db.workspace = true
+vfs.workspace = true
