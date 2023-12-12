@@ -39,7 +39,6 @@ impl<T: Clone> InFile<&T> {
 
 impl<T> InFile<Option<T>> {
     pub fn transpose(self) -> Option<InFile<T>> {
-        let value = self.value?;
-        Some(InFile::new(self.file_id, value))
+        Some(InFile::new(self.file_id, self.value?))
     }
 }
