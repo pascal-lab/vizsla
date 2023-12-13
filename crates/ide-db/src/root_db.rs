@@ -58,9 +58,9 @@ impl RootDb {
         db
     }
 
+    // TODO
     pub fn update_parse_query_lru_capacity(&mut self, lru_capacity: Option<usize>) {
         let lru_capacity = lru_capacity.unwrap_or(DEFAULT_PARSE_LRU_CAP);
-        todo!()
     }
 }
 
