@@ -6,6 +6,7 @@ use base_db::{
     salsa::{self, Durability},
     source_db::{FileLoader, SourceDb, SourceRootDb},
 };
+use line_index::LineIndex;
 use rustc_hash::FxHashSet;
 use triomphe::Arc;
 use vfs::{anchored_path::AnchoredPath, vfs::FileId};
@@ -68,4 +69,14 @@ impl salsa::ParallelDatabase for RootDb {
     fn snapshot(&self) -> salsa::Snapshot<RootDb> {
         salsa::Snapshot::new(RootDb { storage: ManuallyDrop::new(self.storage.snapshot()) })
     }
+}
+
+#[salsa::query_group(LineIndexDbStorage)]
+pub trait LineIndexDb: SourceDb {
+    fn line_index(&self, file_id: FileId) -> Arc<LineIndex>;
+}
+
+fn line_index(db: &dyn LineIndexDb, file_id: FileId) -> Arc<LineIndex> {
+    let text = db.file_text(file_id);
+    Arc::new(LineIndex::new(&text))
 }
