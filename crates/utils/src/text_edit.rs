@@ -6,21 +6,21 @@ use line_index::{TextRange, TextSize};
 // A single atomic change to text: a insertion, a deletion or a replacement.
 // Must not overlap with other `InDel`s
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct TextChange {
+pub struct TextEditItem {
     pub ins: String,
     /// Refers to offsets in the original text
     pub del: TextRange,
 }
 
-impl TextChange {
-    pub fn insert(offset: TextSize, text: String) -> TextChange {
-        TextChange::replace(TextRange::empty(offset), text)
+impl TextEditItem {
+    pub fn insert(offset: TextSize, text: String) -> TextEditItem {
+        TextEditItem::replace(TextRange::empty(offset), text)
     }
-    pub fn delete(range: TextRange) -> TextChange {
-        TextChange::replace(range, String::new())
+    pub fn delete(range: TextRange) -> TextEditItem {
+        TextEditItem::replace(range, String::new())
     }
-    pub fn replace(range: TextRange, replace_with: String) -> TextChange {
-        TextChange { del: range, ins: replace_with }
+    pub fn replace(range: TextRange, replace_with: String) -> TextEditItem {
+        TextEditItem { del: range, ins: replace_with }
     }
 
     pub fn apply_on(&self, text: &mut String) {
@@ -33,7 +33,7 @@ impl TextChange {
 #[derive(Default, Debug, Clone)]
 pub struct TextEdit {
     /// Invariant: disjoint and sorted by `delete`.
-    changes: Vec<TextChange>,
+    changes: Vec<TextEditItem>,
 }
 
 impl TextEdit {
@@ -67,7 +67,7 @@ impl TextEdit {
         self.changes.is_empty()
     }
 
-    pub fn iter(&self) -> std::slice::Iter<'_, TextChange> {
+    pub fn iter(&self) -> std::slice::Iter<'_, TextEditItem> {
         self.into_iter()
     }
 
@@ -131,8 +131,8 @@ impl TextEdit {
 }
 
 impl IntoIterator for TextEdit {
-    type Item = TextChange;
-    type IntoIter = std::vec::IntoIter<TextChange>;
+    type Item = TextEditItem;
+    type IntoIter = std::vec::IntoIter<TextEditItem>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.changes.into_iter()
@@ -140,8 +140,8 @@ impl IntoIterator for TextEdit {
 }
 
 impl<'a> IntoIterator for &'a TextEdit {
-    type Item = &'a TextChange;
-    type IntoIter = std::slice::Iter<'a, TextChange>;
+    type Item = &'a TextEditItem;
+    type IntoIter = std::slice::Iter<'a, TextEditItem>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.changes.iter()
@@ -150,7 +150,7 @@ impl<'a> IntoIterator for &'a TextEdit {
 
 #[derive(Debug, Default, Clone)]
 pub struct TextEditBuilder {
-    changes: Vec<TextChange>,
+    changes: Vec<TextEditItem>,
 }
 
 impl TextEditBuilder {
@@ -159,15 +159,15 @@ impl TextEditBuilder {
     }
 
     pub fn replace(&mut self, range: TextRange, with: String) {
-        self.change(TextChange::replace(range, with));
+        self.change(TextEditItem::replace(range, with));
     }
 
     pub fn delete(&mut self, range: TextRange) {
-        self.change(TextChange::delete(range));
+        self.change(TextEditItem::delete(range));
     }
 
     pub fn insert(&mut self, offset: TextSize, text: String) {
-        self.change(TextChange::insert(offset, text));
+        self.change(TextEditItem::insert(offset, text));
     }
 
     pub fn finish(self) -> TextEdit {
@@ -181,7 +181,7 @@ impl TextEditBuilder {
         self.changes.iter().any(|change| change.del.contains_inclusive(offset))
     }
 
-    fn change(&mut self, change: TextChange) {
+    fn change(&mut self, change: TextEditItem) {
         self.changes.push(change);
         if self.changes.len() <= 16 {
             assert!(sort_and_check_disjoint(&mut self.changes));
@@ -189,19 +189,19 @@ impl TextEditBuilder {
     }
 }
 
-fn sort_and_check_disjoint(changes: &mut [TextChange]) -> bool {
+fn sort_and_check_disjoint(changes: &mut [TextEditItem]) -> bool {
     changes.sort_by_key(|change| (change.del.start(), change.del.end()));
     check_all_disjoint(changes.iter())
 }
 
 fn check_all_disjoint<'a, I>(changes: I) -> bool
 where
-    I: std::iter::Iterator<Item = &'a TextChange> + Clone,
+    I: std::iter::Iterator<Item = &'a TextEditItem> + Clone,
 {
     changes.clone().zip(changes.skip(1)).all(|(l, r)| l.del.end() <= r.del.start() || l == r)
 }
 
-fn coalsece_changes(changes: Vec<TextChange>) -> Vec<TextChange> {
+fn coalsece_changes(changes: Vec<TextEditItem>) -> Vec<TextEditItem> {
     changes
         .into_iter()
         .coalesce(|mut a, b| {
