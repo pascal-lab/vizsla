@@ -11,7 +11,6 @@ edition.workspace = true
 serde.workspace = true
 tree-sitter.workspace = true
 tree-sitter-verilog.workspace = true
-triomphe.workspace = true
 utils.workspace = true
 
 [build-dependencies]
