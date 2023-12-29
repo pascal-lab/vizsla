@@ -1,6 +1,6 @@
 use salsa::Durability;
 use triomphe::Arc;
-use vfs::vfs::{ChangeKind, ChangedFile};
+use vfs::vfs::ChangedFile;
 
 use crate::{
     package_graph::PackageGraph,
@@ -55,6 +55,8 @@ impl Change {
             if is_create_or_modified {
                 parse_source(db, file_id);
             }
+
+            dbg!(&db.syntax_tree(file_id).map(|tree| tree.tree().root_node().to_sexp()));
         }
 
         if let Some(package_graph) = self.package_graph {

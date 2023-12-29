@@ -1,6 +1,5 @@
 use std::ops::Range;
 
-use itertools::Position;
 use line_index::LineIndex;
 use lsp_types::{
     DidChangeConfigurationParams, DidChangeTextDocumentParams, DidChangeWatchedFilesParams,

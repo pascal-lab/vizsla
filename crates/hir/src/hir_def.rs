@@ -5,9 +5,8 @@ mod module;
 mod package_or_generate_item;
 mod stmt;
 
-use la_arena::{Arena, Idx};
+use la_arena::Arena;
 use smol_str::SmolStr;
-use std::ops::Index;
 use std::sync::Arc;
 use syntax::ast::ptr;
 

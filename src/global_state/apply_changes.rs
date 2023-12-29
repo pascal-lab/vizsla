@@ -1,4 +1,4 @@
-use std::{borrow::BorrowMut, collections::hash_map::Entry::Occupied, ops::DerefMut};
+use std::collections::hash_map::Entry::Occupied;
 
 use base_db::change::Change;
 use itertools::Itertools;
@@ -7,7 +7,7 @@ use parking_lot::{RwLockUpgradableReadGuard, RwLockWriteGuard};
 use rustc_hash::FxHashMap;
 use triomphe::Arc;
 use utils::lines::LineEndings;
-use vfs::vfs::{ChangeKind, ChangedFile, FileId, Vfs};
+use vfs::vfs::{ChangedFile, FileId, Vfs};
 
 use super::{reload::should_refresh_for_change, GlobalState};
 
