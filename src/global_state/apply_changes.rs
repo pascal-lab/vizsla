@@ -1,3 +1,5 @@
+use std::{borrow::BorrowMut, collections::hash_map::Entry::Occupied, ops::DerefMut};
+
 use base_db::change::Change;
 use itertools::Itertools;
 use nohash_hasher::IntMap;
@@ -5,7 +7,7 @@ use parking_lot::{RwLockUpgradableReadGuard, RwLockWriteGuard};
 use rustc_hash::FxHashMap;
 use triomphe::Arc;
 use utils::lines::LineEndings;
-use vfs::vfs::{ChangedFile, FileId, Vfs};
+use vfs::vfs::{ChangeKind, ChangedFile, FileId, Vfs};
 
 use super::{reload::should_refresh_for_change, GlobalState};
 
@@ -33,13 +35,13 @@ impl GlobalState {
                 if changed_file.is_created_or_deleted() {
                     has_structure_changes = true;
                     workspace_structure_change = Some(path);
-                } else if should_refresh_for_change(&path, changed_file.change_kind) {
+                } else if should_refresh_for_change(&path, &changed_file.change_kind) {
                     workspace_structure_change = Some(path);
                 }
             }
 
             // Collect changes
-            let text = if changed_file.exists() {
+            let new_text = if changed_file.exists() {
                 let contents = vfs.file_contents(changed_file.file_id).unwrap().to_vec();
 
                 String::from_utf8(contents).ok().map(|text| {
@@ -51,7 +53,7 @@ impl GlobalState {
                 None
             };
 
-            bytes.push((changed_file.file_id, text))
+            bytes.push((changed_file, new_text))
         }
 
         let mut write_guard = RwLockUpgradableReadGuard::upgrade(read_guard);
@@ -71,18 +73,19 @@ impl GlobalState {
 
     fn collect_changes(
         &self,
-        bytes: Vec<(FileId, Option<(Arc<str>, LineEndings)>)>,
+        bytes: Vec<(ChangedFile, Option<(Arc<str>, LineEndings)>)>,
         line_ending_map: &mut IntMap<FileId, LineEndings>,
         vfs: &mut Vfs,
         has_structure_changes: bool,
     ) -> Change {
         let mut change = Change::new();
-        for (file_id, text_endings) in bytes {
+        for (changed_file, text_endings) in bytes {
+            let file_id = changed_file.file_id;
             match text_endings {
-                None => change.add_changed_file(file_id, None),
+                None => change.add_changed_file(changed_file, None),
                 Some((text, line_endings)) => {
                     line_ending_map.insert(file_id, line_endings);
-                    change.add_changed_file(file_id, Some(text));
+                    change.add_changed_file(changed_file, Some(text));
                 }
             }
         }
@@ -103,21 +106,31 @@ impl GlobalState {
 
         let mut file_changes = FxHashMap::default();
         for changed_file in vfs_changes {
-            file_changes
-                .entry(changed_file.file_id)
-                .and_modify(|(change, just_created)| {
-                    match (change, just_created, changed_file.change_kind) {
-                        (change, _, Delete) => *change = Delete,
-                        (Create, _, Create | Modify) => {}
-                        (Modify, _, Modify) => {}
-                        (change @ Delete, just_created, Create) => {
-                            *change = Modify;
-                            *just_created = true;
-                        }
-                        (Delete, _, Modify) | (Modify, _, Create) => unreachable!(),
+            if let Occupied(mut entry) = file_changes.entry(changed_file.file_id) {
+                let (change, just_created) = entry.get_mut();
+
+                match (change, *just_created, changed_file.change_kind) {
+                    (change @ Delete, _, Create) => {
+                        *change = Modify(None);
+                        *just_created = true;
                     }
-                })
-                .or_insert((changed_file.change_kind, changed_file.change_kind == Create));
+                    (change @ _, _, Delete) => {
+                        // *change = Delete;
+                    }
+                    (Create, _, Create) | (Create, _, Modify(_)) => {}
+                    (Modify(a), _, Modify(b)) => {
+                        if let (Some(a), Some(b)) = (a.as_mut(), b.as_ref()) {
+                            a.extend(b.into_iter());
+                        } else {
+                            *a = None;
+                        }
+                    }
+                    (Delete, _, Modify(_)) | (Modify(_), _, Create) => unreachable!(),
+                }
+            } else {
+                let just_created = matches!(changed_file.change_kind, Create);
+                file_changes.insert(changed_file.file_id, (changed_file.change_kind, just_created));
+            }
         }
 
         let changed_file = file_changes

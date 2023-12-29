@@ -190,7 +190,7 @@ impl GlobalState {
     }
 }
 
-pub(crate) fn should_refresh_for_change(path: &AbsPath, change_kind: ChangeKind) -> bool {
+pub(crate) fn should_refresh_for_change(path: &AbsPath, change_kind: &ChangeKind) -> bool {
     let file_name = match path.file_name().unwrap_or_default().to_str() {
         Some(it) => it,
         None => return false,
@@ -200,7 +200,7 @@ pub(crate) fn should_refresh_for_change(path: &AbsPath, change_kind: ChangeKind)
         return true;
     }
 
-    if change_kind == ChangeKind::Modify {
+    if matches!(change_kind, ChangeKind::Modify(_)) {
         return false;
     }
 

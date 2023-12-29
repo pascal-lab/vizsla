@@ -3,7 +3,8 @@ use nohash_hasher::IntMap;
 use rustc_hash::FxHashMap;
 
 use crate::{
-    vfs::{AnchoredPath, FileId, Vfs},
+    anchored_path::AnchoredPath,
+    vfs::{FileId, Vfs},
     vfs_path::VfsPath,
 };
 

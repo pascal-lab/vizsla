@@ -291,7 +291,7 @@ impl GlobalState {
                 for (path, content) in files {
                     let path = VfsPath::from(path);
                     if !self.mem_docs.contains(&path) {
-                        vfs.set_file_contents(path, content);
+                        vfs.set_file_contents(path, content, None);
                     }
                 }
             }

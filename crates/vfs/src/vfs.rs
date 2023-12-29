@@ -1,12 +1,15 @@
 use std::{fmt, hash::BuildHasherDefault, mem};
 
-pub use crate::{
+use crate::{
     anchored_path::{AnchoredPath, AnchoredPathBuf},
     vfs_path::VfsPath,
 };
 use indexmap::IndexSet;
 use rustc_hash::FxHasher;
-pub use utils::paths::{AbsPath, AbsPathBuf};
+use utils::{
+    paths::{AbsPath, AbsPathBuf},
+    text_edit::SourceEdit,
+};
 
 #[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct FileId(pub u32);
@@ -34,12 +37,25 @@ impl ChangedFile {
     pub fn is_created_or_deleted(&self) -> bool {
         matches!(self.change_kind, ChangeKind::Create | ChangeKind::Delete)
     }
+
+    pub fn is_created_or_modified(&self) -> bool {
+        matches!(self.change_kind, ChangeKind::Create | ChangeKind::Modify(_))
+    }
+
+    pub fn source_edits(&self) -> Option<&Vec<SourceEdit>> {
+        match self.change_kind {
+            ChangeKind::Create | ChangeKind::Delete => None,
+            ChangeKind::Modify(Some(ref edits)) => Some(edits),
+            ChangeKind::Modify(None) => None,
+        }
+    }
 }
 
-#[derive(Eq, PartialEq, Copy, Clone, Debug)]
+#[derive(Eq, PartialEq, Clone, Debug)]
 pub enum ChangeKind {
     Create,
-    Modify,
+    // None means modifications is unknown, so we need to update the whole text
+    Modify(Option<Vec<SourceEdit>>),
     Delete,
 }
 
@@ -67,23 +83,30 @@ impl Vfs {
             .map(move |file_id| (file_id, self.file_path(file_id)))
     }
 
-    pub fn set_file_contents(&mut self, path: VfsPath, mut contents: Option<Vec<u8>>) -> bool {
+    pub fn set_file_contents(
+        &mut self,
+        path: VfsPath,
+        mut contents: Option<Vec<u8>>,
+        source_edits: Option<Vec<SourceEdit>>,
+    ) {
         let file_id = self.file_id_or_alloc(path);
-        let change_kind = match (self.get_file_contents(file_id), &contents) {
-            (None, None) => return false,
-            (Some(old), Some(new)) if old == new => return false,
+        let change_kind = match (self.get_file_contents(file_id), &mut contents) {
+            (None, None) => return,
             (None, Some(_)) => ChangeKind::Create,
             (Some(_), None) => ChangeKind::Delete,
-            (Some(_), Some(_)) => ChangeKind::Modify,
+            // TODO: should we add this redundant comparison?
+            // (Some(old), Some(new)) if old == new => return,
+            (Some(_), Some(_)) => ChangeKind::Modify(source_edits),
         };
 
-        if let Some(contents) = &mut contents {
-            contents.shrink_to_fit();
+        if let ChangeKind::Modify(Some(edits)) = &change_kind
+            && edits.is_empty()
+        {
+            return;
         }
 
         *self.get_file_contents_mut(file_id) = contents;
         self.changes.push(ChangedFile { file_id, change_kind });
-        true
     }
 
     pub fn has_changes(&self) -> bool {
