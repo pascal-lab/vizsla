@@ -48,9 +48,6 @@ pub fn parse_source(db: &mut dyn SourceDb, file_id: FileId) {
     parser.set_language(tree_sitter_verilog::language()).unwrap();
 
     let old_syntax_tree = db.syntax_tree(file_id);
-    if old_syntax_tree.is_some() {
-        dbg!("INCREMENTAL!");
-    }
     let old_tree = old_syntax_tree.as_ref().map(|it| it.tree());
 
     let new_text = db.file_text(file_id);
