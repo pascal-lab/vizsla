@@ -150,7 +150,7 @@ impl GlobalState {
             vfs_progress_n_total: 0,
             vfs_progress_n_done: 0,
 
-            workspaces: Arc::new(Vec::new()),
+            workspaces: Arc::from_iter([]),
             fetch_workspaces_task: ExclTask::default(),
         }
     }
