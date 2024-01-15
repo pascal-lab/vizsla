@@ -1,4 +1,4 @@
-use std::{ops::Range, mem};
+use std::{mem, ops::Range};
 
 use line_index::LineIndex;
 use lsp_types::{
@@ -9,7 +9,7 @@ use lsp_types::{
 use triomphe::Arc;
 use utils::{
     lines::{LineEndings, LineIndexEnding, PositionEncoding},
-    text_edit::{SourceEdit, SourcePoint},
+    text_edit::{SourceEdit, SourceEditKind, SourcePoint},
 };
 use vfs::vfs::ChangeKind;
 
@@ -37,81 +37,22 @@ pub(crate) fn handle_did_open_text_document(
     params: DidOpenTextDocumentParams,
 ) -> anyhow::Result<()> {
     if let Ok(path) = from_proto::vfs_path(&params.text_document.uri) {
-        if state
-            .mem_docs
-            .insert(path.clone(), DocumentData::new(params.text_document.version))
-            .is_some()
-        {
+        let data = DocumentData {
+            version: params.text_document.version,
+            data: params.text_document.text.clone(),
+        };
+        if state.mem_docs.insert(path.clone(), data).is_some() {
             tracing::error!("duplicate DidOpenTextDocument: {}", path);
         }
+
+        let (text, line_ending) = LineEndings::normalize(params.text_document.text);
         state.vfs.write().0.set_file_contents(
-            path,
-            Some(params.text_document.text.into_bytes()),
-            None,
+            &path,
+            Some((text, Some(line_ending))),
+            SourceEditKind::Full,
         );
     }
     Ok(())
-}
-
-fn apply_document_changes(
-    encoding: PositionEncoding,
-    get_vfs_file_contents: impl FnOnce() -> String,
-    mut content_changes: Vec<lsp_types::TextDocumentContentChangeEvent>,
-) -> (String, Option<Vec<SourceEdit>>) {
-    // Skip to the last full document change and peek at the first content change
-    let (mut text, content_changes) = {
-        let last_full_change = content_changes.iter().rposition(|change| change.range.is_none());
-        if let Some(idx) = last_full_change {
-            (mem::take(&mut content_changes[idx].text), &content_changes[idx + 1..])
-        } else {
-            (get_vfs_file_contents(), &content_changes[..])
-        }
-    };
-
-    if content_changes.is_empty() {
-        return (text, None);
-    }
-
-    // The changes can cross lines so we have to keep our line index updated.
-    // Here's an optimization: we only rebuild the index if we have to, iff
-    // the change's start line is greater than the last valid line.
-    // The VFS will normalize the end of lines to `\n`.
-    // TODO: make line_index incremental?
-    let mut line_index = LineIndexEnding {
-        index: Arc::new(LineIndex::new(&text)),
-        // We don't care about line endings here.
-        endings: LineEndings::Unix,
-        encoding,
-    };
-
-    let mut edits = vec![];
-
-    // set to infinity at first, to avoid rebuilding the index on the first change
-    let mut index_valid_until = !0u32;
-    for change in content_changes {
-        // The None case can't happen
-        let range = change.range.unwrap();
-        if index_valid_until <= range.end.line {
-            *Arc::make_mut(&mut line_index.index) = LineIndex::new(&text);
-        }
-        index_valid_until = range.start.line;
-        // TODO: Use rope for better performance?
-        if let Ok(range) = from_proto::text_range(&line_index, range) {
-            // TODO: The positions is not correct, but it doesn't matter for now.
-            // Maybe we should fix it?
-            let range = Range::<usize>::from(range);
-            edits.push(SourceEdit {
-                start_byte: range.start,
-                old_end_byte: range.end,
-                new_end_byte: range.start + change.text.len(),
-                start_position: SourcePoint { row: 0, column: 0 },
-                old_end_position: SourcePoint { row: 0, column: 0 },
-                new_end_position: SourcePoint { row: 0, column: 0 },
-            });
-            text.replace_range(range, &change.text);
-        }
-    }
-    (text, Some(edits))
 }
 
 pub(crate) fn handle_did_change_text_document(
@@ -119,11 +60,12 @@ pub(crate) fn handle_did_change_text_document(
     params: DidChangeTextDocumentParams,
 ) -> anyhow::Result<()> {
     if let Ok(path) = from_proto::vfs_path(&params.text_document.uri) {
-        match state.mem_docs.get_mut(&path) {
+        let data = match state.mem_docs.get_mut(&path) {
             Some(doc) => {
-                // The version in DidChangeTextDocument is the one after all edits
+                // The version in DidChangeTextDocument is the one after all edits,
                 // so we should apply it before the vfs is notified.
                 doc.version = params.text_document.version;
+                &mut doc.data
             }
             None => {
                 tracing::error!("unexpected DidChangeTextDocument: {}", path);
@@ -133,15 +75,14 @@ pub(crate) fn handle_did_change_text_document(
 
         let (text, edits) = apply_document_changes(
             state.config.position_encoding(),
-            || {
-                let vfs = &state.vfs.read().0;
-                let file_id = vfs.file_id(&path).unwrap();
-                let contents = vfs.file_contents(file_id).unwrap();
-                std::str::from_utf8(contents).unwrap().into()
-            },
+            mem::take(data),
             params.content_changes,
         );
-        state.vfs.write().0.set_file_contents(path, Some(text.into_bytes()), edits);
+        let (text, line_ending) = LineEndings::normalize(text);
+
+        *data = text.clone();
+
+        state.vfs.write().0.set_file_contents(&path, Some((text, Some(line_ending))), edits);
     }
     Ok(())
 }
@@ -169,7 +110,7 @@ pub(crate) fn handle_did_save_text_document(
     // TODO: check on save
     if let Ok(vfs_path) = from_proto::vfs_path(&params.text_document.uri)
         && let Some(abs_path) = vfs_path.as_abs_path()
-        && reload::should_refresh_for_change(abs_path, &ChangeKind::Modify(None))
+        && reload::should_refresh_for_change(abs_path, false)
     {
         // Re-fetch workspaces if a workspace related file has changed
         state.fetch_workspaces_task.request(format!("DidSaveTextDocument {abs_path}"), ());
@@ -257,4 +198,65 @@ pub(crate) fn handle_did_change_watched_files(
 pub(crate) fn handle_workspace_reload(state: &mut GlobalState, _: ()) -> anyhow::Result<()> {
     state.fetch_workspaces_task.request("reload workspace request".to_string(), ());
     Ok(())
+}
+
+fn apply_document_changes(
+    encoding: PositionEncoding,
+    file_contents: String,
+    mut content_changes: Vec<lsp_types::TextDocumentContentChangeEvent>,
+) -> (String, SourceEditKind) {
+    // Skip to the last full document change and peek at the first content change
+    let (mut text, content_changes) = {
+        let last_full_change = content_changes.iter().rposition(|change| change.range.is_none());
+        if let Some(idx) = last_full_change {
+            (mem::take(&mut content_changes[idx].text), &content_changes[idx + 1..])
+        } else {
+            (file_contents, &content_changes[..])
+        }
+    };
+
+    if content_changes.is_empty() {
+        return (text, SourceEditKind::Edits(vec![]));
+    }
+
+    // The changes can cross lines so we have to keep our line index updated.
+    // Here's an optimization: we only rebuild the index if we have to, iff
+    // the change's start line is greater than the last valid line.
+    // The VFS will normalize the end of lines to `\n`.
+    // TODO: make line_index incremental?
+    let mut line_index = LineIndexEnding {
+        index: Arc::new(LineIndex::new(&text)),
+        // We don't care about line endings here.
+        endings: LineEndings::Unix,
+        encoding,
+    };
+
+    let mut edits = vec![];
+
+    // set to infinity at first, to avoid rebuilding the index on the first change
+    let mut index_valid_until = !0u32;
+    for change in content_changes {
+        // The None case can't happen
+        let range = change.range.unwrap();
+        if index_valid_until <= range.end.line {
+            *Arc::make_mut(&mut line_index.index) = LineIndex::new(&text);
+        }
+        index_valid_until = range.start.line;
+        // TODO: Use rope for better performance?
+        if let Ok(range) = from_proto::text_range(&line_index, range) {
+            // TODO: The positions is not correct, but it doesn't matter for now.
+            // Maybe we should fix it?
+            let range = Range::<usize>::from(range);
+            edits.push(SourceEdit {
+                start_byte: range.start,
+                old_end_byte: range.end,
+                new_end_byte: range.start + change.text.len(),
+                start_position: SourcePoint { row: 0, column: 0 },
+                old_end_position: SourcePoint { row: 0, column: 0 },
+                new_end_position: SourcePoint { row: 0, column: 0 },
+            });
+            text.replace_range(range, &change.text);
+        }
+    }
+    (text, SourceEditKind::Edits(edits))
 }

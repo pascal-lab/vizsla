@@ -4,6 +4,12 @@ use itertools::Itertools;
 pub use line_index::{TextRange, TextSize};
 pub use tree_sitter::{InputEdit as SourceEdit, Point as SourcePoint};
 
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum SourceEditKind {
+    Full,
+    Edits(Vec<SourceEdit>),
+}
+
 // A single atomic change to text: a insertion, a deletion or a replacement.
 // Must not overlap with other `InDel`s
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

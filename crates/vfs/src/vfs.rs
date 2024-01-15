@@ -3,18 +3,26 @@ use std::{fmt, hash::BuildHasherDefault, mem};
 use crate::vfs_path::VfsPath;
 use indexmap::IndexSet;
 use rustc_hash::FxHasher;
-use utils::text_edit::SourceEdit;
+use utils::{lines::LineEndings, text_edit::SourceEditKind};
 
 #[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct FileId(pub u32);
 
 impl nohash_hasher::IsEnabled for FileId {}
 
+pub type VfsContentTy = (String, Option<LineEndings>);
+
 #[derive(Default)]
 pub struct Vfs {
     paths: IndexSet<VfsPath, BuildHasherDefault<FxHasher>>,
-    data: Vec<Option<Vec<u8>>>,
+    file_states: Vec<FileState>,
     changes: Vec<ChangedFile>,
+}
+
+#[derive(Copy, PartialEq, PartialOrd, Clone)]
+pub enum FileState {
+    Exists,
+    Deleted,
 }
 
 #[derive(Debug)]
@@ -24,54 +32,62 @@ pub struct ChangedFile {
 }
 
 impl ChangedFile {
-    pub fn exists(&self) -> bool {
-        self.change_kind != ChangeKind::Delete
+    pub fn file_state(&self) -> FileState {
+        match &self.change_kind {
+            ChangeKind::Create(_) | ChangeKind::Modify(_, _) => FileState::Exists,
+            ChangeKind::Delete => FileState::Deleted,
+        }
     }
 
     pub fn is_created_or_deleted(&self) -> bool {
-        matches!(self.change_kind, ChangeKind::Create | ChangeKind::Delete)
+        matches!(self.change_kind, ChangeKind::Create(_) | ChangeKind::Delete)
     }
 
-    pub fn is_created_or_modified(&self) -> bool {
-        matches!(self.change_kind, ChangeKind::Create | ChangeKind::Modify(_))
+    pub fn exists(&self) -> bool {
+        self.file_state() == FileState::Exists
     }
 
-    pub fn source_edits(&self) -> Option<&Vec<SourceEdit>> {
+    pub fn source_edits(&self) -> Option<&SourceEditKind> {
+        match &self.change_kind {
+            ChangeKind::Create(_) | ChangeKind::Delete => None,
+            ChangeKind::Modify(_, edits) => Some(edits),
+        }
+    }
+
+    pub fn get_line_endings(&self) -> Option<LineEndings> {
+        match &self.change_kind {
+            ChangeKind::Create((_, ending)) | ChangeKind::Modify((_, ending), _) => *ending,
+            _ => None,
+        }
+    }
+
+    pub fn get_text(self) -> Option<String> {
         match self.change_kind {
-            ChangeKind::Create | ChangeKind::Delete => None,
-            ChangeKind::Modify(Some(ref edits)) => Some(edits),
-            ChangeKind::Modify(None) => None,
+            ChangeKind::Create((text, _)) | ChangeKind::Modify((text, _), _) => Some(text),
+            ChangeKind::Delete => None,
         }
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub enum ChangeKind {
-    Create,
-    // None means modifications is unknown, so we need to update the whole text
-    Modify(Option<Vec<SourceEdit>>),
+    Create(VfsContentTy),
+    // None means modifications is unknown, so we need to update the whole text anyway
+    Modify(VfsContentTy, SourceEditKind),
     Delete,
 }
 
 impl Vfs {
     pub fn file_id(&self, path: &VfsPath) -> Option<FileId> {
-        self.paths.get_index_of(path).map(|id| FileId(id as u32))
+        self.paths.get_index_of(path).map(|id| FileId(id as u32)).filter(|id| self.exists(*id))
     }
 
     pub fn file_path(&self, file_id: FileId) -> &VfsPath {
         self.paths.get_index(file_id.0 as usize).unwrap()
     }
 
-    pub fn file_contents(&self, file_id: FileId) -> Option<&[u8]> {
-        self.get_file_contents(file_id).as_deref()
-    }
-
-    pub fn memory_usage(&self) -> usize {
-        self.data.iter().flatten().map(|d| d.capacity()).sum()
-    }
-
     pub fn iter(&self) -> impl Iterator<Item = (FileId, &VfsPath)> + '_ {
-        (0..self.data.len())
+        (0..self.file_states.len())
             .map(|it| FileId(it as u32))
             .filter(move |&file_id| self.exists(file_id))
             .map(move |file_id| (file_id, self.file_path(file_id)))
@@ -79,28 +95,27 @@ impl Vfs {
 
     pub fn set_file_contents(
         &mut self,
-        path: VfsPath,
-        mut contents: Option<Vec<u8>>,
-        source_edits: Option<Vec<SourceEdit>>,
+        path: &VfsPath,
+        contents: Option<VfsContentTy>,
+        source_edits: SourceEditKind,
     ) {
         let file_id = self.file_id_or_alloc(path);
-        let change_kind = match (self.get_file_contents(file_id), &mut contents) {
-            (None, None) => return,
-            (None, Some(_)) => ChangeKind::Create,
-            (Some(_), None) => ChangeKind::Delete,
-            // TODO: should we add this redundant comparison?
-            // (Some(old), Some(new)) if old == new => return,
-            (Some(_), Some(_)) => ChangeKind::Modify(source_edits),
+        let change_kind = match (self.file_state(file_id), contents) {
+            (FileState::Exists, None) => ChangeKind::Delete,
+            (FileState::Exists, Some(v)) => ChangeKind::Modify(v, source_edits),
+            (FileState::Deleted, None) => return,
+            (FileState::Deleted, Some(v)) => ChangeKind::Create(v),
         };
 
-        if let ChangeKind::Modify(Some(edits)) = &change_kind
+        if let ChangeKind::Modify(_, SourceEditKind::Edits(edits)) = &change_kind
             && edits.is_empty()
         {
             return;
         }
 
-        *self.get_file_contents_mut(file_id) = contents;
-        self.changes.push(ChangedFile { file_id, change_kind });
+        let change_file = ChangedFile { file_id, change_kind };
+        self.file_states[file_id.0 as usize] = change_file.file_state();
+        self.changes.push(change_file);
     }
 
     pub fn has_changes(&self) -> bool {
@@ -112,29 +127,31 @@ impl Vfs {
     }
 
     pub fn exists(&self, file_id: FileId) -> bool {
-        self.get_file_contents(file_id).is_some()
+        self.file_state(file_id) == FileState::Exists
     }
 
-    fn file_id_or_alloc(&mut self, path: VfsPath) -> FileId {
-        let (id, _) = self.paths.insert_full(path);
+    fn file_id_or_alloc(&mut self, path: &VfsPath) -> FileId {
+        let id = match self.paths.get_index_of(path) {
+            Some(id) => id,
+            None => {
+                let path = path.clone();
+                self.paths.insert_full(path).0
+            }
+        };
         assert!(id < u32::MAX as usize);
 
-        let len = self.data.len().max(id + 1);
-        self.data.resize(len, None);
+        let len = self.file_states.len().max(id + 1);
+        self.file_states.resize(len, FileState::Deleted);
         FileId(id as u32)
     }
 
-    fn get_file_contents(&self, file_id: FileId) -> &Option<Vec<u8>> {
-        &self.data[file_id.0 as usize]
-    }
-
-    fn get_file_contents_mut(&mut self, file_id: FileId) -> &mut Option<Vec<u8>> {
-        &mut self.data[file_id.0 as usize]
+    fn file_state(&self, file_id: FileId) -> FileState {
+        self.file_states[file_id.0 as usize]
     }
 }
 
 impl fmt::Debug for Vfs {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Vfs").field("n_files", &self.data.len()).finish()
+        f.debug_struct("Vfs").field("n_files", &self.file_states.len()).finish()
     }
 }

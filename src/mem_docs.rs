@@ -6,14 +6,10 @@ use vfs::vfs_path::VfsPath;
 #[derive(Debug, Clone)]
 pub(crate) struct DocumentData {
     pub(crate) version: i32,
+    pub(crate) data: String,
 }
 
-impl DocumentData {
-    pub(crate) fn new(version: i32) -> Self {
-        DocumentData { version }
-    }
-}
-
+// Files managed by client via notifications
 #[derive(Default, Clone)]
 pub(crate) struct MemDocs {
     mem_docs: FxHashMap<VfsPath, DocumentData>,

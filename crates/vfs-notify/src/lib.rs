@@ -3,9 +3,11 @@ use std::{collections::HashSet, fs, ops::Not};
 use crossbeam_channel::{never, select, unbounded, Receiver, Sender};
 use itertools::Itertools;
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
+use utils::lines::LineEndings;
 use utils::paths::{AbsPath, AbsPathBuf};
 use utils::thread;
 use vfs::loader;
+use vfs::vfs::VfsContentTy;
 use walkdir::WalkDir;
 
 #[derive(Debug)]
@@ -40,7 +42,7 @@ impl loader::Handle for NotifyHandle {
         self.sender.send(ServerMsg::Invalidate(path)).unwrap();
     }
 
-    fn load_sync(&mut self, path: &AbsPath) -> Option<Vec<u8>> {
+    fn load_sync(&mut self, path: &AbsPath) -> Option<VfsContentTy> {
         read(path)
     }
 }
@@ -171,7 +173,7 @@ impl NotifyActor {
         &mut self,
         entry: loader::Entry,
         watch: bool,
-    ) -> Vec<(AbsPathBuf, Option<Vec<u8>>)> {
+    ) -> Vec<(AbsPathBuf, Option<VfsContentTy>)> {
         match entry {
             loader::Entry::Files(files) => files
                 .into_iter()
@@ -240,8 +242,15 @@ impl NotifyActor {
     }
 }
 
-fn read(path: &AbsPath) -> Option<Vec<u8>> {
-    std::fs::read(path).ok()
+fn read(path: &AbsPath) -> Option<VfsContentTy> {
+    let bytes = std::fs::read(path).ok()?;
+    match String::from_utf8(bytes).ok() {
+        Some(text) => {
+            let (text, line_ending) = LineEndings::normalize(text);
+            Some((text, Some(line_ending)))
+        }
+        None => Some((String::new(), None)),
+    }
 }
 
 fn log_notify_error<T>(res: notify::Result<T>) -> Option<T> {

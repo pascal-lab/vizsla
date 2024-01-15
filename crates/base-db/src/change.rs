@@ -11,7 +11,7 @@ use crate::{
 #[derive(Debug, Default)]
 pub struct Change {
     pub roots: Option<Vec<SourceRoot>>,
-    pub changed_files: Vec<(ChangedFile, Option<Arc<str>>)>,
+    pub changed_files: Vec<ChangedFile>,
     pub package_graph: Option<PackageGraph>,
 }
 
@@ -24,8 +24,8 @@ impl Change {
         self.roots = Some(roots);
     }
 
-    pub fn add_changed_file(&mut self, changed_file: ChangedFile, new_text: Option<Arc<str>>) {
-        self.changed_files.push((changed_file, new_text))
+    pub fn add_changed_file(&mut self, changed_file: ChangedFile) {
+        self.changed_files.push(changed_file)
     }
 
     pub fn apply(self, db: &mut dyn SourceRootDb) {
@@ -40,23 +40,16 @@ impl Change {
             }
         }
 
-        for (changed_file, new_text) in self.changed_files {
+        for changed_file in self.changed_files {
             let file_id = changed_file.file_id;
-            let source_root_id = db.source_root_id(file_id);
-            let source_root = db.source_root(source_root_id);
+            let source_root = db.source_root(db.source_root_id(file_id));
             let durability = durability(&source_root);
 
-            // cannot remove a file, so reset it
-            let text = new_text.unwrap_or_else(|| Arc::from(""));
-            db.set_file_text_with_durability(file_id, text, durability);
-
-            let is_create_or_modified = changed_file.is_created_or_modified();
-            edit_syntax_tree(db, changed_file);
-            if is_create_or_modified {
+            let file_exists = changed_file.exists();
+            edit_syntax_tree(db, changed_file, durability);
+            if file_exists {
                 parse_source(db, file_id);
             }
-
-            dbg!(&db.syntax_tree(file_id).map(|tree| tree.tree().root_node().to_sexp()));
         }
 
         if let Some(package_graph) = self.package_graph {

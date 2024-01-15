@@ -1,6 +1,8 @@
 use rustc_hash::FxHashSet;
+use salsa::Durability;
 use syntax::parse::SyntaxTree;
 use triomphe::Arc;
+use utils::text_edit::SourceEditKind;
 use vfs::{
     anchored_path::AnchoredPath,
     vfs::{ChangeKind, ChangedFile, FileId},
@@ -29,17 +31,28 @@ pub trait SourceDb: FileLoader + std::fmt::Debug {
 }
 
 // `edits` = None => old syntax tree should be removed
-pub fn edit_syntax_tree(db: &mut dyn SourceDb, changed_file: ChangedFile) {
+pub fn edit_syntax_tree(
+    db: &mut dyn SourceRootDb,
+    changed_file: ChangedFile,
+    durability: Durability,
+) {
     let file_id = changed_file.file_id;
-    match changed_file.change_kind {
-        ChangeKind::Modify(Some(edits)) => {
+
+    match changed_file.source_edits() {
+        Some(SourceEditKind::Full) => db.set_syntax_tree(file_id, None),
+        Some(SourceEditKind::Edits(edits)) => {
             let syntax_tree = db.syntax_tree(file_id).expect("Initial parse expected");
             let mut tree = syntax_tree.tree().clone();
+
             edits.iter().for_each(|edit| tree.edit(edit));
-            db.set_syntax_tree(file_id, Some(SyntaxTree::new(tree)));
+
+            db.set_syntax_tree_with_durability(file_id, Some(SyntaxTree::new(tree)), durability);
         }
-        _ => db.set_syntax_tree(file_id, None),
+        None => {}
     }
+
+    let text = changed_file.get_text().map_or_else(|| Arc::from(""), |s| Arc::from(s.as_str()));
+    db.set_file_text_with_durability(file_id, text, durability);
 }
 
 pub fn parse_source(db: &mut dyn SourceDb, file_id: FileId) {

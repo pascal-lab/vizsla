@@ -1,7 +1,7 @@
-mod apply_changes;
 pub mod dispatcher;
 mod handlers;
 pub mod main_loop;
+mod process_changes;
 pub mod reload;
 pub mod respond;
 
@@ -150,7 +150,7 @@ impl GlobalState {
             vfs_progress_n_total: 0,
             vfs_progress_n_done: 0,
 
-            workspaces: Arc::from_iter([]),
+            workspaces: Arc::from(vec![]),
             fetch_workspaces_task: ExclTask::default(),
         }
     }

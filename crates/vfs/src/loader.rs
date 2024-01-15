@@ -3,6 +3,8 @@ use std::fmt;
 
 use utils::paths::{AbsPath, AbsPathBuf};
 
+use crate::vfs::VfsContentTy;
+
 #[derive(Debug, Clone)]
 pub enum Entry {
     Files(Vec<AbsPathBuf>),
@@ -25,7 +27,7 @@ pub struct Config {
 
 pub enum Message {
     Progress { n_total: usize, n_done: usize, config_version: u32 },
-    Loaded { files: Vec<(AbsPathBuf, Option<Vec<u8>>)> },
+    Loaded { files: Vec<(AbsPathBuf, Option<VfsContentTy>)> },
 }
 
 pub type Sender = Box<dyn Fn(Message) + Send>;
@@ -39,7 +41,7 @@ pub trait Handle: fmt::Debug {
 
     fn invalidate(&mut self, path: AbsPathBuf);
 
-    fn load_sync(&mut self, path: &AbsPath) -> Option<Vec<u8>>;
+    fn load_sync(&mut self, path: &AbsPath) -> Option<VfsContentTy>;
 }
 
 impl Entry {

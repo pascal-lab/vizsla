@@ -7,6 +7,7 @@ use lsp_server::{Connection, Message, Notification, Request, Response};
 use lsp_types::notification::Notification as _;
 use project_model::project_manifest;
 use triomphe::Arc;
+use utils::text_edit::SourceEditKind;
 use vfs::vfs_path::VfsPath;
 
 use crate::config::Config;
@@ -291,7 +292,7 @@ impl GlobalState {
                 for (path, content) in files {
                     let path = VfsPath::from(path);
                     if !self.mem_docs.contains(&path) {
-                        vfs.set_file_contents(path, content, None);
+                        vfs.set_file_contents(&path, content, SourceEditKind::Full);
                     }
                 }
             }
