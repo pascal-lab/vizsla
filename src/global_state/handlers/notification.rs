@@ -11,7 +11,6 @@ use utils::{
     lines::{LineEndings, LineIndexEnding, PositionEncoding},
     text_edit::{SourceEdit, SourceEditKind, SourcePoint},
 };
-use vfs::vfs::ChangeKind;
 
 use crate::{
     global_state::{reload, GlobalState},

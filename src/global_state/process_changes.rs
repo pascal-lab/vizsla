@@ -3,10 +3,7 @@ use itertools::Itertools;
 use nohash_hasher::IntMap;
 use parking_lot::{RwLockUpgradableReadGuard, RwLockWriteGuard};
 use rustc_hash::FxHashMap;
-use std::{
-    collections::hash_map::Entry::{Occupied, Vacant},
-    io::LineWriter,
-};
+use std::collections::hash_map::Entry::{Occupied, Vacant};
 use utils::{lines::LineEndings, text_edit::SourceEditKind};
 use vfs::vfs::{ChangedFile, FileId, Vfs};
 

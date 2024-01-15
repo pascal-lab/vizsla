@@ -5,7 +5,7 @@ use triomphe::Arc;
 use utils::text_edit::SourceEditKind;
 use vfs::{
     anchored_path::AnchoredPath,
-    vfs::{ChangeKind, ChangedFile, FileId},
+    vfs::{ChangedFile, FileId},
 };
 
 use crate::{

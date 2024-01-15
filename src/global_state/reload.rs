@@ -6,7 +6,6 @@ use project_model::{
 use rustc_hash::FxHashSet;
 use triomphe::Arc;
 use utils::{paths::AbsPath, thread::ThreadIntent};
-use vfs::vfs::ChangeKind;
 
 use crate::{
     config::{Config, FilesWatcher},
