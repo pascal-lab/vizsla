@@ -1,6 +1,9 @@
 use std::{fmt, hash::BuildHasherDefault, mem};
 
-use crate::vfs_path::VfsPath;
+use crate::{
+    loader::{VfsLoadError, VfsLoadResult},
+    vfs_path::VfsPath,
+};
 use indexmap::IndexSet;
 use rustc_hash::FxHasher;
 use utils::{lines::LineEndings, text_edit::SourceEditKind};
@@ -9,8 +12,6 @@ use utils::{lines::LineEndings, text_edit::SourceEditKind};
 pub struct FileId(pub u32);
 
 impl nohash_hasher::IsEnabled for FileId {}
-
-pub type VfsContentTy = (String, Option<LineEndings>);
 
 #[derive(Default)]
 pub struct Vfs {
@@ -55,25 +56,25 @@ impl ChangedFile {
     }
 
     pub fn get_line_endings(&self) -> Option<LineEndings> {
-        match &self.change_kind {
-            ChangeKind::Create((_, ending)) | ChangeKind::Modify((_, ending), _) => *ending,
+        match self.change_kind {
+            ChangeKind::Create(Ok((_, e))) | ChangeKind::Modify(Ok((_, e)), _) => Some(e),
             _ => None,
         }
     }
 
     pub fn get_text(self) -> Option<String> {
         match self.change_kind {
-            ChangeKind::Create((text, _)) | ChangeKind::Modify((text, _), _) => Some(text),
-            ChangeKind::Delete => None,
+            ChangeKind::Create(Ok((text, _))) | ChangeKind::Modify(Ok((text, _)), _) => Some(text),
+            _ => None,
         }
     }
 }
 
 #[derive(Clone, Debug)]
 pub enum ChangeKind {
-    Create(VfsContentTy),
+    Create(VfsLoadResult),
     // None means modifications is unknown, so we need to update the whole text anyway
-    Modify(VfsContentTy, SourceEditKind),
+    Modify(VfsLoadResult, SourceEditKind),
     Delete,
 }
 
@@ -96,15 +97,15 @@ impl Vfs {
     pub fn set_file_contents(
         &mut self,
         path: &VfsPath,
-        contents: Option<VfsContentTy>,
+        contents: VfsLoadResult,
         source_edits: SourceEditKind,
     ) {
         let file_id = self.file_id_or_alloc(path);
         let change_kind = match (self.file_state(file_id), contents) {
-            (FileState::Exists, None) => ChangeKind::Delete,
-            (FileState::Exists, Some(v)) => ChangeKind::Modify(v, source_edits),
-            (FileState::Deleted, None) => return,
-            (FileState::Deleted, Some(v)) => ChangeKind::Create(v),
+            (FileState::Exists, Err(VfsLoadError::LoadError)) => ChangeKind::Delete,
+            (FileState::Exists, v) => ChangeKind::Modify(v, source_edits),
+            (FileState::Deleted, Err(VfsLoadError::LoadError)) => return,
+            (FileState::Deleted, v) => ChangeKind::Create(v),
         };
 
         if let ChangeKind::Modify(_, SourceEditKind::Edits(edits)) = &change_kind

@@ -1,9 +1,10 @@
 // Object safe interface for file watching and reading.
 use std::fmt;
 
-use utils::paths::{AbsPath, AbsPathBuf};
-
-use crate::vfs::VfsContentTy;
+use utils::{
+    lines::LineEndings,
+    paths::{AbsPath, AbsPathBuf},
+};
 
 #[derive(Debug, Clone)]
 pub enum Entry {
@@ -27,10 +28,18 @@ pub struct Config {
 
 pub enum Message {
     Progress { n_total: usize, n_done: usize, config_version: u32 },
-    Loaded { files: Vec<(AbsPathBuf, Option<VfsContentTy>)> },
+    Loaded { files: Vec<(AbsPathBuf, VfsLoadResult)> },
 }
 
 pub type Sender = Box<dyn Fn(Message) + Send>;
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum VfsLoadError {
+    LoadError,
+    DecodeError,
+}
+
+pub type VfsLoadResult = Result<(String, LineEndings), VfsLoadError>;
 
 pub trait Handle: fmt::Debug {
     fn spawn(sender: Sender) -> Self
@@ -41,7 +50,7 @@ pub trait Handle: fmt::Debug {
 
     fn invalidate(&mut self, path: AbsPathBuf);
 
-    fn load_sync(&mut self, path: &AbsPath) -> Option<VfsContentTy>;
+    fn load_sync(&mut self, path: &AbsPath) -> VfsLoadResult;
 }
 
 impl Entry {

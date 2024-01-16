@@ -45,11 +45,7 @@ pub(crate) fn handle_did_open_text_document(
         }
 
         let (text, line_ending) = LineEndings::normalize(params.text_document.text);
-        state.vfs.write().0.set_file_contents(
-            &path,
-            Some((text, Some(line_ending))),
-            SourceEditKind::Full,
-        );
+        state.vfs.write().0.set_file_contents(&path, Ok((text, line_ending)), SourceEditKind::Full);
     }
     Ok(())
 }
@@ -81,7 +77,7 @@ pub(crate) fn handle_did_change_text_document(
 
         *data = text.clone();
 
-        state.vfs.write().0.set_file_contents(&path, Some((text, Some(line_ending))), edits);
+        state.vfs.write().0.set_file_contents(&path, Ok((text, line_ending)), edits);
     }
     Ok(())
 }

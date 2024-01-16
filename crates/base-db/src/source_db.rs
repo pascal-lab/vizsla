@@ -39,7 +39,7 @@ pub fn edit_syntax_tree(
     let file_id = changed_file.file_id;
 
     match changed_file.source_edits() {
-        Some(SourceEditKind::Full) => db.set_syntax_tree(file_id, None),
+        Some(SourceEditKind::Full) | None => db.set_syntax_tree(file_id, None),
         Some(SourceEditKind::Edits(edits)) => {
             let syntax_tree = db.syntax_tree(file_id).expect("Initial parse expected");
             let mut tree = syntax_tree.tree().clone();
@@ -48,7 +48,6 @@ pub fn edit_syntax_tree(
 
             db.set_syntax_tree_with_durability(file_id, Some(SyntaxTree::new(tree)), durability);
         }
-        None => {}
     }
 
     let text = changed_file.get_text().map_or_else(|| Arc::from(""), |s| Arc::from(s.as_str()));

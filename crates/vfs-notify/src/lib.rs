@@ -6,8 +6,7 @@ use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 use utils::lines::LineEndings;
 use utils::paths::{AbsPath, AbsPathBuf};
 use utils::thread;
-use vfs::loader;
-use vfs::vfs::VfsContentTy;
+use vfs::loader::{self, VfsLoadError, VfsLoadResult};
 use walkdir::WalkDir;
 
 #[derive(Debug)]
@@ -42,7 +41,7 @@ impl loader::Handle for NotifyHandle {
         self.sender.send(ServerMsg::Invalidate(path)).unwrap();
     }
 
-    fn load_sync(&mut self, path: &AbsPath) -> Option<VfsContentTy> {
+    fn load_sync(&mut self, path: &AbsPath) -> VfsLoadResult {
         read(path)
     }
 }
@@ -173,7 +172,7 @@ impl NotifyActor {
         &mut self,
         entry: loader::Entry,
         watch: bool,
-    ) -> Vec<(AbsPathBuf, Option<VfsContentTy>)> {
+    ) -> Vec<(AbsPathBuf, VfsLoadResult)> {
         match entry {
             loader::Entry::Files(files) => files
                 .into_iter()
@@ -242,15 +241,10 @@ impl NotifyActor {
     }
 }
 
-fn read(path: &AbsPath) -> Option<VfsContentTy> {
-    let bytes = std::fs::read(path).ok()?;
-    match String::from_utf8(bytes).ok() {
-        Some(text) => {
-            let (text, line_ending) = LineEndings::normalize(text);
-            Some((text, Some(line_ending)))
-        }
-        None => Some((String::new(), None)),
-    }
+fn read(path: &AbsPath) -> VfsLoadResult {
+    let bytes = std::fs::read(path).map_err(|_| VfsLoadError::LoadError)?;
+    let text = String::from_utf8(bytes).map_err(|_| VfsLoadError::DecodeError)?;
+    Ok(LineEndings::normalize(text))
 }
 
 fn log_notify_error<T>(res: notify::Result<T>) -> Option<T> {
