@@ -9,7 +9,7 @@ mod tf;
 use la_arena::{Arena, Idx};
 use smol_str::SmolStr;
 use std::sync::Arc;
-use syntax::{ast::ptr, SyntaxNodePtr};
+use syntax::SyntaxNodePtr;
 
 use crate::hir_def::{
     data::DataDecl,
@@ -31,9 +31,21 @@ macro_rules! impl_index {
 
 pub type Ident = SmolStr;
 
-pub type NodeId = Idx<SyntaxNodePtr>;
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct IdentSelect {
+    pub ident: Ident,
+    pub select_expr: Option<NodeId>,
+}
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct HierarchicalIdent {
+    pub root: bool,
+    pub ident_selects: Box<IdentSelect>,
+}
+
+pub type NodeId = Idx<SyntaxNodePtr>;
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct File {
     pub items: FileItems,
     pub data: FileData,
@@ -48,10 +60,10 @@ pub enum FileItems {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct FileData {
-    idents: Arena<Ident>,
-    data_decls: Arena<DataDecl>,
-    module_decls: Arena<ModuleDecl>,
-    interface_decls: Arena<InterfaceDecl>,
+    pub ident: Arena<Ident>,
+    pub data_decls: Arena<DataDecl>,
+    pub module_decls: Arena<ModuleDecl>,
+    pub interface_decls: Arena<InterfaceDecl>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]

@@ -1,81 +1,108 @@
 use crate::hir_def::{
-    block::Block,
-    data::{DataDecl, ParamDecl},
+    data::{DataDecl, NetDecl, ParamDecl, VarDecl},
     generate::{GenerateConstruct, GenvarDecl},
-    stmt::Stmt,
     tf::TFDecl,
-    Ident, NodeId,
+    HierarchicalIdent, Ident, NodeId,
 };
 use la_arena::{Arena, Idx};
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ModuleDecl {
     pub ident: Ident,
-    pub port_param_decls: Arena<ParamDecl>,
-    pub non_ansi_ports: Arena<NonAnsiPort>,
+    pub param_port_list: Arena<ParamDecl>,
+    pub non_ansi_ports: Option<Arena<NonAnsiPort>>,
     pub port_decls: Arena<PortDecl>,
-    pub module_items: Box<ModuleItems>,
+    pub module_items: Box<ModuleItem>,
     pub data: ModuleData,
     pub node_id: NodeId,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub enum ModuleItems {
+pub enum ModuleItem {
     DataDecl(Idx<DataDecl>),
     TFDecl(Idx<TFDecl>),
     ParamOverride(Idx<ParamOverride>),
+    ModuleInstantiation(Idx<ModuleInstantiation>),
+    InterfaceInstantiation(Idx<InterfaceInstantiation>),
+    ContinuousAssignment(Idx<ContinuousAssignment>),
+    ProcessConstruct(Idx<ProcessConstruct>),
     // TODO: Add more module items
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct InterfaceDecl {
-    pub ident: Ident,
-    // TODO: complete this
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ModuleData {
     pub data_decls: Arena<DataDecl>,
-    pub blocks: Arena<Block>,
     pub tf_decls: Arena<TFDecl>,
 
-    // module or generate items
     pub param_overrides: Arena<ParamOverride>,
     pub module_instantiations: Arena<ModuleInstantiation>,
-
-    // module_common_item
     pub interface_instantiations: Arena<InterfaceInstantiation>,
     pub continuous_assignments: Arena<ContinuousAssignment>,
     pub process_constructs: Arena<ProcessConstruct>,
-
-    // data types
 
     // generate
     pub genvar_decls: Arena<GenvarDecl>,
     pub generate_constructs: Arena<GenerateConstruct>,
 }
 
+// TODO: ref and interface port
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub enum PortDecl {
+    IODecl(IODecl),
+    RefDecl,
+    InterfacePortDecl,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub enum IOType {
+    Input,
+    Output,
+    Inout,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub enum PortDataDecl {
+    NetDecl(NetDecl),
+    VarDecl(VarDecl),
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct IODecl {
+    pub port_type: IOType,
+    pub data_decl: PortDataDecl,
+    pub node_id: NodeId,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct NonAnsiPort {
+    ident: Option<Ident>,
+    port_expr: Option<NodeId>,
+    node_id: NodeId,
+}
+
 // TODO: complete the following content
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct PortParamDecl {}
+pub struct ParamOverride {
+    pub hierarchical_ident: HierarchicalIdent,
+    pub expr: NodeId,
+    pub node_id: NodeId,
+}
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct PortDecl {}
+pub struct ModuleInstantiation {
+    module_ident: Ident,
+    // TODO: complete this
+}
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct NonAnsiPort {}
+pub struct InterfaceInstantiation {
+    // TODO: complete this
+}
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct ParamOverride {}
-
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct ModuleInstantiation {}
-
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct InterfaceInstantiation {}
-
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct ContinuousAssignment {}
+pub struct ContinuousAssignment {
+    // TODO: complete this
+}
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum AlwaysType {
@@ -95,5 +122,10 @@ pub enum ProcessType {
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ProcessConstruct {
     pub process_type: ProcessType,
-    pub stmt: Idx<Stmt>,
+    pub stmt: NodeId,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct InterfaceDecl {
+    // TODO: complete this
 }

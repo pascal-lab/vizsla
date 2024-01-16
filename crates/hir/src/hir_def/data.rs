@@ -10,15 +10,11 @@ pub enum DataType {
     // TODO: complete all the data types
 }
 
+// TODO: associative_dimension | queue_dimension
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub enum UnpackedDimension {
+pub enum Dimension {
     Range(NodeId, NodeId),
     Expr(NodeId),
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub enum PackedDimension {
-    Range(NodeId, NodeId),
     Unsized,
 }
 
@@ -38,11 +34,10 @@ pub enum NetType {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct NetDeclAssignment {
+pub struct DataDeclAssignment {
     pub ident: Ident,
-    pub dimensions: Option<Box<[UnpackedDimension]>>,
+    pub dimensions: Option<Box<[Dimension]>>,
     pub expr: Option<NodeId>,
-    pub node_id: NodeId,
 }
 
 // Todo: [ drive_strength | charge_strength ] [ vectored | scalared ]  [ delay3 ]
@@ -50,22 +45,7 @@ pub struct NetDeclAssignment {
 pub struct NetDecl {
     pub net_type: NetType,
     pub data_type: DataType,
-    pub list: Box<[NetDeclAssignment]>,
-    pub node_id: NodeId,
-}
-
-// TODO: associative_dimension | queue_dimension
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub enum VarDimension {
-    Unpacked(UnpackedDimension),
-    Packed(PackedDimension),
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct VarDeclAssignment {
-    pub ident: Ident,
-    pub dimensions: Option<Box<[VarDimension]>>,
-    pub expr: Option<NodeId>,
+    pub list: Box<[DataDeclAssignment]>,
     pub node_id: NodeId,
 }
 
@@ -74,22 +54,7 @@ pub struct VarDecl {
     pub konst: bool,
     pub var: bool,
     pub data_type: DataType,
-    pub list: Box<[VarDeclAssignment]>,
-    pub node_id: NodeId,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub enum ParamExpression {
-    Expr(NodeId),
-    DataType(DataType),
-    Dollar,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct ParamAssignment {
-    pub ident: Ident,
-    pub dimensions: Box<[UnpackedDimension]>,
-    pub param_expr: Option<ParamExpression>,
+    pub list: Box<[DataDeclAssignment]>,
     pub node_id: NodeId,
 }
 
@@ -98,7 +63,7 @@ pub struct ParamDecl {
     pub local: bool,
     // 6.20.2
     pub data_type: Option<DataType>,
-    pub param_assignments: Box<[ParamAssignment]>,
+    pub list: Box<[DataDeclAssignment]>,
     pub node_id: NodeId,
 }
 
