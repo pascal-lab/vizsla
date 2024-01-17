@@ -92,6 +92,7 @@ impl VfsProgress {
 
 pub(crate) struct GlobalState {
     pub(crate) sender: Sender<Message>,
+
     pub(crate) req_queue: ReqQueue<(String, Instant), ReqHandler>,
 
     pub(crate) task_pool: Handle<TaskPool<Task>, Receiver<Task>>,

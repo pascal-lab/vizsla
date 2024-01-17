@@ -51,7 +51,7 @@ pub fn main_loop(config: Config, connection: Connection) -> anyhow::Result<()> {
 }
 
 impl GlobalState {
-    pub(crate) fn run(&mut self, cli_inbox: Receiver<Message>) -> anyhow::Result<()> {
+    pub(crate) fn run(&mut self, client_receiver: Receiver<Message>) -> anyhow::Result<()> {
         // TODO: check for status
 
         if self.config.cli_did_save_dyn_reg() {
@@ -63,7 +63,7 @@ impl GlobalState {
             self.fetch_workspaces(cause);
         }
 
-        while let Some(event) = self.next_event(&cli_inbox) {
+        while let Some(event) = self.next_event(&client_receiver) {
             if let Event::Lsp(Message::Notification(Notification { method, .. })) = &event
                 && method == lsp_types::notification::Exit::METHOD
             {
