@@ -13,9 +13,8 @@ use utils::{
 };
 
 use crate::{
-    global_state::{reload, GlobalState},
+    global_state::{mem_docs::DocumentData, reload, GlobalState},
     lsp_ext::from_proto,
-    mem_docs::DocumentData,
     DEFAULT_PROCESS_NAME,
 };
 

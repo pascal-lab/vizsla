@@ -4,6 +4,7 @@ pub mod main_loop;
 mod process_changes;
 pub mod reload;
 pub mod respond;
+mod mem_docs;
 
 use base_db::source_root::SourceRootConfig;
 use crossbeam_channel::{unbounded, Receiver, Sender};
@@ -21,7 +22,6 @@ use utils::{
 
 use crate::{
     config::{Config, ConfigError},
-    mem_docs::MemDocs,
 };
 use ide::{
     self,
@@ -32,7 +32,7 @@ use vfs::{
     vfs::{FileId, Vfs},
 };
 
-use self::main_loop::Task;
+use self::{main_loop::Task, mem_docs::MemDocs};
 
 pub(crate) type ReqHandler = fn(&mut GlobalState, lsp_server::Response);
 

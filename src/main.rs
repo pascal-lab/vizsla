@@ -23,7 +23,6 @@ use crate::global_state::main_loop;
 mod config;
 mod global_state;
 mod lsp_ext;
-mod mem_docs;
 
 const DEFAULT_PROCESS_NAME: &str = env!("CARGO_PKG_NAME");
 const DEBUG: bool = cfg!(debug_assertions);
