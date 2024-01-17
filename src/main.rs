@@ -25,13 +25,13 @@ mod global_state;
 mod lsp_ext;
 mod mem_docs;
 
-const DEFAULT_PROCESS_NAME: &str = "vizsla";
+const DEFAULT_PROCESS_NAME: &str = env!("CARGO_PKG_NAME");
 const DEBUG: bool = cfg!(debug_assertions);
 const VERSION: &str =
     formatcp!("{}_{}", env!("CARGO_PKG_VERSION"), if DEBUG { "DEBUG" } else { "RELEASE" });
 
 #[derive(Clone, Debug, Parser)]
-#[clap(name = "vizsla", version = VERSION)]
+#[clap(name = DEFAULT_PROCESS_NAME, version = VERSION)]
 pub struct Opt {
     #[clap(long, default_value = DEFAULT_PROCESS_NAME)]
     pub process_name: String,
