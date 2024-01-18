@@ -11,6 +11,7 @@ crossbeam-channel.workspace = true
 itertools.workspace = true
 jod-thread = "0.1.2"
 line-index.workspace = true
+memchr = "2.7.1"
 serde.workspace = true
 serde_json.workspace = true
 tracing.workspace = true
