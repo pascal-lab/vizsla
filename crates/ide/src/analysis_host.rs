@@ -1,8 +1,7 @@
-use base_db::{
-    change::Change,
-    salsa::{self, ParallelDatabase},
-};
+use base_db::{change::Change, salsa::ParallelDatabase};
 use ide_db::root_db::RootDb;
+
+use crate::analysis::Analysis;
 
 pub struct AnalysisHost {
     db: RootDb,
@@ -34,9 +33,4 @@ impl Default for AnalysisHost {
     fn default() -> AnalysisHost {
         AnalysisHost::new(None)
     }
-}
-
-#[derive(Debug)]
-pub struct Analysis {
-    db: salsa::Snapshot<RootDb>,
 }
