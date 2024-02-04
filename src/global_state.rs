@@ -16,7 +16,7 @@ use std::time::Instant;
 use triomphe::Arc;
 use utils::{
     excl_task::ExclTask,
-    lines::LineEndings,
+    lines::LineEnding,
     thread::{Pool, ThreadIntent},
 };
 
@@ -107,7 +107,7 @@ pub(crate) struct GlobalState {
     pub(crate) shutdown_requested: bool,
 
     pub(crate) vfs_loader: Handle<Box<dyn vfs::loader::Handle>, Receiver<vfs::loader::Message>>,
-    pub(crate) vfs: Arc<RwLock<(Vfs, IntMap<FileId, LineEndings>)>>,
+    pub(crate) vfs: Arc<RwLock<(Vfs, IntMap<FileId, LineEnding>)>>,
     pub(crate) vfs_config_version: u32,
     pub(crate) vfs_progress: VfsProgress,
 

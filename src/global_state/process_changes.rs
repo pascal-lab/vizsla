@@ -4,7 +4,7 @@ use nohash_hasher::IntMap;
 use parking_lot::{RwLockUpgradableReadGuard, RwLockWriteGuard};
 use rustc_hash::FxHashMap;
 use std::collections::hash_map::Entry::{Occupied, Vacant};
-use utils::{lines::LineEndings, text_edit::SourceEditKind};
+use utils::{lines::LineEnding, text_edit::SourceEditKind};
 use vfs::vfs::{ChangedFile, FileId, Vfs};
 
 use super::{reload::should_refresh_for_change, GlobalState};
@@ -57,7 +57,7 @@ impl GlobalState {
     fn collect_changes(
         &self,
         bytes: Vec<ChangedFile>,
-        line_ending_map: &mut IntMap<FileId, LineEndings>,
+        line_ending_map: &mut IntMap<FileId, LineEnding>,
         vfs: &mut Vfs,
         has_structure_changes: bool,
     ) -> Change {

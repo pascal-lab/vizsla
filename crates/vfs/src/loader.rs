@@ -2,7 +2,7 @@
 use std::fmt;
 
 use utils::{
-    lines::LineEndings,
+    lines::LineEnding,
     paths::{AbsPath, AbsPathBuf},
 };
 
@@ -39,7 +39,7 @@ pub enum VfsLoadError {
     DecodeError,
 }
 
-pub type VfsLoadResult = Result<(String, LineEndings), VfsLoadError>;
+pub type VfsLoadResult = Result<(String, LineEnding), VfsLoadError>;
 
 pub trait Handle: fmt::Debug {
     fn spawn(sender: Sender) -> Self

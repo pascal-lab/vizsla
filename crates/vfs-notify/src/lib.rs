@@ -3,7 +3,7 @@ use std::{collections::HashSet, fs, ops::Not};
 use crossbeam_channel::{never, select, unbounded, Receiver, Sender};
 use itertools::Itertools;
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
-use utils::lines::LineEndings;
+use utils::lines::LineEnding;
 use utils::paths::{AbsPath, AbsPathBuf};
 use utils::thread;
 use vfs::loader::{self, VfsLoadError, VfsLoadResult};
@@ -244,7 +244,7 @@ impl NotifyActor {
 fn read(path: &AbsPath) -> VfsLoadResult {
     let bytes = std::fs::read(path).map_err(|_| VfsLoadError::LoadError)?;
     let text = String::from_utf8(bytes).map_err(|_| VfsLoadError::DecodeError)?;
-    Ok(LineEndings::normalize(text))
+    Ok(LineEnding::normalize(text))
 }
 
 fn log_notify_error<T>(res: notify::Result<T>) -> Option<T> {

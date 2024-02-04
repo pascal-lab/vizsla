@@ -9,14 +9,20 @@ pub enum PositionEncoding {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum LineEndings {
+pub enum LineEnding {
     Unix,
     Dos,
 }
 
-impl LineEndings {
+pub struct LineInfo {
+    pub index: Arc<LineIndex>,
+    pub ending: LineEnding,
+    pub encoding: PositionEncoding,
+}
+
+impl LineEnding {
     /// Replaces `\r\n` with `\n` in-place in `src`.
-    pub fn normalize(src: String) -> (String, LineEndings) {
+    pub fn normalize(src: String) -> (String, LineEnding) {
         // We replace `\r\n` with `\n` in-place, which doesn't break utf-8 encoding.
         // While we *can* call `as_mut_vec` and do surgery on the live string
         // directly, let's rather steal the contents of `src`. This makes the code
@@ -33,7 +39,7 @@ impl LineEndings {
             let idx = match finder.find(&tail[gap_len..]) {
                 None if crlf_seen => tail.len(),
                 // SAFETY: buf is unchanged and therefore still contains utf8 data
-                None => return (unsafe { String::from_utf8_unchecked(buf) }, LineEndings::Unix),
+                None => return (unsafe { String::from_utf8_unchecked(buf) }, LineEnding::Unix),
                 Some(idx) => {
                     crlf_seen = true;
                     idx + gap_len
@@ -54,12 +60,6 @@ impl LineEndings {
             buf.set_len(new_len);
             String::from_utf8_unchecked(buf)
         };
-        (src, LineEndings::Dos)
+        (src, LineEnding::Dos)
     }
-}
-
-pub struct LineIndexEnding {
-    pub index: Arc<LineIndex>,
-    pub endings: LineEndings,
-    pub encoding: PositionEncoding,
 }

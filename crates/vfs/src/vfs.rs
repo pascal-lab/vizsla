@@ -6,7 +6,7 @@ use crate::{
 };
 use indexmap::IndexSet;
 use rustc_hash::FxHasher;
-use utils::{lines::LineEndings, text_edit::SourceEditKind};
+use utils::{lines::LineEnding, text_edit::SourceEditKind};
 
 #[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct FileId(pub u32);
@@ -55,7 +55,7 @@ impl ChangedFile {
         }
     }
 
-    pub fn get_line_endings(&self) -> Option<LineEndings> {
+    pub fn get_line_endings(&self) -> Option<LineEnding> {
         match self.change_kind {
             ChangeKind::Create(Ok((_, e))) | ChangeKind::Modify(Ok((_, e)), _) => Some(e),
             _ => None,
