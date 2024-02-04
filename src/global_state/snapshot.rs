@@ -1,0 +1,45 @@
+use ide::{analysis::Analysis, Cancellable};
+use nohash_hasher::IntMap;
+use parking_lot::{MappedRwLockReadGuard, RwLock, RwLockReadGuard};
+use project_model::workspace::Workspace;
+use triomphe::Arc;
+use utils::lines::{LineEnding, LineInfo};
+use vfs::vfs::{FileId, Vfs};
+
+use crate::{config::Config, lsp_ext::from_proto};
+
+use super::mem_docs::MemDocs;
+
+// immutable
+pub(crate) struct GlobalStateSnapshot {
+    pub(crate) config: Arc<Config>,
+    pub(crate) analysis: Analysis,
+    // pub(crate) check_fixes: CheckFixes,
+    pub(crate) mem_docs: MemDocs,
+    pub(crate) vfs: Arc<RwLock<(Vfs, IntMap<FileId, LineEnding>)>>,
+    pub(crate) workspaces: Arc<Vec<Workspace>>,
+}
+
+impl std::panic::UnwindSafe for GlobalStateSnapshot {}
+
+impl GlobalStateSnapshot {
+    fn vfs_read(&self) -> MappedRwLockReadGuard<'_, Vfs> {
+        RwLockReadGuard::map(self.vfs.read(), |(it, _)| it)
+    }
+
+    pub(crate) fn file_id(&self, url: &lsp_types::Url) -> anyhow::Result<FileId> {
+        let path = from_proto::vfs_path(url)?;
+        let vfs = self.vfs_read();
+        let file_id =
+            vfs.file_id(&path).ok_or_else(|| anyhow::format_err!("file not found: {path}"))?;
+        Ok(file_id)
+    }
+
+    pub(crate) fn line_index(&self, file_id: FileId) -> Cancellable<LineInfo> {
+        let ending = self.vfs.read().1[&file_id];
+        let index = self.analysis.line_index(file_id)?;
+        let encoding = self.config.position_encoding();
+        let res = LineInfo { index, ending, encoding };
+        Ok(res)
+    }
+}

@@ -1,10 +1,11 @@
-pub mod dispatcher;
-mod handlers;
+mod dispatcher;
+mod lsp_handlers;
 pub mod main_loop;
 mod mem_docs;
 mod process_changes;
 pub mod reload;
 pub mod respond;
+pub(crate) mod snapshot;
 
 use base_db::source_root::SourceRootConfig;
 use crossbeam_channel::{unbounded, Receiver, Sender};
@@ -21,18 +22,13 @@ use utils::{
 };
 
 use crate::config::{Config, ConfigError};
-use ide::{
-    self,
-    analysis_host::{Analysis, AnalysisHost},
-};
+use ide::{self, analysis_host::AnalysisHost};
 use vfs::{
     self,
     vfs::{FileId, Vfs},
 };
 
-use self::{main_loop::Task, mem_docs::MemDocs};
-
-pub(crate) type ReqHandler = fn(&mut GlobalState, lsp_server::Response);
+use self::{main_loop::Task, mem_docs::MemDocs, snapshot::GlobalStateSnapshot};
 
 pub(crate) struct TaskPool<T> {
     pub(crate) sender: Sender<T>,
@@ -90,6 +86,8 @@ impl VfsProgress {
     }
 }
 
+pub(crate) type ReqHandler = fn(&mut GlobalState, lsp_server::Response);
+
 pub(crate) struct GlobalState {
     pub(crate) sender: Sender<Message>,
 
@@ -116,18 +114,6 @@ pub(crate) struct GlobalState {
     pub(crate) fetch_workspaces_task:
         ExclTask<(), Option<(Arc<Vec<Workspace>>, Vec<anyhow::Error>)>>,
 }
-
-// immutable
-pub(crate) struct GlobalStateSnapshot {
-    pub(crate) config: Arc<Config>,
-    pub(crate) analysis: Analysis,
-    // pub(crate) check_fixes: CheckFixes,
-    mem_docs: MemDocs,
-    vfs: Arc<RwLock<(Vfs, IntMap<FileId, LineEndings>)>>,
-    pub(crate) workspaces: Arc<Vec<Workspace>>,
-}
-
-impl std::panic::UnwindSafe for GlobalStateSnapshot {}
 
 impl GlobalState {
     pub(crate) fn new(sender: Sender<lsp_server::Message>, config: Config) -> GlobalState {

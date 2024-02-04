@@ -8,12 +8,9 @@ use std::{
 };
 use utils::{json::from_json, thread::ThreadIntent};
 
-use crate::{
-    global_state::{GlobalState, GlobalStateSnapshot},
-    lsp_ext::lsp_error::LspError,
-};
+use crate::{global_state::GlobalState, lsp_ext::lsp_error::LspError};
 
-use super::main_loop::Task;
+use super::{main_loop::Task, snapshot::GlobalStateSnapshot};
 
 pub(crate) struct ReqDispatcher<'a> {
     pub(crate) req: Option<Request>,
