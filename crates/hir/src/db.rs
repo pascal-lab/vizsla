@@ -4,11 +4,11 @@ use crate::{
     hir_def::{self, FileItems, NodeIdMap},
     HirFileId,
 };
-use base_db::{salsa, source_db::SourceRootDb, DbUpcast};
+use base_db::{salsa, source_db::SourceRootDb};
 use vfs::vfs::FileId;
 
 #[salsa::query_group(HirDbStorage)]
-pub trait HirDb: SourceRootDb + DbUpcast<dyn SourceRootDb> {
+pub trait HirDb: SourceRootDb {
     fn hir_file_id(&self, file_id: FileId) -> HirFileId;
 
     #[salsa::invoke(hir_def::file_items_with_source_map_query)]
