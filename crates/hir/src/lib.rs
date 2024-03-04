@@ -1,7 +1,10 @@
-mod db;
-mod hir_def;
+pub mod db;
+pub mod hir_def;
 
-pub type HirFileId = u32;
+use vfs::vfs::FileId;
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+pub struct HirFileId(FileId);
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub struct InFile<T> {

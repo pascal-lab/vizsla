@@ -8,6 +8,7 @@ rustc-hash.workspace = true
 salsa.workspace = true
 la-arena.workspace = true
 hashbrown = { version = "0.12.3", features = ["inline-more"], default-features = false }
+smallvec.workspace = true
 smol_str.workspace = true
 syntax.workspace = true
 base-db.workspace = true

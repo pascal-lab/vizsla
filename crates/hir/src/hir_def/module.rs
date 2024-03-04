@@ -135,6 +135,9 @@ pub struct ProcessConstruct {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct ModuleSourceMap {}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct InterfaceDecl {
     // TODO: complete this
 }
