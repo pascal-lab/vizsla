@@ -1,10 +1,11 @@
-mod block;
-mod data;
-mod expr;
-mod generate;
-mod module;
-mod stmt;
-mod tf;
+pub mod bit;
+pub mod block;
+pub mod data;
+pub mod expr;
+pub mod generate;
+pub mod module;
+pub mod stmt;
+pub mod tf;
 
 use la_arena::{Arena, Idx};
 use smol_str::SmolStr;
@@ -46,13 +47,13 @@ pub struct HierarchicalIdent {
 pub type NodeId = Idx<SyntaxNodePtr>;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct File {
-    pub items: FileItems,
+pub struct HirFile {
+    pub items: Box<[FileItem]>,
     pub data: FileData,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub enum FileItems {
+pub enum FileItem {
     DataDecl(Idx<DataDecl>),
     ModuleDecl(Idx<ModuleDecl>),
     InterfaceDecl(Idx<InterfaceDecl>),
@@ -69,9 +70,9 @@ pub struct FileData {
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct NodeIdMap {}
 
-pub(crate) fn file_items_with_source_map_query(
+pub(crate) fn hir_file_with_source_map_query(
     db: &dyn crate::db::HirDb,
     file_id: crate::HirFileId,
-) -> (Arc<FileItems>, Arc<NodeIdMap>) {
+) -> (Arc<HirFile>, Arc<NodeIdMap>) {
     unimplemented!()
 }

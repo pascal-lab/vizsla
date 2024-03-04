@@ -1,3 +1,5 @@
+use la_arena::Arena;
+
 use crate::hir_def::{Ident, NodeId};
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -10,12 +12,12 @@ pub enum DataType {
     // TODO: complete all the data types
 }
 
-// TODO: associative_dimension | queue_dimension
+// TODO: associative_dimension | queue_dimension | Unsized
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum Dimension {
     Range(NodeId, NodeId),
     Expr(NodeId),
-    Unsized,
+    // Unsized,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -34,7 +36,7 @@ pub enum NetType {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct DataDeclAssignment {
+pub struct DataSubDecl {
     pub ident: Ident,
     pub dimensions: Option<Box<[Dimension]>>,
     pub expr: Option<NodeId>,
@@ -45,17 +47,14 @@ pub struct DataDeclAssignment {
 pub struct NetDecl {
     pub net_type: NetType,
     pub data_type: DataType,
-    pub list: Box<[DataDeclAssignment]>,
-    pub node_id: NodeId,
+    pub sub_decls: Arena<DataSubDecl>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct VarDecl {
     pub konst: bool,
-    pub var: bool,
     pub data_type: DataType,
-    pub list: Box<[DataDeclAssignment]>,
-    pub node_id: NodeId,
+    pub sub_decls: Arena<DataSubDecl>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -63,8 +62,25 @@ pub struct ParamDecl {
     pub local: bool,
     // 6.20.2
     pub data_type: Option<DataType>,
-    pub list: Box<[DataDeclAssignment]>,
-    pub node_id: NodeId,
+    pub sub_decls: Arena<DataSubDecl>,
+}
+
+// 23.3.2 Module instantiation syntax
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct OrderedPortAssignment {
+    expr: NodeId,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct NamedPortAssignment {
+    ident: Ident,
+    expr: Option<NodeId>,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub enum PortAssignmentsList {
+    Ordered(Box<[OrderedPortAssignment]>),
+    Named(Box<[NamedPortAssignment]>),
 }
 
 // TODO: TypeDecl, NetTypeDecl

@@ -4,9 +4,13 @@ use la_arena::Idx;
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum Expr {
     // TODO: Add more expressions
-    Mintypmax(ExprId, ExprId, ExprId),
+    // TODO: Mintypmax(ExprId, ExprId, ExprId),
     DataType(DataType),
+    This,
     Dollar,
+    Null,
+    // primary
+    NumberLiteral(),
 }
 
 pub type ExprId = Idx<Expr>;
