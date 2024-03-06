@@ -1,19 +1,30 @@
+mod lower;
+pub mod module_item;
+pub mod port;
+
 use crate::hir_def::{
     data::{DataDecl, Dimension, NetDecl, ParamDecl, PortAssignmentsList, VarDecl},
-    generate::{GenerateConstruct, GenvarDecl},
+    expr::{ExprHolder, SelectHolder},
+    module::{
+        port::{NonAnsiPort, PortDecl},
+        //module_item
+    },
     tf::TFDecl,
-    HierarchicalIdent, Ident, NodeId,
+    Ident,
 };
-use la_arena::{Arena, Idx};
+use la_arena::{Arena, ArenaMap, Idx};
+use smallvec::SmallVec;
+use syntax::ast::ptr;
+use triomphe::Arc;
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ModuleDecl {
     pub ident: Ident,
     pub param_port_list: Arena<ParamDecl>,
     pub port_decls: Arena<PortDecl>,
-    pub module_items: Box<ModuleItem>,
+    pub non_ansi_ports: Arena<NonAnsiPort>,
+    pub module_items: SmallVec<[ModuleItem; 1]>,
     pub data: ModuleData,
-    pub node_id: NodeId,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -21,72 +32,39 @@ pub enum ModuleItem {
     NonAnsiPort(Idx<NonAnsiPort>),
     DataDecl(Idx<DataDecl>),
     TFDecl(Idx<TFDecl>),
-    ParamOverride(Idx<ParamOverride>),
+    // ParamOverride(Idx<ParamOverride>),
     ModuleInstantiation(Idx<ModuleInstantiation>),
-    InterfaceInstantiation(Idx<InterfaceInstantiation>),
     ContinuousAssignment(Idx<ContinuousAssignment>),
     ProcessConstruct(Idx<ProcessConstruct>),
     // TODO: Add more module items
+    // InterfaceInstantiation(Idx<InterfaceInstantiation>),
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Default, Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ModuleData {
-    pub non_ansi_ports: Arena<NonAnsiPort>,
-
     pub data_decls: Arena<DataDecl>,
     pub tf_decls: Arena<TFDecl>,
 
-    pub param_overrides: Arena<ParamOverride>,
+    // TODO: ParamOverride
+    // pub param_overrides: Arena<ParamOverride>,
     pub module_instantiations: Arena<ModuleInstantiation>,
-    pub interface_instantiations: Arena<InterfaceInstantiation>,
+
     pub continuous_assignments: Arena<ContinuousAssignment>,
     pub process_constructs: Arena<ProcessConstruct>,
     // TODO: generate
     // pub genvar_decls: Arena<GenvarDecl>,
     // pub generate_constructs: Arena<GenerateConstruct>,
+
+    // TODO: interface_instantiations
+    // pub interface_instantiations: Arena<InterfaceInstantiation>,
 }
 
-// TODO: ref and interface port
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub enum PortDecl {
-    IODecl(IODecl),
-    // RefDecl,
-    // InterfacePortDecl,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct IODecl {
-    pub port_type: IOType,
-    pub data_decl: PortDataDecl,
-    pub node_id: NodeId,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub enum IOType {
-    Input,
-    Output,
-    Inout,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub enum PortDataDecl {
-    NetDecl(NetDecl),
-    VarDecl(VarDecl),
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct NonAnsiPort {
-    ident: Option<Ident>,
-    port_expr: Option<NodeId>,
-    node_id: NodeId,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct ParamOverride {
-    pub hierarchical_ident: HierarchicalIdent,
-    pub expr: NodeId,
-    pub node_id: NodeId,
-}
+// #[derive(Debug, PartialEq, Eq, Clone, Hash)]
+// pub struct ParamOverride {
+//     pub hierarchical_ident: HierarchicalIdent,
+//     pub expr: NodeId,
+//     pub node_id: NodeId,
+// }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct HierarchicalInstance {
@@ -100,11 +78,6 @@ pub struct ModuleInstantiation {
     pub module_ident: Ident,
     pub param_list: PortAssignmentsList,
     pub hierarchical_instances: Box<HierarchicalInstance>,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct InterfaceInstantiation {
-    // TODO: complete this
 }
 
 // TODO: net: [drive_strength][delay3] variable: [delay_control]
@@ -131,13 +104,47 @@ pub enum ProcessType {
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ProcessConstruct {
     pub process_type: ProcessType,
-    pub stmt: NodeId,
+    //pub stmt: NodeId,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct ModuleSourceMap {}
+#[derive(Default, Debug, PartialEq, Eq, Clone)]
+pub struct ModuleSourceMap {
+    pub exprs: Arena<ExprHolder>,
+    pub selects: Arena<SelectHolder>,
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct InterfaceDecl {
-    // TODO: complete this
+    pub ports: ArenaMap<Idx<NonAnsiPort>, ptr::PortPtr>,
+}
+
+pub(crate) fn module_with_source_map_query(
+    db: &dyn crate::db::HirDb,
+    module_id: crate::hir_def::ModuleId,
+) -> (Arc<ModuleDecl>, Arc<ModuleSourceMap>) {
+    let (hir_file, file_source_map) = db.hir_file_with_source_map(module_id.file_id);
+    let ident = hir_file.data[module_id.value].ident.clone();
+    let mut module_decl = ModuleDecl {
+        ident,
+        param_port_list: Arena::default(),
+        port_decls: Arena::default(),
+        non_ansi_ports: Arena::default(),
+        module_items: SmallVec::new(),
+        data: ModuleData::default(),
+    };
+    let mut module_source_map = ModuleSourceMap::default();
+
+    let module_ptr = &file_source_map.module_map_back[module_id.value];
+
+    (|| {
+        let tree = db.hir_syntax_tree(module_id.file_id)?;
+        let module_node = module_ptr.value.to_node(tree.tree())?;
+        let file_text = db.hir_file_text(module_id.file_id);
+        let mut ctx = lower::ModuleLowerCtx {
+            module_decl: &mut module_decl,
+            module_source_map: &mut module_source_map,
+            file_text: file_text.as_ref(),
+        };
+        ctx.lower_module_decl(&module_node);
+        Some(())
+    })();
+
+    (Arc::new(module_decl), Arc::new(module_source_map))
 }

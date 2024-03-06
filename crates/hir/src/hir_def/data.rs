@@ -1,6 +1,7 @@
 use la_arena::Arena;
 
-use crate::hir_def::{Ident, NodeId};
+use crate::hir_def::{expr::ExprHolder, Ident};
+use la_arena::Idx;
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum DataType {
@@ -15,8 +16,8 @@ pub enum DataType {
 // TODO: associative_dimension | queue_dimension | Unsized
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum Dimension {
-    Range(NodeId, NodeId),
-    Expr(NodeId),
+    Range(Idx<ExprHolder>, Idx<ExprHolder>),
+    Expr(Idx<ExprHolder>),
     // Unsized,
 }
 
@@ -39,7 +40,7 @@ pub enum NetType {
 pub struct DataSubDecl {
     pub ident: Ident,
     pub dimensions: Option<Box<[Dimension]>>,
-    pub expr: Option<NodeId>,
+    pub expr: Option<Idx<ExprHolder>>,
 }
 
 // Todo: [ drive_strength | charge_strength ] [ vectored | scalared ]  [ delay3 ]
@@ -68,13 +69,13 @@ pub struct ParamDecl {
 // 23.3.2 Module instantiation syntax
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct OrderedPortAssignment {
-    expr: NodeId,
+    expr: Idx<ExprHolder>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct NamedPortAssignment {
     ident: Ident,
-    expr: Option<NodeId>,
+    expr: Option<Idx<ExprHolder>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
