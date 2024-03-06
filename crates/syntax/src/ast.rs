@@ -16,6 +16,10 @@ pub trait AstNode<'a> {
 
     fn syntax(&self) -> &'a SyntaxNode;
 
+    fn to_text(&'a self, text: &'a str) -> Option<&'a str> {
+        self.syntax().utf8_text(text.as_bytes()).ok()
+    }
+
     fn errors(&'a self) -> support::AstChildren<'a, symbol::ErrorNode<'a>> {
         support::children(self.syntax())
     }
