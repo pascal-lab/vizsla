@@ -13,15 +13,16 @@ use vfs::vfs::FileId;
 
 #[salsa::query_group(HirDbStorage)]
 pub trait HirDb: SourceDb {
-    fn hir_file_id(&self, file_id: FileId) -> HirFileId;
-
+    #[salsa::transparent]
     fn hir_syntax_tree(&self, file_id: HirFileId) -> Option<SyntaxTree>;
 
+    #[salsa::transparent]
     fn hir_file_text(&self, file_id: HirFileId) -> Arc<str>;
 
     #[salsa::invoke(hir_def::hir_file_with_source_map_query)]
     fn hir_file_with_source_map(&self, file_id: HirFileId) -> (Arc<HirFile>, Arc<FileSourceMap>);
 
+    #[salsa::transparent]
     fn hir_file(&self, file_id: HirFileId) -> Arc<HirFile>;
 
     #[salsa::invoke(module::module_with_source_map_query)]
@@ -37,10 +38,6 @@ pub fn hir_syntax_tree(db: &dyn HirDb, file_id: HirFileId) -> Option<SyntaxTree>
 
 pub fn hir_file_text(db: &dyn HirDb, file_id: HirFileId) -> Arc<str> {
     db.file_text(file_id.0)
-}
-
-pub fn hir_file_id(_db: &dyn HirDb, file_id: FileId) -> HirFileId {
-    HirFileId(file_id)
 }
 
 pub fn hir_file(db: &dyn HirDb, file_id: HirFileId) -> Arc<HirFile> {
