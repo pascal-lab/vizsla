@@ -68,17 +68,14 @@ pub(crate) struct Handle<H, C> {
     pub(crate) receiver: C,
 }
 
+#[derive(Default)]
 pub(crate) struct VfsProgress {
     pub(crate) config_version: u32,
     pub(crate) n_done: usize,
     pub(crate) n_total: usize,
 }
 
-impl Default for VfsProgress {
-    fn default() -> Self {
-        VfsProgress { config_version: 0, n_total: 0, n_done: 0 }
-    }
-}
+
 
 impl VfsProgress {
     fn in_progress(&self) -> bool {
@@ -131,7 +128,7 @@ impl GlobalState {
             Handle { handle, receiver }
         };
 
-        let mut analysis_host = AnalysisHost::new(None);
+        let analysis_host = AnalysisHost::new(None);
 
         GlobalState {
             sender,

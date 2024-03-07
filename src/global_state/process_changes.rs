@@ -92,7 +92,7 @@ impl GlobalState {
                     let (change, just_created) = entry.get_mut();
 
                     match (change, *just_created, changed_file.change_kind) {
-                        (change @ _, _, Delete) => *change = Delete,
+                        (change, _, Delete) => *change = Delete,
                         (Create(prev), _, Create(new) | Modify(new, _)) => *prev = new,
                         (Modify(prev, Edits(a)), _, Modify(new, Edits(b))) => {
                             *prev = new;

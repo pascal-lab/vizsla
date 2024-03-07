@@ -1,8 +1,8 @@
-use span::FileRange;
+
 
 use crate::{
     global_state::snapshot::GlobalStateSnapshot,
-    lsp_ext::{from_proto, to_proto},
+    lsp_ext::{from_proto},
 };
 
 pub(crate) fn handle_goto_definition(

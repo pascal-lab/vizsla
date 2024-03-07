@@ -46,7 +46,7 @@ pub(crate) fn text_range(
     let end = offset(line_index, range.end)?;
 
     if end < start {
-        return Err(anyhow::format_err!("Invalid Range").into());
+        return Err(anyhow::format_err!("Invalid Range"));
     }
 
     Ok(TextRange::new(start, end))
