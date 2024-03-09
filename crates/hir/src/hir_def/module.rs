@@ -3,8 +3,8 @@ pub mod module_item;
 pub mod port;
 
 use crate::hir_def::{
-    data::{DataDecl, Dimension, NetDecl, ParamDecl, PortAssignmentsList, VarDecl},
-    expr::{ExprHolder, SelectHolder},
+    data::{DataDecl, DataSubDecl, Dimension, LocalDataSubDeclSrc, ParamDecl, PortAssignmentsList},
+    expr::{LocalExprSrc, LocalSelectSrc},
     module::{
         port::{NonAnsiPort, PortDecl},
         //module_item
@@ -16,8 +16,9 @@ use la_arena::{Arena, ArenaMap, Idx};
 use smallvec::SmallVec;
 use syntax::ast::ptr;
 use triomphe::Arc;
+use utils::try_;
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ModuleDecl {
     pub ident: Ident,
     pub param_port_list: Arena<ParamDecl>,
@@ -40,8 +41,10 @@ pub enum ModuleItem {
     // InterfaceInstantiation(Idx<InterfaceInstantiation>),
 }
 
-#[derive(Default, Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Default, Debug, PartialEq, Eq, Clone)]
 pub struct ModuleData {
+    pub data_sub_decls: Arena<DataSubDecl>,
+
     pub data_decls: Arena<DataDecl>,
     pub tf_decls: Arena<TFDecl>,
 
@@ -109,9 +112,9 @@ pub struct ProcessConstruct {
 
 #[derive(Default, Debug, PartialEq, Eq, Clone)]
 pub struct ModuleSourceMap {
-    pub exprs: Arena<ExprHolder>,
-    pub selects: Arena<SelectHolder>,
-
+    pub expr_srcs: Arena<LocalExprSrc>,
+    pub select_srcs: Arena<LocalSelectSrc>,
+    pub data_sub_decls: ArenaMap<Idx<DataSubDecl>, LocalDataSubDeclSrc>,
     pub ports: ArenaMap<Idx<NonAnsiPort>, ptr::PortPtr>,
 }
 
@@ -133,7 +136,7 @@ pub(crate) fn module_with_source_map_query(
 
     let module_ptr = &file_source_map.module_map_back[module_id.value];
 
-    (|| {
+    try_!({
         let tree = db.hir_syntax_tree(module_id.file_id)?;
         let module_node = module_ptr.value.to_node(tree.tree())?;
         let file_text = db.hir_file_text(module_id.file_id);
@@ -143,8 +146,7 @@ pub(crate) fn module_with_source_map_query(
             file_text: file_text.as_ref(),
         };
         ctx.lower_module_decl(&module_node);
-        Some(())
-    })();
+    });
 
     (Arc::new(module_decl), Arc::new(module_source_map))
 }

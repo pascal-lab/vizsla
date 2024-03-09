@@ -1,32 +1,32 @@
 use crate::hir_def::{
     data::{NetDecl, VarDecl},
-    expr::SelectHolder,
+    expr::LocalSelectSrcId,
     Ident,
 };
-use la_arena::{Arena, Idx};
+use la_arena::Arena;
 
 // TODO: ref and interface port
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum PortDecl {
     IODecl(IODecl),
     // RefDecl,
     // InterfacePortDecl,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct IODecl {
-    pub port_type: IOType,
+    pub direction: PortDirection,
     pub data_decl: PortDataDecl,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub enum IOType {
+pub enum PortDirection {
     Input,
     Output,
     Inout,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum PortDataDecl {
     NetDecl(NetDecl),
     VarDecl(VarDecl),
@@ -35,7 +35,7 @@ pub enum PortDataDecl {
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct PortReference {
     pub ident: Ident,
-    pub select: Idx<SelectHolder>,
+    pub select: LocalSelectSrcId,
 }
 
 #[derive(Default, Debug, PartialEq, Eq, Clone, Hash)]
