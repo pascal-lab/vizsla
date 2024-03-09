@@ -4,6 +4,7 @@ pub mod data;
 pub mod expr;
 pub mod generate;
 pub mod interface;
+pub mod lower;
 pub mod module;
 pub mod stmt;
 pub mod tf;
@@ -14,10 +15,7 @@ use smallvec::SmallVec;
 use smol_str::SmolStr;
 use std::ops::Index;
 use syntax::ast::ptr;
-use syntax::{
-    ast::{self, AstNode},
-    SyntaxNodePtr,
-};
+use syntax::ast::{self, AstNode};
 use triomphe::Arc;
 use utils::try_;
 
