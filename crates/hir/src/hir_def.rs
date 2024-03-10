@@ -8,6 +8,7 @@ pub mod lower;
 pub mod module;
 pub mod stmt;
 pub mod tf;
+pub mod literal;
 
 use la_arena::{Arena, ArenaMap, Idx};
 use rustc_hash::FxHashMap;
