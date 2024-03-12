@@ -35,6 +35,14 @@ macro_rules! impl_index {
     };
 }
 
+macro_rules! try_match {
+    ($child:expr, $target:pat => $body:expr) => {
+        if let Some($target) = $child {
+            $body
+        }
+    };
+}
+
 pub type Ident = SmolStr;
 
 // #[derive(Debug, PartialEq, Eq, Clone, Hash)]
