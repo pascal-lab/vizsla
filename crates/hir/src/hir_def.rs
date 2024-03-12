@@ -4,11 +4,11 @@ pub mod data;
 pub mod expr;
 pub mod generate;
 pub mod interface;
+pub mod literal;
 pub mod lower;
 pub mod module;
 pub mod stmt;
 pub mod tf;
-pub mod literal;
 
 use la_arena::{Arena, ArenaMap, Idx};
 use rustc_hash::FxHashMap;
@@ -36,12 +36,24 @@ macro_rules! impl_index {
 }
 
 macro_rules! try_match {
-    ($child:expr, $target:pat => $body:expr) => {
+    ($child:expr, $target:pat => $body:expr $(,)?) => {
         if let Some($target) = $child {
             $body
         }
     };
+
+    (_ => $body:expr) => { $body };
+
+    ($child:expr, $target:pat => $body:expr, $($rest:tt)*) => {
+        if let Some($target) = $child {
+            $body
+        } else {
+            try_match!($($rest)*)
+        }
+    };
 }
+
+pub(crate) use try_match;
 
 pub type Ident = SmolStr;
 
@@ -116,7 +128,7 @@ pub(crate) fn hir_file_with_source_map_query(
 
         for description in root.descriptions() {
             if let Some(module) = description.module_declaration() {
-                try_!({
+                try_! {
                     let ptr = module.to_ptr();
                     let module_id = hir_file.data.modules.alloc(ModuleInFile {
                         ident: module.identifier()?.to_text(&file_text)?.into(),
@@ -127,7 +139,7 @@ pub(crate) fn hir_file_with_source_map_query(
 
                     source_map.module_map.insert(module_source.clone(), module_id);
                     source_map.module_map_back.insert(module_id, module_source);
-                });
+                }
             }
         }
         Some(())
