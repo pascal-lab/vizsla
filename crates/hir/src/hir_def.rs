@@ -35,6 +35,7 @@ macro_rules! impl_index {
     };
 }
 
+#[macro_export]
 macro_rules! try_match {
     ($child:expr, $target:pat => $body:expr $(,)?) => {
         if let Some($target) = $child {

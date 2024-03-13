@@ -16,6 +16,18 @@ impl From<bool> for Bit {
     }
 }
 
+impl From<char> for Bit {
+    fn from(c: char) -> Self {
+        match c {
+            '0' => Bit::L,
+            '1' => Bit::H,
+            'x' | 'X' => Bit::X,
+            'z' | 'Z' | '?' => Bit::Z,
+            _ => panic!("Invalid character for Bit"),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct U64BasedBitVector {
     bits: u64,
@@ -59,6 +71,7 @@ impl U64BasedBitVector {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
+// lsb -> msb
 pub struct BoxBasedBitVector {
     pub bits: Box<[Bit]>,
 }

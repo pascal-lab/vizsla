@@ -1,6 +1,10 @@
 use crate::hir_def::{data::DataType, lower::Lower};
 use la_arena::{Arena, Idx};
-use syntax::ast::{self, ptr};
+use smol_str::SmolStr;
+use syntax::ast::{
+    self,
+    ptr::{self, AstNodePtr},
+};
 
 use super::literal::Literal;
 
@@ -155,16 +159,12 @@ pub enum IncDecOp {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum MinTypMaxExpr {
-    MinTypMax {
-        min: ExprId,
-        typ: ExprId,
-        max: ExprId,
-    },
+    MinTypMax { min: ExprId, typ: ExprId, max: ExprId },
     Expr(ExprId),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct ConcatExpr{
+pub struct ConcatExpr {
     pub exprs: Box<[ExprId]>,
 }
 
@@ -173,59 +173,33 @@ pub enum Expr {
     // TODO: Add more expressions
     // TODO: only used in params
     // DataType(DataType),
-
-    Unary {
-        op: UnaryOp,
-        expr: ExprId,
-    },
-    Bin {
-        op: BinaryOp,
-        lhs: ExprId,
-        rhs: ExprId,
-    },
-    Cond {
-        cond: ExprId,
-        true_expr: ExprId,
-        false_expr: ExprId,
-    },
-    IncDec {
-        op: IncDecOp,
-        expr: ExprId,
-        is_post: bool,
-    },
+    Unary { op: UnaryOp, expr: ExprId },
+    Bin { op: BinaryOp, lhs: ExprId, rhs: ExprId },
+    Cond { cond: ExprId, true_expr: ExprId, false_expr: ExprId },
+    IncDec { op: IncDecOp, expr: ExprId, is_post: bool },
 
     // Primary
     Literal(Literal),
-    TimeLiteral {
-        value: String,
-        unit: String,
-    },
+    TimeLiteral { value: String, unit: String },
     Concat(ConcatExpr),
-    MultiConcat {
-        expr: ExprId,
-        count: ConcatExpr,
-    },
-    Cast {
-        data_type: DataType,
-        expr: ExprId,
-    },
+    MultiConcat { expr: ExprId, count: ConcatExpr },
+    Cast { data_type: DataType, expr: ExprId },
     MinTypMax(MinTypMaxExpr),
-    FuncCall {
-        callee: Path,
-        args: Box<[ExprId]>,
-    },
+    FuncCall { callee: Path, args: Box<[ExprId]> },
     // TODO: method call chain?
-    TaskCall {
-        callee: Path,
-        args: Box<[ExprId]>,
-    },
+    TaskCall { callee: Path, args: Box<[ExprId]> },
     // This,
     // Dollar,
     // Null,
     // TODO: add more primary expressions
 }
 
-#[Debug, Clone, PartialEq, Eq, Hash]
-pub struct Path(Box<[str]>);
+pub enum RangeExpr {
+    Indexed { is_addr: bool, index: ExprId, offset: ExprId },
+    Range { lsb: ExprId, msb: ExprId },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Path(Box<[SmolStr]>);
 
 pub type ExprId = Idx<Expr>;
