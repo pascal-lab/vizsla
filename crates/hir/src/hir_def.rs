@@ -140,7 +140,7 @@ pub(crate) fn hir_file_with_source_map_query(
 
                     source_map.module_map.insert(module_source.clone(), module_id);
                     source_map.module_map_back.insert(module_id, module_source);
-                }
+                };
             }
         }
         Some(())
