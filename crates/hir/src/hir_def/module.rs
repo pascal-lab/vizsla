@@ -3,10 +3,13 @@ pub mod module_item;
 pub mod port;
 
 use crate::hir_def::{
-    data::{DataDecl, DataSubDecl, Dimension, LocalDataSubDeclSrc, ParamDecl, PortAssignmentsList},
+    data::{
+        DataDecl, DataSubDecl, Dimension, LocalDataSubDeclSrc, LocalParamPortDeclSrc, ParamDecl,
+        PortAssignmentsList,
+    },
     expr::{LocalExprSrc, LocalSelectSrc},
     module::{
-        port::{NonAnsiPort, PortDecl},
+        port::{AnsiPortDecl, NonAnsiPort, PortDecl},
         //module_item
     },
     tf::TFDecl,
@@ -22,7 +25,7 @@ use utils::try_;
 pub struct ModuleDecl {
     pub ident: Ident,
     pub param_port_list: Arena<ParamDecl>,
-    pub port_decls: Arena<PortDecl>,
+    pub ansi_port_decls: Arena<AnsiPortDecl>,
     pub non_ansi_ports: Arena<NonAnsiPort>,
     pub module_items: SmallVec<[ModuleItem; 1]>,
     pub data: ModuleData,
@@ -30,7 +33,7 @@ pub struct ModuleDecl {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum ModuleItem {
-    NonAnsiPort(Idx<NonAnsiPort>),
+    PortDecl(Idx<PortDecl>),
     DataDecl(Idx<DataDecl>),
     TFDecl(Idx<TFDecl>),
     // ParamOverride(Idx<ParamOverride>),
@@ -43,10 +46,12 @@ pub enum ModuleItem {
 
 #[derive(Default, Debug, PartialEq, Eq, Clone)]
 pub struct ModuleData {
+    pub port_decls: Arena<PortDecl>,
     pub data_sub_decls: Arena<DataSubDecl>,
-
     pub data_decls: Arena<DataDecl>,
     pub tf_decls: Arena<TFDecl>,
+
+    // pub stmts: Arena<Stmt>,
 
     // TODO: ParamOverride
     // pub param_overrides: Arena<ParamOverride>,
@@ -115,7 +120,9 @@ pub struct ModuleSourceMap {
     pub expr_srcs: Arena<LocalExprSrc>,
     pub select_srcs: Arena<LocalSelectSrc>,
     pub data_sub_decls: ArenaMap<Idx<DataSubDecl>, LocalDataSubDeclSrc>,
+    pub param_port_decls: ArenaMap<Idx<ParamDecl>, LocalParamPortDeclSrc>,
     pub ports: ArenaMap<Idx<NonAnsiPort>, ptr::PortPtr>,
+    pub ansi_port_decls: ArenaMap<Idx<AnsiPortDecl>, ptr::AnsiPortDeclarationPtr>,
 }
 
 pub(crate) fn module_with_source_map_query(
@@ -127,7 +134,7 @@ pub(crate) fn module_with_source_map_query(
     let mut module_decl = ModuleDecl {
         ident,
         param_port_list: Arena::default(),
-        port_decls: Arena::default(),
+        ansi_port_decls: Arena::default(),
         non_ansi_ports: Arena::default(),
         module_items: SmallVec::new(),
         data: ModuleData::default(),
@@ -136,7 +143,7 @@ pub(crate) fn module_with_source_map_query(
 
     let module_ptr = &file_source_map.module_map_back[module_id.value];
 
-    try_!({
+    try_! {
         let tree = db.hir_syntax_tree(module_id.file_id)?;
         let module_node = module_ptr.value.to_node(tree.tree())?;
         let file_text = db.hir_file_text(module_id.file_id);
@@ -146,7 +153,7 @@ pub(crate) fn module_with_source_map_query(
             file_text: file_text.as_ref(),
         };
         ctx.lower_module_decl(&module_node);
-    });
+    };
 
     (Arc::new(module_decl), Arc::new(module_source_map))
 }

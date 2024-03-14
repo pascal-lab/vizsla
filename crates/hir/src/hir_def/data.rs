@@ -10,7 +10,7 @@ use utils::try_;
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum DataType {
-    Implicit{dimensions: Option<SmallVec<[Dimension; 1]>>, sign: bool},
+    Implicit { dimensions: Option<SmallVec<[Dimension; 1]>>, sign: bool },
     IntegerType(IntegerType),
     NonIntegerType,
     StructUnion,
@@ -23,19 +23,19 @@ pub enum DataType {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum IntegerType {
-    Byte{sign: bool},
-    ShortInt{sign: bool},
-    Int{sign: bool},
-    LongInt{sign: bool},
-    Integer{sign: bool},
-    Time{sign: bool},
-    Bit{dimensions: Option<SmallVec<[Dimension; 1]>>, sign: bool},
-    Logic{dimensions: Option<SmallVec<[Dimension; 1]>>, sign: bool},
-    Reg{dimensions: Option<SmallVec<[Dimension; 1]>>, sign: bool},
+    Byte { sign: bool },
+    ShortInt { sign: bool },
+    Int { sign: bool },
+    LongInt { sign: bool },
+    Integer { sign: bool },
+    Time { sign: bool },
+    Bit { dimensions: Option<SmallVec<[Dimension; 1]>>, sign: bool },
+    Logic { dimensions: Option<SmallVec<[Dimension; 1]>>, sign: bool },
+    Reg { dimensions: Option<SmallVec<[Dimension; 1]>>, sign: bool },
 }
 
 pub(crate) fn lower_signing(signing: &ast::Signing) -> Option<bool> {
-    try_match!{
+    try_match! {
         signing.token_signed(), _ => Some(true),
         signing.token_unsigned(), _ => Some(false),
         _ => None,
@@ -44,7 +44,7 @@ pub(crate) fn lower_signing(signing: &ast::Signing) -> Option<bool> {
 
 pub(crate) trait LowerDataType: LowerDimension {
     fn lower_data_type(&mut self, data_type: &ast::DataType) -> Option<DataType> {
-        try_match!{
+        try_match! {
             // 6.11
             data_type.integer_atom_type(), int_atom => try_!{
                 let sign = try_match!{
@@ -87,7 +87,7 @@ pub(crate) trait LowerDataType: LowerDimension {
         &mut self,
         data_type_or_implicit: &ast::DataTypeOrImplicit,
     ) -> Option<DataType> {
-        try_match!{
+        try_match! {
             data_type_or_implicit.data_type(), data_type => {
                 self.lower_data_type(&data_type)
             },
@@ -99,7 +99,7 @@ pub(crate) trait LowerDataType: LowerDimension {
                             dimensions.push(self.lower_packed_dimension(&packed_dimension)?);
                         }
                         if dimensions.is_empty() { None } else { Some(dimensions) }
-                    }, 
+                    },
                     sign:try_match!{
                         implicit_data_type.signing(), signing => lower_signing(&signing)?,
                         _ => false,
@@ -211,7 +211,7 @@ pub(crate) fn lower_net_type(net_type: &ast::NetType) -> Option<NetType> {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum NetKind {
-    Default{net_type: NetType, data_type: DataType},
+    Default { net_type: NetType, data_type: DataType },
     // TODO: net_type_identifier
     // Ident{ident: Ident},
 }
