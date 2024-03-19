@@ -1,10 +1,7 @@
 use crate::hir_def::{data::DataType, lower::Lower};
 use la_arena::{Arena, Idx};
 use smol_str::SmolStr;
-use syntax::ast::{
-    self,
-    ptr::{self, AstNodePtr},
-};
+use syntax::ast::{self, ptr};
 
 use super::literal::Literal;
 
@@ -12,6 +9,7 @@ use super::literal::Literal;
 pub enum LocalExprSrc {
     Expr(ptr::ExpressionPtr),
     ConstExpr(ptr::ConstantExpressionPtr),
+    ParamExpr(ptr::ParamExpressionPtr),
     ConstantParamExpression(ptr::ConstantParamExpressionPtr),
 }
 
@@ -26,6 +24,10 @@ pub(crate) trait LowerExprSrc: Lower {
 
     fn lower_const_expr_src(&mut self, expr_node: &ast::ConstantExpression) -> LocalExprSrcId {
         self.arena_expr_srcs().alloc(LocalExprSrc::ConstExpr(expr_node.to_ptr()))
+    }
+
+    fn lower_param_expr_src(&mut self, expr_node: &ast::ParamExpression) -> LocalExprSrcId {
+        self.arena_expr_srcs().alloc(LocalExprSrc::ParamExpr(expr_node.to_ptr()))
     }
 
     fn lower_const_param_expr_src(

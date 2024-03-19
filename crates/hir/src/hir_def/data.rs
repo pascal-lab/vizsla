@@ -5,7 +5,7 @@ use crate::hir_def::{
 use la_arena::{Arena, ArenaMap, Idx, IdxRange, RawIdx};
 use smallvec::SmallVec;
 use smol_str::SmolStr;
-use syntax::ast::{self, ptr, AstNode};
+use syntax::ast::{self, ptr};
 use utils::try_;
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -234,6 +234,7 @@ pub enum LocalDataSubDeclSrc {
     // Those SubDecls Below is edited for convenience
     PortIdentDecl(ptr::PortIdentifierDeclarationPtr),
     VarIdentDecl(ptr::VariableIdentifierDeclarationPtr),
+    VarPortIdentDecl(ptr::VariablePortIdentifierDeclarationPtr),
 }
 
 pub(crate) trait LowerDataSubDecl: LowerDimension + LowerExprSrc {
@@ -249,7 +250,7 @@ pub(crate) trait LowerDataSubDecl: LowerDimension + LowerExprSrc {
         &mut self,
         net_assign: &ast::NetDeclAssignment,
     ) -> Option<Idx<DataSubDecl>> {
-        let ident: SmolStr = net_assign.identifier()?.to_text(self.file_text())?.into();
+        let ident = self.lower_ident(&net_assign.identifier()?)?;
         let expr = net_assign.expression().map(|expr| self.lower_expr_src(&expr));
         let mut dimensions = SmallVec::<[Dimension; 1]>::new();
         for unpacked_dimension in net_assign.unpacked_dimensions() {
@@ -278,7 +279,7 @@ pub(crate) trait LowerDataSubDecl: LowerDimension + LowerExprSrc {
         &mut self,
         var_assign: &ast::VariableDeclAssignment,
     ) -> Option<Idx<DataSubDecl>> {
-        let ident: SmolStr = var_assign.identifier()?.to_text(self.file_text())?.into();
+        let ident = self.lower_ident(&var_assign.identifier()?)?;
         let expr = var_assign.expression().map(|expr| self.lower_expr_src(&expr));
         let mut dimensions = SmallVec::<[Dimension; 1]>::new();
         for var_dimension in var_assign.variable_dimensions() {
@@ -307,7 +308,7 @@ pub(crate) trait LowerDataSubDecl: LowerDimension + LowerExprSrc {
         &mut self,
         param_assign: &ast::ParamAssignment,
     ) -> Option<Idx<DataSubDecl>> {
-        let ident: SmolStr = param_assign.identifier()?.to_text(self.file_text())?.into();
+        let ident = self.lower_ident(&param_assign.identifier()?)?;
         let expr = param_assign
             .constant_param_expression()
             .map(|expr| self.lower_const_param_expr_src(&expr));
@@ -338,8 +339,10 @@ pub(crate) trait LowerDataSubDecl: LowerDimension + LowerExprSrc {
         &mut self,
         ansi_port_decl: &ast::AnsiPortDeclaration,
     ) -> Option<Idx<DataSubDecl>> {
-        let ident: SmolStr = ansi_port_decl.identifier()?.to_text(self.file_text())?.into();
-        let expr = ansi_port_decl.expression().map(|expr| self.lower_expr_src(&expr));
+        let ident = self.lower_ident(&ansi_port_decl.identifier()?)?;
+        let expr = ansi_port_decl
+            .constant_expression()
+            .map(|const_expr| self.lower_const_expr_src(&const_expr));
         let mut dimensions = SmallVec::<[Dimension; 1]>::new();
         for unpacked_dimension in ansi_port_decl.unpacked_dimensions() {
             dimensions.push(self.lower_unpacked_dimension(&unpacked_dimension)?);
@@ -352,6 +355,93 @@ pub(crate) trait LowerDataSubDecl: LowerDimension + LowerExprSrc {
         self.src_map_data_sub_decls()
             .insert(idx, LocalDataSubDeclSrc::AnsiPortDecl(ansi_port_decl.to_ptr()));
         Some(idx)
+    }
+
+    fn lower_port_ident_decl(
+        &mut self,
+        port_ident_decl: &ast::PortIdentifierDeclaration,
+    ) -> Option<Idx<DataSubDecl>> {
+        let ident = self.lower_ident(&port_ident_decl.identifier()?)?;
+        let mut dimensions: SmallVec<[Dimension; 1]> = SmallVec::new();
+        for packed_dimension in port_ident_decl.unpacked_dimensions() {
+            dimensions.push(self.lower_unpacked_dimension(&packed_dimension)?);
+        }
+        let dimensions = if dimensions.is_empty() { None } else { Some(dimensions) };
+        let idx = self.arena_data_sub_decls().alloc(DataSubDecl { ident, dimensions, expr: None });
+        self.src_map_data_sub_decls()
+            .insert(idx, LocalDataSubDeclSrc::PortIdentDecl(port_ident_decl.to_ptr()));
+        Some(idx)
+    }
+
+    fn lower_port_ident_list(
+        &mut self,
+        port_ident_list: &ast::ListOfPortIdentifier,
+    ) -> IdxRange<DataSubDecl> {
+        let begin_idx = self.next_data_sub_decl_idx();
+        for port_ident_decl in port_ident_list.port_identifier_declarations() {
+            self.lower_port_ident_decl(&port_ident_decl);
+        }
+        let end_idx = self.next_data_sub_decl_idx();
+        IdxRange::new(begin_idx..end_idx)
+    }
+
+    fn lower_var_ident_decl(
+        &mut self,
+        var_ident_decl: &ast::VariableIdentifierDeclaration,
+    ) -> Option<Idx<DataSubDecl>> {
+        let ident = self.lower_ident(&var_ident_decl.identifier()?)?;
+        let mut dimensions: SmallVec<[Dimension; 1]> = SmallVec::new();
+        for packed_dimension in var_ident_decl.variable_dimensions() {
+            dimensions.push(self.lower_var_dimension(&packed_dimension)?);
+        }
+        let dimensions = if dimensions.is_empty() { None } else { Some(dimensions) };
+        let idx = self.arena_data_sub_decls().alloc(DataSubDecl { ident, dimensions, expr: None });
+        self.src_map_data_sub_decls()
+            .insert(idx, LocalDataSubDeclSrc::VarIdentDecl(var_ident_decl.to_ptr()));
+        Some(idx)
+    }
+
+    fn lower_var_ident_list(
+        &mut self,
+        var_ident_list: &ast::ListOfVariableIdentifier,
+    ) -> IdxRange<DataSubDecl> {
+        let begin_idx = self.next_data_sub_decl_idx();
+        for var_ident_decl in var_ident_list.variable_identifier_declarations() {
+            self.lower_var_ident_decl(&var_ident_decl);
+        }
+        let end_idx = self.next_data_sub_decl_idx();
+        IdxRange::new(begin_idx..end_idx)
+    }
+
+    fn lower_var_port_ident_decl(
+        &mut self,
+        var_port_ident_decl: &ast::VariablePortIdentifierDeclaration,
+    ) -> Option<Idx<DataSubDecl>> {
+        let ident: SmolStr = self.lower_ident(&var_port_ident_decl.identifier()?)?;
+        let expr = var_port_ident_decl
+            .constant_expression()
+            .map(|const_expr| self.lower_const_expr_src(&const_expr));
+        let mut dimensions: SmallVec<[Dimension; 1]> = SmallVec::new();
+        for packed_dimension in var_port_ident_decl.variable_dimensions() {
+            dimensions.push(self.lower_var_dimension(&packed_dimension)?);
+        }
+        let dimensions = if dimensions.is_empty() { None } else { Some(dimensions) };
+        let idx = self.arena_data_sub_decls().alloc(DataSubDecl { ident, dimensions, expr });
+        self.src_map_data_sub_decls()
+            .insert(idx, LocalDataSubDeclSrc::VarPortIdentDecl(var_port_ident_decl.to_ptr()));
+        Some(idx)
+    }
+
+    fn lower_var_port_ident_list(
+        &mut self,
+        var_port_ident_list: &ast::ListOfVariablePortIdentifier,
+    ) -> IdxRange<DataSubDecl> {
+        let begin_idx = self.next_data_sub_decl_idx();
+        for var_port_ident_decl in var_port_ident_list.variable_port_identifier_declarations() {
+            self.lower_var_port_ident_decl(&var_port_ident_decl);
+        }
+        let end_idx = self.next_data_sub_decl_idx();
+        IdxRange::new(begin_idx..end_idx)
     }
 }
 
@@ -366,11 +456,52 @@ pub struct NetDecl {
     pub sub_decls: IdxRange<DataSubDecl>,
 }
 
+pub(crate) trait LowerNetDecl: LowerDataType + LowerDataSubDecl {
+    fn lower_net_decl(&mut self, net_decl: &ast::NetDeclaration) -> Option<NetDecl> {
+        try_match! {
+            net_decl.net_type(), net_type => {
+                // TODO: [ drive_strength | charge_strength ] [ vectored | scalared ] [ delay3 ]
+                let net_type = lower_net_type(&net_type)?;
+                let data_type = {
+                    let data_type = net_decl.data_type_or_implicit()?;
+                    self.lower_data_type_or_implicit(&data_type)?
+                };
+                Some(NetDecl{
+                    net_kind: NetKind::Default{net_type, data_type},
+                    sub_decls: self.lower_net_sub_decl_list(&net_decl.list_of_net_decl_assignments()?),
+                })
+            },
+            net_decl.net_declaration_with_net_type_identifier(), _net_decl_with_net_type_identifier => {
+                unimplemented!("net_declaration ::= net_type_identifier [delay_control]
+                list_of_net_decl_assignments;")
+            },
+            net_decl.token_interconnect(), _ => {
+                unimplemented!("net_declaration ::= interconnect implicit_data_type [#delay_value] net_identifier {{unpacked_dimension}}
+                [, net_identifier {{unpacked_dimension}}];")
+            },
+            _ => None
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct VarDecl {
-    pub konst: bool,
+    // TODO: [const]
+    // pub konst: bool,
     pub data_type: DataType,
     pub sub_decls: IdxRange<DataSubDecl>,
+}
+
+pub(crate) trait LowerVarDecl: LowerDataType + LowerDataSubDecl {
+    fn lower_var_decl(&mut self, var_decl: &ast::VariableDeclaration) -> Option<VarDecl> {
+        Some(VarDecl {
+            data_type: {
+                let data_type = var_decl.data_type_or_implicit()?;
+                self.lower_data_type_or_implicit(&data_type)?
+            },
+            sub_decls: self.lower_var_sub_decl_list(&var_decl.list_of_variable_decl_assignments()?),
+        })
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -436,28 +567,30 @@ pub(crate) trait LowerParamDecl: LowerDataType + LowerDataSubDecl {
     }
 }
 
-// 23.3.2 Module instantiation syntax
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct OrderedPortAssignment {
-    expr: LocalExprSrcId,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct NamedPortAssignment {
-    ident: Ident,
-    expr: Option<LocalExprSrcId>,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub enum PortAssignmentsList {
-    Ordered(Box<[OrderedPortAssignment]>),
-    Named(Box<[NamedPortAssignment]>),
-}
-
-// TODO: TypeDecl, NetTypeDecl
+// TODO: TypeDecl, NetTypeDecl, package_import_declaration11
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum DataDecl {
     NetDecl(NetDecl),
     VarDecl(VarDecl),
     ParamDecl(ParamDecl),
+}
+
+pub(crate) trait LowerDataDecl: LowerNetDecl + LowerVarDecl + LowerParamDecl {
+    fn lower_data_decl(&mut self, data_decl: &ast::DataDeclaration) -> Option<DataDecl> {
+        try_match! {
+            data_decl.variable_declaration(), var_decl => {
+                Some(DataDecl::VarDecl(self.lower_var_decl(&var_decl)?))
+            },
+            data_decl.type_declaration(), _type_decl => {
+                unimplemented!("Type Declaration");
+            },
+            data_decl.net_type_declaration(), _net_type_decl => {
+                unimplemented!("Net Type Declaration");
+            },
+            data_decl.package_import_declaration(), _package_import_decl => {
+                unimplemented!("Package Import Declaration");
+            },
+            _ => None
+        }
+    }
 }

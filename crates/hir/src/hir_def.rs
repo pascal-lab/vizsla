@@ -7,6 +7,7 @@ pub mod interface;
 pub mod literal;
 pub mod lower;
 pub mod module;
+pub mod pack_or_gen_item;
 pub mod stmt;
 pub mod tf;
 

@@ -4,8 +4,7 @@ use crate::hir_def::{
     try_match, Ident,
 };
 use la_arena::{Arena, ArenaMap, Idx, IdxRange};
-use smol_str::SmolStr;
-use syntax::ast::{self, ptr, AstNode};
+use syntax::ast::{self, ptr};
 use utils::try_;
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -71,10 +70,8 @@ pub(crate) fn lower_port_direction(port_direction: &ast::PortDirection) -> Optio
     }
 }
 
-pub trait LowerPortDecl: LowerDataType + LowerDataSubDecl + LowerSelectSrc {
+pub(crate) trait LowerPortDecl: LowerDataType + LowerDataSubDecl + LowerSelectSrc {
     fn arena_non_ansi_ports(&mut self) -> &mut Arena<NonAnsiPort>;
-
-    fn arena_port_decls(&mut self) -> &mut Arena<PortDecl>;
 
     fn arena_ansi_port_decls(&mut self) -> &mut Arena<AnsiPortDecl>;
 
@@ -89,12 +86,11 @@ pub trait LowerPortDecl: LowerDataType + LowerDataSubDecl + LowerSelectSrc {
             try_! {
                 let ident = port_node
                     .identifier()
-                    .and_then(|ident| ident.to_text(self.file_text()).map(SmolStr::from));
+                    .and_then(|ident| self.lower_ident(&ident));
                 let port_expr = {
                     let mut arena = Arena::default();
                     for port_ref in port_node.port_expression()?.port_references() {
-                        let ident =
-                            SmolStr::from(port_ref.identifier()?.to_text(self.file_text())?);
+                        let ident = self.lower_ident(&port_ref.identifier()?)?;
                         let select = self.lower_const_select_src(&port_ref.constant_select()?);
                         arena.alloc(PortReference { ident, select });
                     }
@@ -107,7 +103,103 @@ pub trait LowerPortDecl: LowerDataType + LowerDataSubDecl + LowerSelectSrc {
         }
     }
 
-    fn lower_port_decl(&mut self, port_decl: &ast::PortDeclaration) {}
+    fn lower_net_port_type(&mut self, net_port_type: &ast::NetPortType) -> Option<PortKind> {
+        Some(PortKind::Net(try_match! {
+            net_port_type.data_type_or_implicit(), data_type_or_implicit => {
+                NetKind::Default {
+                    net_type: try_match!{
+                        net_port_type.net_type(), net_type => {
+                            data::lower_net_type(&net_type)?
+                        },
+                        _ => data::DEFAULT_NET_TYPE,
+                    },
+                    data_type: self.lower_data_type_or_implicit(&data_type_or_implicit)?
+                }
+            },
+            net_port_type.identifier(), _ident => {
+                unimplemented!("net_port_type ::= net_type_identifier");
+            },
+            net_port_type.token_interconnect(), _ => {
+                unimplemented!("net_port_type ::= interconnect implicit_data_type");
+            },
+            _ => {return None;}
+        }))
+    }
+
+    fn lower_var_port_type(&mut self, var_port_type: &ast::VariablePortType) -> Option<PortKind> {
+        let var_data_type = var_port_type.var_data_type()?;
+        Some(PortKind::Var(try_match! {
+            var_data_type.data_type(), data_type => {
+                self.lower_data_type(&data_type)?
+            },
+            var_data_type.data_type_or_implicit(), data_type_or_implicit => {
+                self.lower_data_type_or_implicit(&data_type_or_implicit)?
+            },
+            _ => {return None;}
+        }))
+    }
+
+    fn lower_port_decl(&mut self, port_decl_node: &ast::PortDeclaration) -> Option<PortDecl> {
+        try_! {
+            let port_decl = try_match!{
+                port_decl_node.inout_declaration(), inout_decl => {
+                    let direction = PortDirection::Inout;
+                    let port_kind = self.lower_net_port_type(&inout_decl.net_port_type()?)?;
+                    let data_decls = self.lower_port_ident_list(&inout_decl.list_of_port_identifiers()?);
+                    PortDecl::IODecl(IODecl {
+                        direction, port_kind, data_decls,
+                    })
+                },
+                port_decl_node.input_declaration(), input_decl => {
+                    let direction = PortDirection::Input;
+                    let (port_kind, data_decls) = try_match! {
+                        input_decl.net_port_type(), net_port_type => (
+                            self.lower_net_port_type(&net_port_type)?,
+                            self.lower_port_ident_list(&input_decl.list_of_port_identifiers()?)
+                        ),
+                        input_decl.variable_port_type(), var_port_type => (
+                            self.lower_var_port_type(&var_port_type)?,
+                            self.lower_var_ident_list(&input_decl.list_of_variable_identifiers()?)
+                        ),
+                        _ => {return None;}
+                    };
+                    PortDecl::IODecl(IODecl {
+                        direction, port_kind, data_decls,
+                    })
+
+                },
+                port_decl_node.output_declaration(), output_decl => {
+                    let direction = PortDirection::Output;
+                    let (port_kind, data_decls) = try_match! {
+                        output_decl.net_port_type(), net_port_type => (
+                            self.lower_net_port_type(&net_port_type)?,
+                            self.lower_port_ident_list(&output_decl.list_of_port_identifiers()?)
+                        ),
+                        output_decl.variable_port_type(), var_port_type => (
+                            self.lower_var_port_type(&var_port_type)?,
+                            self.lower_var_port_ident_list(&output_decl.list_of_variable_port_identifiers()?)
+                        ),
+                        _ => {return None;}
+                    };
+                    PortDecl::IODecl(IODecl {
+                        direction, port_kind, data_decls,
+                    })
+                },
+                port_decl_node.ref_declaration(), ref_decl => {
+                    let direction = PortDirection::Ref;
+                    let port_kind = self.lower_var_port_type(&ref_decl.variable_port_type()?)?;
+                    let data_decls = self.lower_var_ident_list(&ref_decl.list_of_variable_identifiers()?);
+                    PortDecl::IODecl(IODecl {
+                        direction, port_kind, data_decls,
+                    })
+                },
+                _ => {
+                    unimplemented!("port_declaration ::= interface_port_declaration")
+                }
+            };
+            port_decl
+        }
+    }
 
     fn lower_ansi_port_decl_list(&mut self, port_decl_list: &ast::ListOfPortDeclaration) {
         let mut direction = PortDirection::Inout;
@@ -128,25 +220,7 @@ pub trait LowerPortDecl: LowerDataType + LowerDataSubDecl + LowerSelectSrc {
                                 direction = lower_port_direction(&direction_node)?;
                             }
                         };
-                        let net_port_type = net_port_header.net_port_type()?;
-                        port_kind = PortKind::Net(try_match!{
-                            net_port_type.data_type_or_implicit(), data_type_or_implicit => NetKind::Default{
-                                net_type: try_match!{
-                                    net_port_type.net_type(), net_type => {
-                                        data::lower_net_type(&net_type)?
-                                    },
-                                    _ => data::DEFAULT_NET_TYPE,
-                                },
-                                data_type: self.lower_data_type_or_implicit(&data_type_or_implicit)?
-                            },
-                            net_port_type.identifier(), _ident => {
-                                unimplemented!("net_port_type ::= net_type_identifier");
-                            },
-                            net_port_type.token_interconnect(), _ => {
-                                unimplemented!("net_port_type ::= interconnect implicit_data_type");
-                            },
-                            _ => {return None;}
-                        });
+                        port_kind = self.lower_net_port_type(&net_port_header.net_port_type()?)?;
                         let direction = direction.clone();
                         let port_kind = port_kind.clone();
                         let sub_decl = self.lower_ansi_port_decl(&port_decl)?;
@@ -163,15 +237,7 @@ pub trait LowerPortDecl: LowerDataType + LowerDataSubDecl + LowerSelectSrc {
                                 direction = lower_port_direction(&direction_node)?;
                             }
                         };
-                        let var_port_type = var_port_header.variable_port_type()?;
-                        let var_data_type = var_port_type.var_data_type()?;
-                        port_kind = PortKind::Var(try_match!{
-                            var_data_type.data_type(), data_type => self.lower_data_type(&data_type)?,
-                            var_data_type.data_type_or_implicit(), data_type_or_implicit => {
-                                self.lower_data_type_or_implicit(&data_type_or_implicit)?
-                            },
-                            _ => {return None;}
-                        });
+                        port_kind = self.lower_var_port_type(&var_port_header.variable_port_type()?)?;
                         let direction = direction.clone();
                         let port_kind = port_kind.clone();
                         let sub_decl = self.lower_ansi_port_decl(&port_decl)?;

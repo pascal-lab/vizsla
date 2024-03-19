@@ -9,7 +9,6 @@ use crate::{
 use base_db::source_db::SourceDb;
 use syntax::parse::SyntaxTree;
 use triomphe::Arc;
-use vfs::vfs::FileId;
 
 #[salsa::query_group(HirDbStorage)]
 pub trait HirDb: SourceDb {
