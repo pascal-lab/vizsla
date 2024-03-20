@@ -1,21 +1,22 @@
 use crate::hir_def::{
     data::{
-        DataSubDecl, LocalDataSubDeclSrc, LocalParamPortDeclSrc, LowerDataSubDecl, LowerDataType,
+        DataSubDecl, DataSubDeclSrc, LocalParamPortDeclSrc, LowerDataSubDecl, LowerDataType,
         LowerDimension, LowerParamDecl, ParamDecl,
     },
-    expr::{self, LocalSelectSrc, LowerExprSrc, LowerSelectSrc},
+    expr::{Expr, ExprSrc, LowerExpr},
     lower::Lower,
     module::{
         port::{AnsiPortDecl, LowerPortDecl, NonAnsiPort},
         ModuleDecl, ModuleSourceMap,
     },
-    try_match,
+    try_match, HirFileId, InFile, SourceMap,
 };
-use la_arena::{Arena, ArenaMap, Idx};
+use la_arena::Arena;
 use syntax::ast::{self, ptr};
 use utils::try_;
 
 pub(crate) struct ModuleLowerCtx<'a> {
+    pub hir_file_id: HirFileId,
     pub module_decl: &'a mut ModuleDecl,
     pub module_src_map: &'a mut ModuleSourceMap,
     pub file_text: &'a str,
@@ -53,58 +54,62 @@ impl<'a> ModuleLowerCtx<'a> {
     fn lower_param_port_list(&mut self, param_port_list: &ast::ParameterPortList) {
         if let Some(param_assign_list) = param_port_list.list_of_param_assignments() {
             let sub_decls = self.lower_param_sub_decl_list(&param_assign_list);
+            let src =
+                self.in_file(LocalParamPortDeclSrc::ParamAssignList(param_assign_list.to_ptr()));
             let idx = self.module_decl.param_port_list.alloc(ParamDecl {
                 local: false,
                 data_type: None,
                 sub_decls,
             });
-            self.module_src_map
-                .param_port_decls
-                .insert(idx, LocalParamPortDeclSrc::ParamAssignList(param_assign_list.to_ptr()));
+            self.module_src_map.param_port_decl.insert(src, idx);
         }
         for param_port_decl in param_port_list.parameter_port_declarations() {
             try_! {
-                let idx = if let Some(any_param_decl) = param_port_decl.any_parameter_declaration()
-                {
-                    let any_param_decl = self.lower_any_param_decl(&any_param_decl)?;
-                    self.module_decl.param_port_list.alloc(any_param_decl)
-                } else if let Some(data_type) = param_port_decl.data_type() {
-                    let data_type = self.lower_data_type(&data_type)?;
-                    let sub_decls = self
-                        .lower_param_sub_decl_list(&param_port_decl.list_of_param_assignments()?);
-                    self.module_decl.param_port_list.alloc(ParamDecl {
-                        local: false,
-                        data_type: Some(data_type),
-                        sub_decls,
-                    })
-                } else if param_port_decl.token_type().is_some() {
-                    unimplemented!("parameter_port_declaration ::= type list_of_type_assignments");
-                } else {
-                    return None;
+                let src = self.in_file(LocalParamPortDeclSrc::ParamPortDecl(param_port_decl.to_ptr()));
+                let idx = try_match!{
+                    param_port_decl.any_parameter_declaration(), any_param_decl => {
+                        let any_param_decl = self.lower_any_param_decl(&any_param_decl)?;
+                        self.module_decl.param_port_list.alloc(any_param_decl)
+                    },
+                    param_port_decl.data_type(), data_type => {
+                        let data_type = self.lower_data_type(&data_type)?;
+                        let sub_decls = self.lower_param_sub_decl_list(&param_port_decl.list_of_param_assignments()?);
+                        self.module_decl.param_port_list.alloc(ParamDecl {
+                            local: false,
+                            data_type: Some(data_type),
+                            sub_decls,
+                        })
+                    },
+                    param_port_decl.token_type(), _token_type => {
+                        unimplemented!("parameter_port_declaration ::= type list_of_type_assignments");
+                    },
+                    _ => { return None; }
                 };
                 self.module_src_map
-                    .param_port_decls
-                    .insert(idx, LocalParamPortDeclSrc::ParamPortDecl(param_port_decl.to_ptr()));
+                    .param_port_decl
+                    .insert(src, idx);
             };
         }
     }
 }
 
 impl Lower for ModuleLowerCtx<'_> {
+    fn file_id(&self) -> HirFileId {
+        self.hir_file_id
+    }
+
     fn file_text(&self) -> &str {
         self.file_text
     }
 }
 
-impl LowerExprSrc for ModuleLowerCtx<'_> {
-    fn arena_expr_srcs(&mut self) -> &mut Arena<expr::LocalExprSrc> {
-        &mut self.module_src_map.expr_srcs
+impl LowerExpr for ModuleLowerCtx<'_> {
+    fn arena_expr(&mut self) -> &mut Arena<Expr> {
+        &mut self.module_decl.data.exprs
     }
-}
 
-impl LowerSelectSrc for ModuleLowerCtx<'_> {
-    fn arena_select_srcs(&mut self) -> &mut Arena<LocalSelectSrc> {
-        &mut self.module_src_map.select_srcs
+    fn src_map_expr(&mut self) -> &mut SourceMap<ExprSrc, Expr> {
+        &mut self.module_src_map.expr
     }
 }
 
@@ -113,32 +118,32 @@ impl LowerDataType for ModuleLowerCtx<'_> {}
 impl LowerDimension for ModuleLowerCtx<'_> {}
 
 impl LowerDataSubDecl for ModuleLowerCtx<'_> {
-    fn arena_data_sub_decls(&mut self) -> &mut Arena<DataSubDecl> {
+    fn arena_data_sub_decl(&mut self) -> &mut Arena<DataSubDecl> {
         &mut self.module_decl.data.data_sub_decls
     }
 
-    fn src_map_data_sub_decls(&mut self) -> &mut ArenaMap<Idx<DataSubDecl>, LocalDataSubDeclSrc> {
-        &mut self.module_src_map.data_sub_decls
+    fn src_map_data_sub_decl(&mut self) -> &mut SourceMap<DataSubDeclSrc, DataSubDecl> {
+        &mut self.module_src_map.data_sub_decl
     }
 }
 
 impl LowerPortDecl for ModuleLowerCtx<'_> {
-    fn arena_non_ansi_ports(&mut self) -> &mut Arena<NonAnsiPort> {
+    fn arena_non_ansi_port(&mut self) -> &mut Arena<NonAnsiPort> {
         &mut self.module_decl.non_ansi_ports
     }
 
-    fn arena_ansi_port_decls(&mut self) -> &mut Arena<AnsiPortDecl> {
+    fn arena_ansi_port_decl(&mut self) -> &mut Arena<AnsiPortDecl> {
         &mut self.module_decl.ansi_port_decls
     }
 
-    fn src_map_non_ansi_ports(&mut self) -> &mut ArenaMap<Idx<NonAnsiPort>, ptr::PortPtr> {
-        &mut self.module_src_map.ports
+    fn src_map_non_ansi_port(&mut self) -> &mut SourceMap<InFile<ptr::PortPtr>, NonAnsiPort> {
+        &mut self.module_src_map.port
     }
 
-    fn src_map_ansi_port_decls(
+    fn src_map_ansi_port_decl(
         &mut self,
-    ) -> &mut ArenaMap<Idx<AnsiPortDecl>, ptr::AnsiPortDeclarationPtr> {
-        &mut self.module_src_map.ansi_port_decls
+    ) -> &mut SourceMap<InFile<ptr::AnsiPortDeclarationPtr>, AnsiPortDecl> {
+        &mut self.module_src_map.ansi_port_decl
     }
 }
 

@@ -15,14 +15,14 @@ use la_arena::{Arena, ArenaMap, Idx};
 use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
 use smol_str::SmolStr;
-use std::ops::Index;
-use syntax::ast::ptr;
-use syntax::ast::{self, AstNode};
+use std::{hash::Hash, ops::Index};
+use syntax::ast::{self, ptr, AstNode};
 use triomphe::Arc;
 use utils::try_;
 
-use crate::InFile;
+pub(crate) use crate::{HirFileId, InFile};
 
+#[macro_export]
 macro_rules! impl_index {
     ($datas:ident for $($tpy:ident, $fld:ident),+ $(,)? ) => {
         $(
@@ -35,6 +35,8 @@ macro_rules! impl_index {
         )+
     };
 }
+
+pub(crate) use impl_index;
 
 #[macro_export]
 macro_rules! try_match {
@@ -58,18 +60,6 @@ macro_rules! try_match {
 pub(crate) use try_match;
 
 pub type Ident = SmolStr;
-
-// #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-// pub struct IdentSelect {
-//     pub ident: Ident,
-//     pub select_expr: Option<NodeId>,
-// }
-
-// #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-// pub struct HierarchicalIdent {
-//     pub root: bool,
-//     pub ident_selects: Box<IdentSelect>,
-// }
 
 #[derive(Default, Debug, PartialEq, Eq, Clone)]
 pub struct HirFile {
@@ -108,13 +98,40 @@ pub struct ModuleInFile {
 }
 
 pub type ModuleSource = InFile<ptr::ModuleDeclarationPtr>;
-pub type ModuleInFileId = Idx<ModuleInFile>;
-pub type ModuleId = InFile<ModuleInFileId>;
+pub type LocalModuleId = Idx<ModuleInFile>;
+pub type ModuleId = InFile<LocalModuleId>;
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct SourceMap<Src, Hir>
+where
+    Src: PartialEq + Eq + Hash + Clone,
+{
+    pub src2idx: FxHashMap<Src, Idx<Hir>>,
+    pub idx2src: ArenaMap<Idx<Hir>, Src>,
+}
+
+impl<Src, Hir> SourceMap<Src, Hir>
+where
+    Src: PartialEq + Eq + Hash + Clone,
+{
+    pub fn insert(&mut self, src: Src, idx: Idx<Hir>) {
+        self.src2idx.insert(src.clone(), idx);
+        self.idx2src.insert(idx, src);
+    }
+}
+
+impl<Src, Hir> Default for SourceMap<Src, Hir>
+where
+    Src: PartialEq + Eq + Hash + Clone,
+{
+    fn default() -> Self {
+        SourceMap { src2idx: FxHashMap::default(), idx2src: ArenaMap::default() }
+    }
+}
 
 #[derive(Default, Debug, PartialEq, Eq)]
 pub struct FileSourceMap {
-    pub module_map: FxHashMap<ModuleSource, ModuleInFileId>,
-    pub module_map_back: ArenaMap<ModuleInFileId, ModuleSource>,
+    pub module: SourceMap<ModuleSource, ModuleInFile>,
 }
 
 pub(crate) fn hir_file_with_source_map_query(
@@ -139,8 +156,7 @@ pub(crate) fn hir_file_with_source_map_query(
 
                     let module_source = InFile::new(file_id, ptr);
 
-                    source_map.module_map.insert(module_source.clone(), module_id);
-                    source_map.module_map_back.insert(module_id, module_source);
+                    source_map.module.insert(module_source, module_id);
                 };
             }
         }

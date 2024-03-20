@@ -1,13 +1,16 @@
-use crate::hir_def::{
-    data::{Dimension, LowerDataDecl, LowerDimension, LowerNetDecl, LowerVarDecl},
-    expr::{LocalExprSrcId, LowerExprSrc},
-    lower::Lower,
-    module::{
-        lower::ModuleLowerCtx,
-        port::{LowerPortDecl, PortDecl},
+use crate::{
+    hir_def::{
+        data::{Dimension, LowerDataDecl, LowerDimension, LowerNetDecl, LowerVarDecl},
+        expr::{ExprId, LowerExpr},
+        lower::Lower,
+        module::{
+            lower::ModuleLowerCtx,
+            port::{LowerPortDecl, PortDecl},
+        },
+        pack_or_gen_item::{LowerPackOrGenItemDecl, PackOrGenItemDecl},
+        try_match, Ident,
     },
-    pack_or_gen_item::{LowerPackOrGenItemDecl, PackOrGenItemDecl},
-    try_match, Ident,
+    InFile,
 };
 use la_arena::{Idx, IdxRange, RawIdx};
 use smallvec::SmallVec;
@@ -32,6 +35,8 @@ pub enum LocalModuleItemSrc {
     PortDecl(ptr::PortDeclarationPtr),
 }
 
+pub type ModuleItemSrc = InFile<LocalModuleItemSrc>;
+
 // #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 // pub struct ParamOverride {
 //     pub hierarchical_ident: HierarchicalIdent,
@@ -48,8 +53,8 @@ pub struct ModuleInstantiation {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum ParamAssigns {
-    Ordered(SmallVec<[LocalExprSrcId; 1]>),
-    Named(SmallVec<[(Ident, Option<LocalExprSrcId>); 1]>),
+    Ordered(SmallVec<[ExprId; 1]>),
+    Named(SmallVec<[(Ident, Option<ExprId>); 1]>),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -61,8 +66,8 @@ pub struct HierarchicalInstance {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum PortConnects {
-    Ordered(SmallVec<[Option<LocalExprSrcId>; 1]>),
-    Named(SmallVec<[(Ident, Option<LocalExprSrcId>); 1]>),
+    Ordered(SmallVec<[Option<ExprId>; 1]>),
+    Named(SmallVec<[(Ident, Option<ExprId>); 1]>),
 }
 
 // TODO: net: [drive_strength][delay3] variable: [delay_control]
@@ -98,13 +103,15 @@ impl<'a> ModuleLowerCtx<'a> {
             try_match! {
                 item.port_declaration(), port_decl => {
                     let module_item = ModuleItem::PortDecl(self.lower_port_decl(&port_decl)?);
-                    let idx = self.module_decl.data.module_items.alloc(module_item);
-                    self.module_src_map.module_items.insert(idx, LocalModuleItemSrc::PortDecl(port_decl.to_ptr()));
+                    let src = self.in_file(LocalModuleItemSrc::PortDecl(port_decl.to_ptr()));
+                    let idx = self.module_decl.module_items.alloc(module_item);
+                    self.module_src_map.module_item.insert(src, idx);
                 },
                 item.non_port_module_item(), non_port_item => {
                     let module_item = self.lower_non_port_module_item(&non_port_item)?;
-                    let idx = self.module_decl.data.module_items.alloc(module_item);
-                    self.module_src_map.module_items.insert(idx, LocalModuleItemSrc::NonePortItem(non_port_item.to_ptr()));
+                    let src = self.in_file(LocalModuleItemSrc::NonePortItem(non_port_item.to_ptr()));
+                    let idx = self.module_decl.module_items.alloc(module_item);
+                    self.module_src_map.module_item.insert(src, idx);
                 },
                 _ => { return None; }
             };
@@ -258,17 +265,17 @@ impl<'a> ModuleLowerCtx<'a> {
         let param_assigns_node = param_value_assigns.list_of_parameter_assignments()?;
         let param_assigns = try_match! {
             param_assigns_node.list_of_ordered_parameter_assignments(), ordered => {
-                let mut assigns: SmallVec<[LocalExprSrcId; 1]> = SmallVec::new();
+                let mut assigns: SmallVec<[ExprId; 1]> = SmallVec::new();
                 for assign in ordered.ordered_parameter_assignments() {
-                    assigns.push(self.lower_param_expr_src(&assign.param_expression()?))
+                    assigns.push(self.lower_param_expr(&assign.param_expression()?)?)
                 }
                 ParamAssigns::Ordered(assigns)
             },
             param_assigns_node.list_of_named_parameter_assignments(), named => {
-                let mut assigns: SmallVec<[(Ident, Option<LocalExprSrcId>); 1]> = SmallVec::new();
+                let mut assigns: SmallVec<[(Ident, Option<ExprId>); 1]> = SmallVec::new();
                 for assign in named.named_parameter_assignments() {
                     let ident = self.lower_ident(&assign.identifier()?)?;
-                    let expr = assign.param_expression().map(|param_expr| self.lower_param_expr_src(&param_expr));
+                    let expr = assign.param_expression().map(|param_expr| self.lower_param_expr(&param_expr))?;
                     assigns.push((ident, expr))
                 }
                 ParamAssigns::Named(assigns)
@@ -280,8 +287,9 @@ impl<'a> ModuleLowerCtx<'a> {
         for instance_node in module_inst.hierarchical_instances() {
             try_! {
                 let instance = self.lower_hierarchy_instance(&instance_node)?;
+                let src = self.in_file(instance_node.to_ptr());
                 let idx = self.module_decl.data.hierarchical_instances.alloc(instance);
-                self.module_src_map.hierarchical_instances.insert(idx, instance_node.to_ptr());
+                self.module_src_map.hierarchical_instance.insert(src, idx);
             };
         }
         let end_idx = self.module_decl.data.hierarchical_instances.len();
@@ -309,17 +317,17 @@ impl<'a> ModuleLowerCtx<'a> {
         let list = instance.list_of_port_connections()?;
         let port_connects = try_match! {
             list.list_of_ordered_port_connections(), ordered => {
-                let mut connects: SmallVec<[Option<LocalExprSrcId>; 1]> = SmallVec::new();
+                let mut connects: SmallVec<[Option<ExprId>; 1]> = SmallVec::new();
                 for connect in ordered.ordered_port_connections() {
-                    connects.push(connect.expression().map(|expr| self.lower_expr_src(&expr)));
+                    connects.push(connect.expression().and_then(|expr| self.lower_expr(&expr)));
                 }
                 Some(PortConnects::Ordered(connects))
             },
             list.list_of_named_port_connections(), named => {
-                let mut connects: SmallVec<[(Ident, Option<LocalExprSrcId>); 1]> = SmallVec::new();
+                let mut connects: SmallVec<[(Ident, Option<ExprId>); 1]> = SmallVec::new();
                 for connect in named.named_port_connections() {
                     let ident = self.lower_ident(&connect.identifier()?)?;
-                    let expr = connect.expression().map(|expr| self.lower_expr_src(&expr));
+                    let expr = connect.expression().and_then(|expr| self.lower_expr(&expr));
                     connects.push((ident, expr));
                 }
                 Some(PortConnects::Named(connects))

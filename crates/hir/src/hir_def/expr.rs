@@ -1,5 +1,6 @@
-use crate::hir_def::{data::DataType, lower::Lower};
+use crate::hir_def::{data::DataType, lower::Lower, Ident, InFile, SourceMap};
 use la_arena::{Arena, Idx};
+use smallvec::SmallVec;
 use smol_str::SmolStr;
 use syntax::ast::{self, ptr};
 
@@ -13,56 +14,45 @@ pub enum LocalExprSrc {
     ConstantParamExpression(ptr::ConstantParamExpressionPtr),
 }
 
-pub type LocalExprSrcId = Idx<LocalExprSrc>;
+pub type ExprSrc = InFile<LocalExprSrc>;
 
-pub(crate) trait LowerExprSrc: Lower {
-    fn arena_expr_srcs(&mut self) -> &mut Arena<LocalExprSrc>;
+pub(crate) trait LowerExpr: Lower {
+    fn arena_expr(&mut self) -> &mut Arena<Expr>;
 
-    fn lower_expr_src(&mut self, expr_node: &ast::Expression) -> LocalExprSrcId {
-        self.arena_expr_srcs().alloc(LocalExprSrc::Expr(expr_node.to_ptr()))
+    fn src_map_expr(&mut self) -> &mut SourceMap<ExprSrc, Expr>;
+
+    fn lower_expr(&mut self, expr_node: &ast::Expression) -> Option<ExprId> {
+        unimplemented!("lower_expr")
     }
 
-    fn lower_const_expr_src(&mut self, expr_node: &ast::ConstantExpression) -> LocalExprSrcId {
-        self.arena_expr_srcs().alloc(LocalExprSrc::ConstExpr(expr_node.to_ptr()))
+    fn lower_const_expr(&mut self, expr_node: &ast::ConstantExpression) -> Option<ExprId> {
+        unimplemented!("lower_const_expr")
     }
 
-    fn lower_param_expr_src(&mut self, expr_node: &ast::ParamExpression) -> LocalExprSrcId {
-        self.arena_expr_srcs().alloc(LocalExprSrc::ParamExpr(expr_node.to_ptr()))
+    fn lower_param_expr(&mut self, expr_node: &ast::ParamExpression) -> Option<ExprId> {
+        unimplemented!("lower_param_expr")
     }
 
-    fn lower_const_param_expr_src(
+    fn lower_const_param_expr(
         &mut self,
         expr_node: &ast::ConstantParamExpression,
-    ) -> LocalExprSrcId {
-        self.arena_expr_srcs().alloc(LocalExprSrc::ConstantParamExpression(expr_node.to_ptr()))
+    ) -> Option<ExprId> {
+        unimplemented!("lower_const_param_expr_src")
+    }
+
+    fn lower_const_select(
+        &mut self,
+        select_node: &ast::ConstantSelect,
+    ) -> Option<SmallVec<[Select; 1]>> {
+        unimplemented!("lower_const_select")
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub enum LocalMintypmaxExprSrc {
-    MintypmaxExpr(ptr::MintypmaxExpressionPtr),
-    ConstMintypmaxExpr(ptr::ConstantMintypmaxExpressionPtr),
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub enum LocalSelectSrc {
-    Select(ptr::SelectPtr),
-    ConstSelect(ptr::ConstantSelectPtr),
-}
-
-pub type LocalSelectSrcId = Idx<LocalSelectSrc>;
-
-pub(crate) trait LowerSelectSrc: Lower {
-    fn arena_select_srcs(&mut self) -> &mut Arena<LocalSelectSrc>;
-
-    fn lower_select_src(&mut self, select_node: &ast::Select) -> LocalSelectSrcId {
-        self.arena_select_srcs().alloc(LocalSelectSrc::Select(select_node.to_ptr()))
-    }
-
-    fn lower_const_select_src(&mut self, select_node: &ast::ConstantSelect) -> LocalSelectSrcId {
-        self.arena_select_srcs().alloc(LocalSelectSrc::ConstSelect(select_node.to_ptr()))
-    }
-}
+// #[derive(Debug, PartialEq, Eq, Clone, Hash)]
+// pub enum LocalMintypmaxExprSrc {
+//     MintypmaxExpr(ptr::MintypmaxExpressionPtr),
+//     ConstMintypmaxExpr(ptr::ConstantMintypmaxExpressionPtr),
+// }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone, Hash)]
 pub enum UnaryOp {
@@ -196,6 +186,7 @@ pub enum Expr {
     // TODO: add more primary expressions
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum RangeExpr {
     Indexed { is_addr: bool, index: ExprId, offset: ExprId },
     Range { lsb: ExprId, msb: ExprId },
@@ -203,5 +194,12 @@ pub enum RangeExpr {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Path(Box<[SmolStr]>);
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub enum Select {
+    Member(Ident),
+    BitSelect(ExprId),
+    Range(RangeExpr),
+}
 
 pub type ExprId = Idx<Expr>;
