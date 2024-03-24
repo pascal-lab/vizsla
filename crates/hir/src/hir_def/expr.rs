@@ -1,4 +1,7 @@
-use crate::hir_def::{data::DataType, lower::Lower, Ident, InFile, SourceMap};
+use crate::{
+    hir_def::{data::DataType, lower::Lower, Ident, InFile, SourceMap},
+    try_match,
+};
 use la_arena::{Arena, Idx};
 use smallvec::SmallVec;
 use smol_str::SmolStr;
@@ -12,6 +15,9 @@ pub enum LocalExprSrc {
     ConstExpr(ptr::ConstantExpressionPtr),
     ParamExpr(ptr::ParamExpressionPtr),
     ConstantParamExpression(ptr::ConstantParamExpressionPtr),
+    NetLValue(ptr::NetLvaluePtr),
+    VarLValue(ptr::VariableLvaluePtr),
+    // TODO: NoneRangeVarLValue(ptr::NonerangeVariableLvaluePtr),
 }
 
 pub type ExprSrc = InFile<LocalExprSrc>;
@@ -45,6 +51,25 @@ pub(crate) trait LowerExpr: Lower {
         select_node: &ast::ConstantSelect,
     ) -> Option<SmallVec<[Select; 1]>> {
         unimplemented!("lower_const_select")
+    }
+
+    fn lower_net_lvalue(&mut self, lvalue_node: &ast::NetLvalue) -> Option<ExprId> {
+        unimplemented!("lower_net_lvalue")
+    }
+
+    fn lower_var_lvalue(&mut self, lvalue_node: &ast::VariableLvalue) -> Option<ExprId> {
+        unimplemented!("lower_var_lvalue")
+    }
+
+    fn lower_delay_value(&mut self, delay_value_node: &ast::DelayValue) -> Option<MinTypMaxExpr> {
+        unimplemented!("lower_delay_value")
+    }
+
+    fn lower_min_typ_max_expr(
+        &mut self,
+        min_typ_max_expr_node: &ast::MintypmaxExpression,
+    ) -> Option<MinTypMaxExpr> {
+        unimplemented!("lower_min_typ_max_expr")
     }
 }
 
@@ -147,6 +172,33 @@ pub enum IncDecOp {
     Inc,
     // `--`
     Dec,
+}
+
+#[derive(Debug, PartialEq, Eq, Copy, Clone, Hash)]
+pub enum AssignOp {
+    // `=`
+    Assign,
+    // `+=`
+    BinaryOpAssign(BinaryOp),
+}
+
+pub(crate) fn lower_assign_op(op: &ast::AssignmentOperator) -> Option<AssignOp> {
+    try_match! {
+        op.token_eq(), _ => Some(AssignOp::Assign),
+        op.token_plus_eq(), _ => Some(AssignOp::BinaryOpAssign(BinaryOp::Add)),
+        op.token_minus_eq(), _ => Some(AssignOp::BinaryOpAssign(BinaryOp::Sub)),
+        op.token_star_eq(), _ => Some(AssignOp::BinaryOpAssign(BinaryOp::Mul)),
+        op.token_slash_eq(), _ => Some(AssignOp::BinaryOpAssign(BinaryOp::Div)),
+        op.token_percent_eq(), _ => Some(AssignOp::BinaryOpAssign(BinaryOp::Mod)),
+        op.token_and_eq(), _ => Some(AssignOp::BinaryOpAssign(BinaryOp::BitAnd)),
+        op.token_or_eq(), _ => Some(AssignOp::BinaryOpAssign(BinaryOp::BitOr)),
+        op.token_xor_eq(), _ => Some(AssignOp::BinaryOpAssign(BinaryOp::BitXor)),
+        op.token_lshift_eq(), _ => Some(AssignOp::BinaryOpAssign(BinaryOp::ShiftLeft)),
+        op.token_rshift_eq(), _ => Some(AssignOp::BinaryOpAssign(BinaryOp::ShiftRight)),
+        op.token_arith_lshift_eq(), _ => Some(AssignOp::BinaryOpAssign(BinaryOp::ArithShiftLeft)),
+        op.token_arith_rshift_eq(), _ => Some(AssignOp::BinaryOpAssign(BinaryOp::ArithShiftRight)),
+        _ => None,
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]

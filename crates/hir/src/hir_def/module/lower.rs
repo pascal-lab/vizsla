@@ -47,7 +47,7 @@ impl<'a> ModuleLowerCtx<'a> {
                     self.lower_non_port_module_item(&non_port_module_item);
                 }
             },
-            _ => { return; }
+            _ => {}
         };
     }
 

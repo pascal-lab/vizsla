@@ -92,8 +92,8 @@ pub(crate) trait LowerPortDecl: LowerDataType + LowerDataSubDecl + LowerExpr {
                     let mut arena = Arena::default();
                     for port_ref in port_node.port_expression()?.port_references() {
                         let ident = self.lower_ident(&port_ref.identifier()?)?;
-                        let selects = self.lower_const_select(&port_ref.constant_select()?);
-                        let selects = if let Some(selects) = selects {
+                        let selects = self.lower_const_select(&port_ref.constant_select()?)?;
+                        let selects = if !selects.is_empty() {
                             Some(selects)
                         } else {
                             None
@@ -148,7 +148,7 @@ pub(crate) trait LowerPortDecl: LowerDataType + LowerDataSubDecl + LowerExpr {
 
     fn lower_port_decl(&mut self, port_decl_node: &ast::PortDeclaration) -> Option<PortDecl> {
         try_! {
-            let port_decl = try_match!{
+            try_match!{
                 port_decl_node.inout_declaration(), inout_decl => {
                     let direction = PortDirection::Inout;
                     let port_kind = self.lower_net_port_type(&inout_decl.net_port_type()?)?;
@@ -203,8 +203,7 @@ pub(crate) trait LowerPortDecl: LowerDataType + LowerDataSubDecl + LowerExpr {
                 _ => {
                     unimplemented!("port_declaration ::= interface_port_declaration")
                 }
-            };
-            port_decl
+            }
         }
     }
 

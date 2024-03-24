@@ -3,14 +3,16 @@ pub mod module_item;
 pub mod port;
 
 use crate::hir_def::{
+    control::EventExpr,
     data::{DataSubDecl, DataSubDeclSrc, ParamDecl, ParamPortDeclSrc},
     expr::{Expr, ExprSrc},
+    //tf::TFDecl,
     impl_index,
     module::{
         module_item::{HierarchicalInstance, ModuleItem, ModuleItemSrc},
         port::{AnsiPortDecl, NonAnsiPort},
     },
-    //tf::TFDecl,
+    stmt::{Block, BlockSrc, Stmt, StmtSrc},
     Ident,
     InFile,
     SourceMap,
@@ -44,8 +46,10 @@ impl_index!(ModuleDecl for
 #[derive(Default, Debug, PartialEq, Eq, Clone)]
 pub struct ModuleData {
     pub exprs: Arena<Expr>,
+    pub event_exprs: Arena<EventExpr>,
     pub data_sub_decls: Arena<DataSubDecl>,
-    // TODO: pub stmts: Arena<Stmt>,
+    pub stmts: Arena<Stmt>,
+    pub blocks: Arena<Block>,
     pub hierarchical_instances: Arena<HierarchicalInstance>,
 }
 
@@ -58,7 +62,10 @@ impl_index!(ModuleData for
 #[derive(Default, Debug, PartialEq, Eq, Clone)]
 pub struct ModuleSourceMap {
     pub expr: SourceMap<ExprSrc, Expr>,
+    pub event_expr: SourceMap<InFile<ptr::EventExpressionPtr>, EventExpr>,
     pub data_sub_decl: SourceMap<DataSubDeclSrc, DataSubDecl>,
+    pub stmt: SourceMap<StmtSrc, Stmt>,
+    pub block: SourceMap<BlockSrc, Block>,
     pub param_port_decl: SourceMap<ParamPortDeclSrc, ParamDecl>,
     pub port: SourceMap<InFile<ptr::PortPtr>, NonAnsiPort>,
     pub ansi_port_decl: SourceMap<InFile<ptr::AnsiPortDeclarationPtr>, AnsiPortDecl>,

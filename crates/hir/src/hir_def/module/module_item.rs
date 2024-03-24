@@ -1,18 +1,22 @@
-use crate::{
-    hir_def::{
-        data::{Dimension, LowerDataDecl, LowerDimension, LowerNetDecl, LowerVarDecl},
-        expr::{ExprId, LowerExpr},
-        lower::Lower,
-        module::{
-            lower::ModuleLowerCtx,
-            port::{LowerPortDecl, PortDecl},
-        },
-        pack_or_gen_item::{LowerPackOrGenItemDecl, PackOrGenItemDecl},
-        try_match, Ident,
+use crate::hir_def::{
+    control::{
+        DelayControl, EventExpr, LowerDelayControl, LowerDelayOrEventControl, LowerEventExpr,
     },
-    InFile,
+    data::{
+        self, Delay, Dimension, DriveStrength, LowerDataDecl, LowerDelay, LowerDimension,
+        LowerNetDecl, LowerVarDecl,
+    },
+    expr::{AssignOp, ExprId, LowerExpr},
+    lower::Lower,
+    module::{
+        lower::ModuleLowerCtx,
+        port::{LowerPortDecl, PortDecl},
+    },
+    pack_or_gen_item::{LowerPackOrGenItemDecl, PackOrGenItemDecl},
+    stmt::{Assign, Block, BlockSrc, LowerStmt, Stmt, StmtId, StmtSrc},
+    try_match, Ident, InFile, SourceMap,
 };
-use la_arena::{Idx, IdxRange, RawIdx};
+use la_arena::{Arena, Idx, IdxRange, RawIdx};
 use smallvec::SmallVec;
 use syntax::ast::{self, ptr};
 use utils::try_;
@@ -72,29 +76,55 @@ pub enum PortConnects {
 
 // TODO: net: [drive_strength][delay3] variable: [delay_control]
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct ContinuousAssignment {
-    // TODO: complete this
+pub enum ContinuousAssignment {
+    Net {
+        drive_strength: Option<DriveStrength>,
+        delay: Option<Delay>,
+        assigns: SmallVec<[Assign; 1]>,
+    },
+    Var {
+        delay_control: Option<DelayControl>,
+        assigns: SmallVec<[Assign; 1]>,
+    },
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub enum AlwaysType {
+pub enum AlwaysKeyword {
     Always,
     AlwaysComb,
     AlwaysLatch,
     AlwaysFf,
 }
 
+pub(crate) fn lower_always_keyword(keyword: &ast::AlwaysKeyword) -> Option<AlwaysKeyword> {
+    try_match! {
+        keyword.token_always(), _ => {
+            Some(AlwaysKeyword::Always)
+        },
+        keyword.token_always_comb(), _ => {
+            Some(AlwaysKeyword::AlwaysComb)
+        },
+        keyword.token_always_latch(), _ => {
+            Some(AlwaysKeyword::AlwaysLatch)
+        },
+        keyword.token_always_ff(), _ => {
+            Some(AlwaysKeyword::AlwaysFf)
+        },
+        _ => None,
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum ProcessType {
     Initial,
-    Always(AlwaysType),
+    Always(AlwaysKeyword),
     Final,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ProcessConstruct {
     pub process_type: ProcessType,
-    //pub stmt: NodeId,
+    pub stmt: Option<StmtId>,
 }
 
 impl<'a> ModuleLowerCtx<'a> {
@@ -185,20 +215,27 @@ impl<'a> ModuleLowerCtx<'a> {
             item.module_or_generate_item_declaration(), module_or_generate_item_decl => {
                 self.lower_module_or_gen_item_decl(&module_or_generate_item_decl)?
             },
-            item.continuous_assign(), _ => {
-                // ModuleItem::ContinuousAssignment(ContinuousAssignment{
-
-                // })
-                unimplemented!()
+            item.continuous_assign(), continuous_assign_node => {
+                self.lower_continuous_assign(&continuous_assign_node)?
             },
-            item.initial_construct(), _ => {
-                unimplemented!()
+            item.initial_construct(), init_construct => {
+                ModuleItem::ProcessConstruct(ProcessConstruct{
+                    process_type: ProcessType::Initial,
+                    stmt: self.lower_stmt_or_null(&init_construct.statement_or_null()?)
+                })
             },
-            item.always_construct(), _ => {
-                unimplemented!()
+            item.always_construct(), always_construct => {
+                let always_keyword = lower_always_keyword(&always_construct.always_keyword()?)?;
+                ModuleItem::ProcessConstruct(ProcessConstruct{
+                    process_type: ProcessType::Always(always_keyword),
+                    stmt: self.lower_stmt(&always_construct.statement()?)
+                })
             },
-            item.final_construct(), _ => {
-                unimplemented!()
+            item.final_construct(), final_construct => {
+                ModuleItem::ProcessConstruct(ProcessConstruct{
+                    process_type: ProcessType::Final,
+                    stmt: Some(self.lower_stmt(&final_construct.function_statement()?.statement()?)?)
+                })
             },
             item.interface_instantiation(), _ => {
                 unimplemented!("interface_instantiation")
@@ -336,12 +373,83 @@ impl<'a> ModuleLowerCtx<'a> {
         };
         Some(HierarchicalInstance { ident, dimensions, port_connects })
     }
+
+    fn lower_continuous_assign(&mut self, assign: &ast::ContinuousAssign) -> Option<ModuleItem> {
+        let assign = try_match! {
+            assign.list_of_net_assignments(), net_assigns => {
+                let drive_strength = assign.drive_strength().and_then(|strenght| data::lower_drive_strength(&strenght));
+                let delay = assign.delay3().and_then(|delay| self.lower_delay3(&delay));
+                let mut assigns: SmallVec<[Assign; 1]> = SmallVec::new();
+                for assign in net_assigns.net_assignments() {
+                    let lhs = self.lower_net_lvalue(&assign.net_lvalue()?)?;
+                    let rhs = self.lower_expr(&assign.expression()?)?;
+                    let op = AssignOp::Assign;
+                    assigns.push(Assign{lhs, rhs, op});
+                }
+                ContinuousAssignment::Net {
+                    drive_strength: drive_strength,
+                    delay: delay,
+                    assigns,
+                }
+            },
+            assign.list_of_variable_assignments(), var_assigns => {
+                let delay_control = assign.delay_control().and_then(|delay| self.lower_delay_control(&delay));
+                let mut assigns: SmallVec<[Assign; 1]> = SmallVec::new();
+                for assign in var_assigns.variable_assignments() {
+                    let lhs = self.lower_var_lvalue(&assign.variable_lvalue()?)?;
+                    let rhs = self.lower_expr(&assign.expression()?)?;
+                    let op = AssignOp::Assign;
+                    assigns.push(Assign{lhs, rhs, op});
+                }
+                ContinuousAssignment::Var {
+                    delay_control,
+                    assigns,
+                }
+            },
+            _ => { return None; }
+        };
+        Some(ModuleItem::ContinuousAssignment(assign))
+    }
 }
+
+impl LowerDelay for ModuleLowerCtx<'_> {}
+
+impl LowerDelayControl for ModuleLowerCtx<'_> {}
 
 impl LowerNetDecl for ModuleLowerCtx<'_> {}
 
 impl LowerVarDecl for ModuleLowerCtx<'_> {}
 
 impl LowerDataDecl for ModuleLowerCtx<'_> {}
+
+impl LowerEventExpr for ModuleLowerCtx<'_> {
+    fn arena_event_exprs(&mut self) -> &mut Arena<EventExpr> {
+        &mut self.module_decl.data.event_exprs
+    }
+
+    fn src_map_event_expr(&mut self) -> &mut SourceMap<InFile<ptr::EventExpressionPtr>, EventExpr> {
+        &mut self.module_src_map.event_expr
+    }
+}
+
+impl LowerDelayOrEventControl for ModuleLowerCtx<'_> {}
+
+impl LowerStmt for ModuleLowerCtx<'_> {
+    fn arena_stmts(&mut self) -> &mut Arena<Stmt> {
+        &mut self.module_decl.data.stmts
+    }
+
+    fn arena_blocks(&mut self) -> &mut Arena<Block> {
+        &mut self.module_decl.data.blocks
+    }
+
+    fn src_map_stmt(&mut self) -> &mut SourceMap<StmtSrc, Stmt> {
+        &mut self.module_src_map.stmt
+    }
+
+    fn src_map_block(&mut self) -> &mut SourceMap<BlockSrc, Block> {
+        &mut self.module_src_map.block
+    }
+}
 
 impl LowerPackOrGenItemDecl for ModuleLowerCtx<'_> {}

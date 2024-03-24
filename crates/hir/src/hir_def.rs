@@ -1,5 +1,5 @@
 pub mod bit;
-pub mod block;
+pub mod control;
 pub mod data;
 pub mod expr;
 pub mod generate;

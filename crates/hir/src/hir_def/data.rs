@@ -1,10 +1,9 @@
 use crate::hir_def::{
-    expr::{ExprId, LowerExpr},
+    expr::{ExprId, LowerExpr, MinTypMaxExpr},
     try_match, Ident, InFile, SourceMap,
 };
 use la_arena::{Arena, Idx, IdxRange, RawIdx};
 use smallvec::SmallVec;
-use smol_str::SmolStr;
 use syntax::ast::{self, ptr};
 use utils::try_;
 
@@ -419,7 +418,7 @@ pub(crate) trait LowerDataSubDecl: LowerDimension + LowerExpr {
         &mut self,
         var_port_ident_decl: &ast::VariablePortIdentifierDeclaration,
     ) -> Option<Idx<DataSubDecl>> {
-        let ident: SmolStr = self.lower_ident(&var_port_ident_decl.identifier()?)?;
+        let ident = self.lower_ident(&var_port_ident_decl.identifier()?)?;
         let expr = var_port_ident_decl
             .constant_expression()
             .and_then(|const_expr| self.lower_const_expr(&const_expr));
@@ -447,22 +446,118 @@ pub(crate) trait LowerDataSubDecl: LowerDimension + LowerExpr {
     }
 }
 
-// Todo: [ drive_strength | charge_strength ] [ vectored | scalared ]  [ delay3 ]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub enum ChargeStrength {
+    Small,
+    Medium,
+    Large,
+}
+
+pub(crate) fn lower_charge_strength(
+    charge_strength: &ast::ChargeStrength,
+) -> Option<ChargeStrength> {
+    try_match! {
+        charge_strength.token_small(), _ => Some(ChargeStrength::Small),
+        charge_strength.token_medium(), _ => Some(ChargeStrength::Medium),
+        charge_strength.token_large(), _ => Some(ChargeStrength::Large),
+        _ => None
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub enum DriveSubStrength {
+    Supply,
+    Strong,
+    Pull,
+    Weak,
+    Highz,
+}
+
+pub type DriveStrength = (DriveSubStrength, DriveSubStrength);
+
+pub(crate) fn lower_drive_strength(drive_strength: &ast::DriveStrength) -> Option<DriveStrength> {
+    let strength0 = try_match! {
+        drive_strength.strength0(), strength0 => {
+            try_match! {
+                strength0.token_supply0(), _ => DriveSubStrength::Supply,
+                strength0.token_strong0(), _ => DriveSubStrength::Strong,
+                strength0.token_pull0(), _ => DriveSubStrength::Pull,
+                strength0.token_weak0(), _ => DriveSubStrength::Weak,
+                _ => { return None; }
+            }
+        },
+        drive_strength.token_highz0(), _ => DriveSubStrength::Highz,
+        _ => { return None; }
+    };
+    let strength1 = try_match! {
+        drive_strength.strength1(), strength1 => {
+            try_match! {
+                strength1.token_supply1(), _ => DriveSubStrength::Supply,
+                strength1.token_strong1(), _ => DriveSubStrength::Strong,
+                strength1.token_pull1(), _ => DriveSubStrength::Pull,
+                strength1.token_weak1(), _ => DriveSubStrength::Weak,
+                _ => { return None; }
+            }
+        },
+        drive_strength.token_highz1(), _ => DriveSubStrength::Highz,
+        _ => { return None; }
+    };
+    Some((strength0, strength1))
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct Delay {
+    exprs: SmallVec<[MinTypMaxExpr; 1]>,
+}
+
+pub(crate) trait LowerDelay: LowerExpr {
+    fn lower_delay3(&mut self, delay3: &ast::Delay3) -> Option<Delay> {
+        let mut exprs = SmallVec::new();
+        try_match! {
+            delay3.delay_value(), delay_value => {
+                exprs.push(self.lower_delay_value(&delay_value)?);
+            },
+            _ => {
+                for expr in delay3.mintypmax_expressions() {
+                    exprs.push(self.lower_min_typ_max_expr(&expr)?);
+                }
+            }
+        }
+        Some(Delay { exprs })
+    }
+
+    fn lower_delay2(&mut self, delay2: &ast::Delay2) -> Option<Delay> {
+        let mut exprs = SmallVec::new();
+        try_match! {
+            delay2.delay_value(), delay_value => {
+                exprs.push(self.lower_delay_value(&delay_value)?);
+            },
+            _ => {
+                for expr in delay2.mintypmax_expressions() {
+                    exprs.push(self.lower_min_typ_max_expr(&expr)?);
+                }
+            }
+        }
+        Some(Delay { exprs })
+    }
+}
+
+// Todo: [ drive_strength | charge_strength ]
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct NetDecl {
     pub net_kind: NetKind,
-    // TODO: [ vectored | scalared ]
-    // pub vectored: bool,
-    // pub scalared: bool,
-    // TODO: drive_strength, charge_strength, delay3
+    pub drive_strength: Option<DriveStrength>,
+    pub charge_strength: Option<ChargeStrength>,
+    pub vectored: bool,
+    pub scalared: bool,
+    pub delay: Option<Delay>,
     pub sub_decls: IdxRange<DataSubDecl>,
 }
 
-pub(crate) trait LowerNetDecl: LowerDataType + LowerDataSubDecl {
+pub(crate) trait LowerNetDecl: LowerDataType + LowerDataSubDecl + LowerDelay {
     fn lower_net_decl(&mut self, net_decl: &ast::NetDeclaration) -> Option<NetDecl> {
         try_match! {
             net_decl.net_type(), net_type => {
-                // TODO: [ drive_strength | charge_strength ] [ vectored | scalared ] [ delay3 ]
                 let net_type = lower_net_type(&net_type)?;
                 let data_type = {
                     let data_type = net_decl.data_type_or_implicit()?;
@@ -470,6 +565,11 @@ pub(crate) trait LowerNetDecl: LowerDataType + LowerDataSubDecl {
                 };
                 Some(NetDecl{
                     net_kind: NetKind::Default{net_type, data_type},
+                    drive_strength: net_decl.drive_strength().and_then(|drive_strength| lower_drive_strength(&drive_strength)),
+                    charge_strength: net_decl.charge_strength().and_then(|charge_strength| lower_charge_strength(&charge_strength)),
+                    vectored: net_decl.token_vectored().is_some(),
+                    scalared: net_decl.token_scalared().is_some(),
+                    delay: net_decl.delay3().and_then(|delay3| self.lower_delay3(&delay3)),
                     sub_decls: self.lower_net_sub_decl_list(&net_decl.list_of_net_decl_assignments()?),
                 })
             },
@@ -488,8 +588,8 @@ pub(crate) trait LowerNetDecl: LowerDataType + LowerDataSubDecl {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct VarDecl {
-    // TODO: [const]
-    // pub konst: bool,
+    // TODO: lifetime
+    pub konst: bool,
     pub data_type: DataType,
     pub sub_decls: IdxRange<DataSubDecl>,
 }
@@ -497,6 +597,7 @@ pub struct VarDecl {
 pub(crate) trait LowerVarDecl: LowerDataType + LowerDataSubDecl {
     fn lower_var_decl(&mut self, var_decl: &ast::VariableDeclaration) -> Option<VarDecl> {
         Some(VarDecl {
+            konst: var_decl.token_const().is_some(),
             data_type: {
                 let data_type = var_decl.data_type_or_implicit()?;
                 self.lower_data_type_or_implicit(&data_type)?
