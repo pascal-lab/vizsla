@@ -1,7 +1,5 @@
 use crate::hir_def::{
-    control::{
-        DelayControl, EventExpr, LowerDelayControl, LowerDelayOrEventControl, LowerEventExpr,
-    },
+    control::{DelayControl, EventExpr, LowerDelayControl, LowerEventExpr, LowerTimingControl},
     data::{
         self, Delay, Dimension, DriveStrength, LowerDataDecl, LowerDelay, LowerDimension,
         LowerNetDecl, LowerVarDecl,
@@ -432,7 +430,7 @@ impl LowerEventExpr for ModuleLowerCtx<'_> {
     }
 }
 
-impl LowerDelayOrEventControl for ModuleLowerCtx<'_> {}
+impl LowerTimingControl for ModuleLowerCtx<'_> {}
 
 impl LowerStmt for ModuleLowerCtx<'_> {
     fn arena_stmts(&mut self) -> &mut Arena<Stmt> {

@@ -1,5 +1,5 @@
 use crate::hir_def::{
-    control::{DelayOrEventControl, LowerDelayOrEventControl},
+    control::{DelayOrEventControl, LowerTimingControl, ProceduralTimingControlControl},
     data::DataDecl,
     expr::{self, AssignOp, ExprId, LowerExpr},
     try_match, Ident, InFile, SourceMap,
@@ -73,14 +73,14 @@ pub(crate) fn lower_case_keyword(keyword: &ast::CaseKeyword) -> Option<CaseKetwo
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub enum CaseDefaultItem {
+pub enum CaseItem {
     Case { exprs: SmallVec<[ExprId; 1]>, stmt: Option<StmtId> },
     Default(Option<StmtId>),
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum CaseItems {
-    Default(SmallVec<[CaseDefaultItem; 1]>),
+    Case(SmallVec<[CaseItem; 1]>),
     // TODO: Pattern()
     // TODO: Inside()
 }
@@ -155,12 +155,16 @@ pub enum StmtItem {
         else_stmt: Option<StmtId>,
     },
     Block(LocalBlockId),
+    ProceduralTimingControlStmt {
+        control: ProceduralTimingControlControl,
+        stmt: Option<StmtId>,
+    },
 }
 
 pub type StmtId = Idx<Stmt>;
 pub type StmtSrc = InFile<ptr::StatementPtr>;
 
-pub(crate) trait LowerStmt: LowerDelayOrEventControl + LowerExpr + LowerDataDecl {
+pub(crate) trait LowerStmt: LowerTimingControl + LowerExpr + LowerDataDecl {
     fn arena_stmts(&mut self) -> &mut Arena<Stmt>;
 
     fn arena_blocks(&mut self) -> &mut Arena<Block>;
@@ -270,11 +274,11 @@ pub(crate) trait LowerStmt: LowerDelayOrEventControl + LowerExpr + LowerDataDecl
                         unimplemented!("case_statement with inside")
                     },
                     _ => {
-                        let mut items: SmallVec<[CaseDefaultItem; 1]> = SmallVec::new();
+                        let mut items: SmallVec<[CaseItem; 1]> = SmallVec::new();
                         for case_item in case.case_items() {
                             let item = try_match! {
                                 case_item.token_default(), _ => {
-                                    CaseDefaultItem::Default(self.lower_stmt_or_null(&case_item.statement_or_null()?))
+                                    CaseItem::Default(self.lower_stmt_or_null(&case_item.statement_or_null()?))
                                 },
                                 _ => {
                                     let mut exprs: SmallVec<[ExprId; 1]> = SmallVec::new();
@@ -282,12 +286,12 @@ pub(crate) trait LowerStmt: LowerDelayOrEventControl + LowerExpr + LowerDataDecl
                                         exprs.push(self.lower_expr(&expr.expression()?)?);
                                     }
                                     let stmt = self.lower_stmt_or_null(&case_item.statement_or_null()?);
-                                    CaseDefaultItem::Case{ exprs, stmt }
+                                    CaseItem::Case{ exprs, stmt }
                                 }
                             };
                             items.push(item);
                         }
-                        CaseItems::Default(items)
+                        CaseItems::Case(items)
                     }
                 };
                 Some(StmtItem::CaseStmt {
@@ -338,8 +342,11 @@ pub(crate) trait LowerStmt: LowerDelayOrEventControl + LowerExpr + LowerDataDecl
             stmt.jump_statement(), _jump => {
                 unimplemented!("jump_statement")
             },
-            stmt.procedural_timing_control_statement(), _timing => {
-                unimplemented!("procedural_timing_control_statement")
+            stmt.procedural_timing_control_statement(), control => {
+                Some(StmtItem::ProceduralTimingControlStmt {
+                    control: self.lower_procedural_timing_control(&control.procedural_timing_control()?)?,
+                    stmt: self.lower_stmt_or_null(&control.statement_or_null()?),
+                })
             },
             stmt.wait_statement(), _wait => {
                 unimplemented!("wait_statement")

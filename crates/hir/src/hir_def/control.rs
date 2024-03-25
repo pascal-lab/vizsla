@@ -105,7 +105,14 @@ pub enum DelayOrEventControl {
     RepeatControl { expr: ExprId, event_control: EventControl },
 }
 
-pub(crate) trait LowerDelayOrEventControl: LowerDelayControl + LowerEventExpr {
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub enum ProceduralTimingControlControl {
+    DelayControl(DelayControl),
+    EventControl(EventControl),
+    // TODO: cycle_delay
+}
+
+pub(crate) trait LowerTimingControl: LowerDelayControl + LowerEventExpr {
     fn lower_delay_or_event_control(
         &mut self,
         control: &ast::DelayOrEventControl,
@@ -123,6 +130,26 @@ pub(crate) trait LowerDelayOrEventControl: LowerDelayControl + LowerEventExpr {
                 let expr = self.lower_expr(&control.expression()?)?;
                 let event_control = self.lower_event_control(&control.event_control()?)?;
                 Some(DelayOrEventControl::RepeatControl{expr, event_control})
+            },
+            _ => None,
+        }
+    }
+
+    fn lower_procedural_timing_control(
+        &mut self,
+        control: &ast::ProceduralTimingControl,
+    ) -> Option<ProceduralTimingControlControl> {
+        try_match! {
+            control.delay_control(), delay_control => {
+                let delay_control = self.lower_delay_control(&delay_control)?;
+                Some(ProceduralTimingControlControl::DelayControl(delay_control))
+            },
+            control.event_control(), event_control => {
+                let event_control = self.lower_event_control(&event_control)?;
+                Some(ProceduralTimingControlControl::EventControl(event_control))
+            },
+            control.cycle_delay(), _cycle_delay => {
+                unimplemented!("cycle_delay")
             },
             _ => None,
         }
