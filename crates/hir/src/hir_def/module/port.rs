@@ -3,7 +3,7 @@ use crate::hir_def::{
     expr::{LowerExpr, Select},
     try_match, Ident, InFile, SourceMap,
 };
-use la_arena::{Arena, Idx, IdxRange};
+use la_arena::{Arena, Idx, IdxRange, RawIdx};
 use smallvec::SmallVec;
 use syntax::ast::{self, ptr};
 use utils::try_;
@@ -72,15 +72,27 @@ pub(crate) fn lower_port_direction(port_direction: &ast::PortDirection) -> Optio
 }
 
 pub(crate) trait LowerPortDecl: LowerDataType + LowerDataSubDecl + LowerExpr {
+    fn arena_port_decl(&mut self) -> &mut Arena<PortDecl>;
+
     fn arena_non_ansi_port(&mut self) -> &mut Arena<NonAnsiPort>;
 
     fn arena_ansi_port_decl(&mut self) -> &mut Arena<AnsiPortDecl>;
+
+    fn src_map_port_decl(&mut self) -> &mut SourceMap<InFile<ptr::PortDeclarationPtr>, PortDecl>;
 
     fn src_map_non_ansi_port(&mut self) -> &mut SourceMap<InFile<ptr::PortPtr>, NonAnsiPort>;
 
     fn src_map_ansi_port_decl(
         &mut self,
     ) -> &mut SourceMap<InFile<ptr::AnsiPortDeclarationPtr>, AnsiPortDecl>;
+
+    fn next_port_decl_idx(&mut self) -> Idx<PortDecl> {
+        Idx::from_raw(RawIdx::from(self.arena_port_decl().len() as u32))
+    }
+
+    fn next_anis_port_decl_idx(&mut self) -> Idx<AnsiPortDecl> {
+        Idx::from_raw(RawIdx::from(self.arena_ansi_port_decl().len() as u32))
+    }
 
     fn lower_port_list(&mut self, port_list: &ast::ListOfPort) {
         for port_node in port_list.ports() {
@@ -146,63 +158,76 @@ pub(crate) trait LowerPortDecl: LowerDataType + LowerDataSubDecl + LowerExpr {
         }))
     }
 
-    fn lower_port_decl(&mut self, port_decl_node: &ast::PortDeclaration) -> Option<PortDecl> {
-        try_! {
-            try_match!{
-                port_decl_node.inout_declaration(), inout_decl => {
-                    let direction = PortDirection::Inout;
-                    let port_kind = self.lower_net_port_type(&inout_decl.net_port_type()?)?;
-                    let data_decls = self.lower_port_ident_list(&inout_decl.list_of_port_identifiers()?);
-                    PortDecl::IODecl(IODecl {
-                        direction, port_kind, data_decls,
-                    })
-                },
-                port_decl_node.input_declaration(), input_decl => {
-                    let direction = PortDirection::Input;
-                    let (port_kind, data_decls) = try_match! {
-                        input_decl.net_port_type(), net_port_type => (
-                            self.lower_net_port_type(&net_port_type)?,
-                            self.lower_port_ident_list(&input_decl.list_of_port_identifiers()?)
-                        ),
-                        input_decl.variable_port_type(), var_port_type => (
-                            self.lower_var_port_type(&var_port_type)?,
-                            self.lower_var_ident_list(&input_decl.list_of_variable_identifiers()?)
-                        ),
-                        _ => {return None;}
-                    };
-                    PortDecl::IODecl(IODecl {
-                        direction, port_kind, data_decls,
-                    })
-
-                },
-                port_decl_node.output_declaration(), output_decl => {
-                    let direction = PortDirection::Output;
-                    let (port_kind, data_decls) = try_match! {
-                        output_decl.net_port_type(), net_port_type => (
-                            self.lower_net_port_type(&net_port_type)?,
-                            self.lower_port_ident_list(&output_decl.list_of_port_identifiers()?)
-                        ),
-                        output_decl.variable_port_type(), var_port_type => (
-                            self.lower_var_port_type(&var_port_type)?,
-                            self.lower_var_port_ident_list(&output_decl.list_of_variable_port_identifiers()?)
-                        ),
-                        _ => {return None;}
-                    };
-                    PortDecl::IODecl(IODecl {
-                        direction, port_kind, data_decls,
-                    })
-                },
-                port_decl_node.ref_declaration(), ref_decl => {
-                    let direction = PortDirection::Ref;
-                    let port_kind = self.lower_var_port_type(&ref_decl.variable_port_type()?)?;
-                    let data_decls = self.lower_var_ident_list(&ref_decl.list_of_variable_identifiers()?);
-                    PortDecl::IODecl(IODecl {
-                        direction, port_kind, data_decls,
-                    })
-                },
-                _ => {
-                    unimplemented!("port_declaration ::= interface_port_declaration")
-                }
+    fn lower_port_decl(&mut self, port_decl_node: &ast::PortDeclaration) -> Option<Idx<PortDecl>> {
+        try_match! {
+            port_decl_node.inout_declaration(), inout_decl => {
+                let src = self.in_file(port_decl_node.to_ptr());
+                let idx = self.next_port_decl_idx();
+                let direction = PortDirection::Inout;
+                let port_kind = self.lower_net_port_type(&inout_decl.net_port_type()?)?;
+                let data_decls = self.lower_port_ident_list(&inout_decl.list_of_port_identifiers()?, idx);
+                self.arena_port_decl().alloc(PortDecl::IODecl(IODecl {
+                    direction, port_kind, data_decls,
+                }));
+                self.src_map_port_decl().insert(src, idx);
+                Some(idx)
+            },
+            port_decl_node.input_declaration(), input_decl => {
+                let src = self.in_file(port_decl_node.to_ptr());
+                let idx = self.next_port_decl_idx();
+                let direction = PortDirection::Input;
+                let (port_kind, data_decls) = try_match! {
+                    input_decl.net_port_type(), net_port_type => (
+                        self.lower_net_port_type(&net_port_type)?,
+                        self.lower_port_ident_list(&input_decl.list_of_port_identifiers()?, idx)
+                    ),
+                    input_decl.variable_port_type(), var_port_type => (
+                        self.lower_var_port_type(&var_port_type)?,
+                        self.lower_var_ident_list(&input_decl.list_of_variable_identifiers()?, idx)
+                    ),
+                    _ => {return None;}
+                };
+                self.arena_port_decl().alloc(PortDecl::IODecl(IODecl {
+                    direction, port_kind, data_decls,
+                }));
+                self.src_map_port_decl().insert(src, idx);
+                Some(idx)
+            },
+            port_decl_node.output_declaration(), output_decl => {
+                let src = self.in_file(port_decl_node.to_ptr());
+                let idx = self.next_port_decl_idx();
+                let direction = PortDirection::Output;
+                let (port_kind, data_decls) = try_match! {
+                    output_decl.net_port_type(), net_port_type => (
+                        self.lower_net_port_type(&net_port_type)?,
+                        self.lower_port_ident_list(&output_decl.list_of_port_identifiers()?, idx)
+                    ),
+                    output_decl.variable_port_type(), var_port_type => (
+                        self.lower_var_port_type(&var_port_type)?,
+                        self.lower_var_port_ident_list(&output_decl.list_of_variable_port_identifiers()?, idx)
+                    ),
+                    _ => {return None;}
+                };
+                self.arena_port_decl().alloc(PortDecl::IODecl(IODecl {
+                    direction, port_kind, data_decls,
+                }));
+                self.src_map_port_decl().insert(src, idx);
+                Some(idx)
+            },
+            port_decl_node.ref_declaration(), ref_decl => {
+                let src = self.in_file(port_decl_node.to_ptr());
+                let idx = self.next_port_decl_idx();
+                let direction = PortDirection::Ref;
+                let port_kind = self.lower_var_port_type(&ref_decl.variable_port_type()?)?;
+                let data_decls = self.lower_var_ident_list(&ref_decl.list_of_variable_identifiers()?, idx);
+                self.arena_port_decl().alloc(PortDecl::IODecl(IODecl {
+                    direction, port_kind, data_decls,
+                }));
+                self.src_map_port_decl().insert(src, idx);
+                Some(idx)
+            },
+            _ => {
+                unimplemented!("port_declaration ::= interface_port_declaration")
             }
         }
     }
@@ -221,6 +246,8 @@ pub(crate) trait LowerPortDecl: LowerDataType + LowerDataSubDecl + LowerExpr {
             try_! {
                 try_match!{
                     port_decl.net_port_header(), net_port_header => {
+                        let src = self.in_file(port_decl.to_ptr());
+                        let idx = self.next_anis_port_decl_idx();
                         try_match!{
                             net_port_header.port_direction(), direction_node => {
                                 direction = lower_port_direction(&direction_node)?;
@@ -229,9 +256,8 @@ pub(crate) trait LowerPortDecl: LowerDataType + LowerDataSubDecl + LowerExpr {
                         port_kind = self.lower_net_port_type(&net_port_header.net_port_type()?)?;
                         let direction = direction.clone();
                         let port_kind = port_kind.clone();
-                        let sub_decl = self.lower_ansi_port_decl(&port_decl)?;
-                        let src = self.in_file(port_decl.to_ptr());
-                        let idx = self.arena_ansi_port_decl().alloc(
+                        let sub_decl = self.lower_ansi_port_decl(&port_decl, idx)?;
+                        self.arena_ansi_port_decl().alloc(
                             AnsiPortDecl::IODecl(AnsiIODecl {
                                 direction, port_kind, sub_decl,
                             })
@@ -239,6 +265,8 @@ pub(crate) trait LowerPortDecl: LowerDataType + LowerDataSubDecl + LowerExpr {
                         self.src_map_ansi_port_decl().insert(src, idx);
                     },
                     port_decl.variable_port_header(), var_port_header => {
+                        let src = self.in_file(port_decl.to_ptr());
+                        let idx = self.next_anis_port_decl_idx();
                         try_match!{
                             var_port_header.port_direction(), direction_node => {
                                 direction = lower_port_direction(&direction_node)?;
@@ -247,9 +275,8 @@ pub(crate) trait LowerPortDecl: LowerDataType + LowerDataSubDecl + LowerExpr {
                         port_kind = self.lower_var_port_type(&var_port_header.variable_port_type()?)?;
                         let direction = direction.clone();
                         let port_kind = port_kind.clone();
-                        let sub_decl = self.lower_ansi_port_decl(&port_decl)?;
-                        let src = self.in_file(port_decl.to_ptr());
-                        let idx = self.arena_ansi_port_decl().alloc(
+                        let sub_decl = self.lower_ansi_port_decl(&port_decl, idx)?;
+                        self.arena_ansi_port_decl().alloc(
                             AnsiPortDecl::IODecl(AnsiIODecl {
                                 direction, port_kind, sub_decl,
                             })
@@ -264,11 +291,12 @@ pub(crate) trait LowerPortDecl: LowerDataType + LowerDataSubDecl + LowerExpr {
                         unimplemented!("ansi_port_declaration ::= [port_direction].port_identifier([expression])")
                     },
                     _ => {
+                        let src = self.in_file(port_decl.to_ptr());
+                        let idx = self.next_anis_port_decl_idx();
                         let direction = direction.clone();
                         let port_kind = port_kind.clone();
-                        let sub_decl = self.lower_ansi_port_decl(&port_decl)?;
-                        let src = self.in_file(port_decl.to_ptr());
-                        let idx = self.arena_ansi_port_decl().alloc(
+                        let sub_decl = self.lower_ansi_port_decl(&port_decl, idx)?;
+                        self.arena_ansi_port_decl().alloc(
                             AnsiPortDecl::IODecl(AnsiIODecl {
                                 direction, port_kind, sub_decl,
                             })

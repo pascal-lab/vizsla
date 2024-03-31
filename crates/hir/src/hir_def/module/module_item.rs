@@ -1,9 +1,6 @@
 use crate::hir_def::{
     control::{DelayControl, EventExpr, LowerDelayControl, LowerEventExpr, LowerTimingControl},
-    data::{
-        self, Delay, Dimension, DriveStrength, LowerDataDecl, LowerDelay, LowerDimension,
-        LowerNetDecl, LowerVarDecl,
-    },
+    data::{self, Delay, Dimension, DriveStrength, LowerDelay, LowerDimension},
     expr::{AssignOp, ExprId, LowerExpr},
     lower::Lower,
     module::{
@@ -21,9 +18,9 @@ use utils::try_;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ModuleItem {
-    PortDecl(PortDecl),
+    PortDecl(Idx<PortDecl>),
     PackOrGenItemDecl(PackOrGenItemDecl),
-    ModuleInstantiation(ModuleInstantiation),
+    ModuleInstantiation(ModuleInst),
     ContinuousAssignment(ContinuousAssignment),
     ProcessConstruct(ProcessConstruct),
     // TODO: Add more module items
@@ -47,10 +44,10 @@ pub type ModuleItemSrc = InFile<LocalModuleItemSrc>;
 // }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct ModuleInstantiation {
+pub struct ModuleInst {
     pub ident: Ident,
     pub param_assigns: ParamAssigns,
-    pub hierarchical_instances: IdxRange<HierarchicalInstance>,
+    pub hierarchical_insts: IdxRange<HierarchicalInst>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -60,7 +57,7 @@ pub enum ParamAssigns {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct HierarchicalInstance {
+pub struct HierarchicalInst {
     pub ident: Ident,
     pub dimensions: Option<SmallVec<[Dimension; 1]>>,
     pub port_connects: Option<PortConnects>,
@@ -330,17 +327,17 @@ impl<'a> ModuleLowerCtx<'a> {
         let end_idx = self.module_decl.data.hierarchical_instances.len();
         let end_idx = Idx::from_raw(RawIdx::from(end_idx as u32));
         let hierarchical_instances = IdxRange::new(begin_idx..end_idx);
-        Some(ModuleItem::ModuleInstantiation(ModuleInstantiation {
+        Some(ModuleItem::ModuleInstantiation(ModuleInst {
             ident,
             param_assigns,
-            hierarchical_instances,
+            hierarchical_insts: hierarchical_instances,
         }))
     }
 
     fn lower_hierarchy_instance(
         &mut self,
         instance: &ast::HierarchicalInstance,
-    ) -> Option<HierarchicalInstance> {
+    ) -> Option<HierarchicalInst> {
         let name = instance.name_of_instance()?;
         let ident = self.lower_ident(&name.identifier()?)?;
         let mut dimensions: SmallVec<[Dimension; 1]> = SmallVec::new();
@@ -369,7 +366,7 @@ impl<'a> ModuleLowerCtx<'a> {
             },
             _ => None,
         };
-        Some(HierarchicalInstance { ident, dimensions, port_connects })
+        Some(HierarchicalInst { ident, dimensions, port_connects })
     }
 
     fn lower_continuous_assign(&mut self, assign: &ast::ContinuousAssign) -> Option<ModuleItem> {
@@ -413,12 +410,6 @@ impl<'a> ModuleLowerCtx<'a> {
 impl LowerDelay for ModuleLowerCtx<'_> {}
 
 impl LowerDelayControl for ModuleLowerCtx<'_> {}
-
-impl LowerNetDecl for ModuleLowerCtx<'_> {}
-
-impl LowerVarDecl for ModuleLowerCtx<'_> {}
-
-impl LowerDataDecl for ModuleLowerCtx<'_> {}
 
 impl LowerEventExpr for ModuleLowerCtx<'_> {
     fn arena_event_exprs(&mut self) -> &mut Arena<EventExpr> {

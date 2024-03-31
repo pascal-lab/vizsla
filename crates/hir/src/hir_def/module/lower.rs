@@ -1,17 +1,17 @@
 use crate::hir_def::{
     data::{
-        DataSubDecl, DataSubDeclSrc, LocalParamPortDeclSrc, LowerDataSubDecl, LowerDataType,
-        LowerDimension, LowerParamDecl, ParamDecl,
+        DataDecl, DataDeclSrc, DataSubDecl, DataSubDeclSrc, LocalDataDeclSrc, LowerDataDecl,
+        LowerDataSubDecl, LowerDataType, LowerDimension, ParamDecl,
     },
     expr::{Expr, ExprSrc, LowerExpr},
     lower::Lower,
     module::{
-        port::{AnsiPortDecl, LowerPortDecl, NonAnsiPort},
+        port::{AnsiPortDecl, LowerPortDecl, NonAnsiPort, PortDecl},
         ModuleDecl, ModuleSourceMap,
     },
     try_match, HirFileId, InFile, SourceMap,
 };
-use la_arena::Arena;
+use la_arena::{Arena, IdxRange};
 use syntax::ast::{self, ptr};
 use utils::try_;
 
@@ -52,44 +52,45 @@ impl<'a> ModuleLowerCtx<'a> {
     }
 
     fn lower_param_port_list(&mut self, param_port_list: &ast::ParameterPortList) {
+        let begin_idx = self.next_data_decl_idx();
         if let Some(param_assign_list) = param_port_list.list_of_param_assignments() {
-            let sub_decls = self.lower_param_sub_decl_list(&param_assign_list);
-            let src =
-                self.in_file(LocalParamPortDeclSrc::ParamAssignList(param_assign_list.to_ptr()));
-            let idx = self.module_decl.param_port_list.alloc(ParamDecl {
+            let idx = self.next_data_decl_idx();
+            let sub_decls = self.lower_param_sub_decl_list(&param_assign_list, idx);
+            let src = self.in_file(LocalDataDeclSrc::ParamAssignList(param_assign_list.to_ptr()));
+            self.arena_data_decl().alloc(DataDecl::ParamDecl(ParamDecl {
                 local: false,
                 data_type: None,
                 sub_decls,
-            });
-            self.module_src_map.param_port_decl.insert(src, idx);
+            }));
+            self.src_map_data_decl().insert(src, idx);
         }
         for param_port_decl in param_port_list.parameter_port_declarations() {
             try_! {
-                let src = self.in_file(LocalParamPortDeclSrc::ParamPortDecl(param_port_decl.to_ptr()));
-                let idx = try_match!{
+                try_match!{
                     param_port_decl.any_parameter_declaration(), any_param_decl => {
-                        let any_param_decl = self.lower_any_param_decl(&any_param_decl)?;
-                        self.module_decl.param_port_list.alloc(any_param_decl)
+                        self.lower_any_param_decl(&any_param_decl);
                     },
                     param_port_decl.data_type(), data_type => {
+                        let src = self.in_file(LocalDataDeclSrc::ParamPortDecl(param_port_decl.to_ptr()));
+                        let idx = self.next_data_decl_idx();
                         let data_type = self.lower_data_type(&data_type)?;
-                        let sub_decls = self.lower_param_sub_decl_list(&param_port_decl.list_of_param_assignments()?);
-                        self.module_decl.param_port_list.alloc(ParamDecl {
+                        let sub_decls = self.lower_param_sub_decl_list(&param_port_decl.list_of_param_assignments()?, idx);
+                        self.arena_data_decl().alloc(DataDecl::ParamDecl(ParamDecl {
                             local: false,
                             data_type: Some(data_type),
                             sub_decls,
-                        })
+                        }));
+                        self.src_map_data_decl().insert(src, idx);
                     },
                     param_port_decl.token_type(), _token_type => {
                         unimplemented!("parameter_port_declaration ::= type list_of_type_assignments");
                     },
                     _ => { return None; }
                 };
-                self.module_src_map
-                    .param_port_decl
-                    .insert(src, idx);
             };
         }
+        let end_idx = self.next_data_decl_idx();
+        self.module_decl.param_port_list = Some(IdxRange::new(begin_idx..end_idx));
     }
 }
 
@@ -127,13 +128,31 @@ impl LowerDataSubDecl for ModuleLowerCtx<'_> {
     }
 }
 
+impl LowerDataDecl for ModuleLowerCtx<'_> {
+    fn arena_data_decl(&mut self) -> &mut Arena<DataDecl> {
+        &mut self.module_decl.data.data_decls
+    }
+
+    fn src_map_data_decl(&mut self) -> &mut SourceMap<DataDeclSrc, DataDecl> {
+        &mut self.module_src_map.data_decl
+    }
+}
+
 impl LowerPortDecl for ModuleLowerCtx<'_> {
+    fn arena_port_decl(&mut self) -> &mut Arena<PortDecl> {
+        &mut self.module_decl.data.port_decls
+    }
+
     fn arena_non_ansi_port(&mut self) -> &mut Arena<NonAnsiPort> {
         &mut self.module_decl.non_ansi_ports
     }
 
     fn arena_ansi_port_decl(&mut self) -> &mut Arena<AnsiPortDecl> {
         &mut self.module_decl.ansi_port_decls
+    }
+
+    fn src_map_port_decl(&mut self) -> &mut SourceMap<InFile<ptr::PortDeclarationPtr>, PortDecl> {
+        &mut self.module_src_map.port_decl
     }
 
     fn src_map_non_ansi_port(&mut self) -> &mut SourceMap<InFile<ptr::PortPtr>, NonAnsiPort> {
@@ -146,5 +165,3 @@ impl LowerPortDecl for ModuleLowerCtx<'_> {
         &mut self.module_src_map.ansi_port_decl
     }
 }
-
-impl LowerParamDecl for ModuleLowerCtx<'_> {}

@@ -127,7 +127,7 @@ pub(crate) fn lower_join_keyword(keyword: &ast::JoinKeyword) -> Option<JoinKeywo
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum BlockItemDecl {
-    DataDecl(DataDecl),
+    DataDecl(Idx<DataDecl>),
     // TODO: LetDecl(),
 }
 
@@ -400,9 +400,7 @@ pub(crate) trait LowerStmt: LowerTimingControl + LowerExpr + LowerDataDecl {
                 Some(BlockItemDecl::DataDecl(self.lower_data_decl(&data_decl)?))
             },
             item.any_parameter_declaration(), any_param_decl => {
-                Some(BlockItemDecl::DataDecl(
-                    DataDecl::ParamDecl(self.lower_any_param_decl(&any_param_decl)?))
-                )
+                Some(BlockItemDecl::DataDecl(self.lower_any_param_decl(&any_param_decl)?))
             },
             _ => None,
         }

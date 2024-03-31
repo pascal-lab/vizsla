@@ -2,11 +2,12 @@ use crate::hir_def::{
     data::{DataDecl, LowerDataDecl},
     try_match,
 };
+use la_arena::Idx;
 use syntax::ast;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum PackOrGenItemDecl {
-    DataDecl(DataDecl),
+    DataDecl(Idx<DataDecl>),
     // TODO: Add more package or generate item decls
 }
 
@@ -17,16 +18,13 @@ pub(crate) trait LowerPackOrGenItemDecl: LowerDataDecl {
     ) -> Option<PackOrGenItemDecl> {
         let item_decl = try_match! {
             item.data_declaration(), data_decl_node => {
-                let data_decl = self.lower_data_decl(&data_decl_node)?;
-                PackOrGenItemDecl::DataDecl(data_decl)
+                PackOrGenItemDecl::DataDecl(self.lower_data_decl(&data_decl_node)?)
             },
             item.net_declaration(), net_decl_node => {
-                let net_data_decl = DataDecl::NetDecl(self.lower_net_decl(&net_decl_node)?);
-                PackOrGenItemDecl::DataDecl(net_data_decl)
+                PackOrGenItemDecl::DataDecl(self.lower_net_decl(&net_decl_node)?)
             },
             item.any_parameter_declaration(), any_param_decl_node => {
-                let param_data_decl = DataDecl::ParamDecl(self.lower_any_param_decl(&any_param_decl_node)?);
-                PackOrGenItemDecl::DataDecl(param_data_decl)
+                PackOrGenItemDecl::DataDecl(self.lower_any_param_decl(&any_param_decl_node)?)
             },
             item.task_declaration(), _task_decl_node => {
                 unimplemented!("task_declaration");

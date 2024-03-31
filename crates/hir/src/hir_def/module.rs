@@ -1,23 +1,23 @@
-mod lower;
+pub(crate) mod lower;
 pub mod module_item;
 pub mod port;
 
 use crate::hir_def::{
     control::EventExpr,
-    data::{DataSubDecl, DataSubDeclSrc, ParamDecl, ParamPortDeclSrc},
+    data::{DataDecl, DataDeclSrc, DataSubDecl, DataSubDeclSrc},
     expr::{Expr, ExprSrc},
     //tf::TFDecl,
     impl_index,
     module::{
-        module_item::{HierarchicalInstance, ModuleItem, ModuleItemSrc},
-        port::{AnsiPortDecl, NonAnsiPort},
+        module_item::{HierarchicalInst, ModuleInst, ModuleItem, ModuleItemSrc},
+        port::{AnsiPortDecl, NonAnsiPort, PortDecl},
     },
     stmt::{Block, BlockSrc, Stmt, StmtSrc},
     Ident,
     InFile,
     SourceMap,
 };
-use la_arena::{Arena, Idx};
+use la_arena::{Arena, Idx, IdxRange};
 use std::ops::Index;
 use syntax::ast::ptr;
 use triomphe::Arc;
@@ -26,7 +26,7 @@ use utils::try_;
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ModuleDecl {
     pub ident: Ident,
-    pub param_port_list: Arena<ParamDecl>,
+    pub param_port_list: Option<IdxRange<DataDecl>>,
     pub ansi_port_decls: Arena<AnsiPortDecl>,
     pub non_ansi_ports: Arena<NonAnsiPort>,
     pub module_items: Arena<ModuleItem>,
@@ -34,13 +34,13 @@ pub struct ModuleDecl {
 }
 
 impl_index!(ModuleDecl for
-    ParamDecl, param_port_list,
     AnsiPortDecl, ansi_port_decls,
     NonAnsiPort, non_ansi_ports,
     ModuleItem, module_items,
     Expr, data,
     DataSubDecl, data,
-    HierarchicalInstance, data,
+    DataDecl, data,
+    HierarchicalInst, data,
 );
 
 #[derive(Default, Debug, PartialEq, Eq, Clone)]
@@ -48,15 +48,20 @@ pub struct ModuleData {
     pub exprs: Arena<Expr>,
     pub event_exprs: Arena<EventExpr>,
     pub data_sub_decls: Arena<DataSubDecl>,
+    pub data_decls: Arena<DataDecl>,
+    pub port_decls: Arena<PortDecl>,
     pub stmts: Arena<Stmt>,
     pub blocks: Arena<Block>,
-    pub hierarchical_instances: Arena<HierarchicalInstance>,
+    pub hierarchical_instances: Arena<HierarchicalInst>,
+    pub module_insts: Arena<ModuleInst>,
 }
 
 impl_index!(ModuleData for
     Expr, exprs,
     DataSubDecl, data_sub_decls,
-    HierarchicalInstance, hierarchical_instances,
+    DataDecl, data_decls,
+    PortDecl, port_decls,
+    HierarchicalInst, hierarchical_instances,
 );
 
 #[derive(Default, Debug, PartialEq, Eq, Clone)]
@@ -64,13 +69,13 @@ pub struct ModuleSourceMap {
     pub expr: SourceMap<ExprSrc, Expr>,
     pub event_expr: SourceMap<InFile<ptr::EventExpressionPtr>, EventExpr>,
     pub data_sub_decl: SourceMap<DataSubDeclSrc, DataSubDecl>,
+    pub data_decl: SourceMap<DataDeclSrc, DataDecl>,
+    pub port_decl: SourceMap<InFile<ptr::PortDeclarationPtr>, PortDecl>,
     pub stmt: SourceMap<StmtSrc, Stmt>,
     pub block: SourceMap<BlockSrc, Block>,
-    pub param_port_decl: SourceMap<ParamPortDeclSrc, ParamDecl>,
     pub port: SourceMap<InFile<ptr::PortPtr>, NonAnsiPort>,
     pub ansi_port_decl: SourceMap<InFile<ptr::AnsiPortDeclarationPtr>, AnsiPortDecl>,
-    pub hierarchical_instance:
-        SourceMap<InFile<ptr::HierarchicalInstancePtr>, HierarchicalInstance>,
+    pub hierarchical_instance: SourceMap<InFile<ptr::HierarchicalInstancePtr>, HierarchicalInst>,
     pub module_item: SourceMap<ModuleItemSrc, ModuleItem>,
 }
 
@@ -82,7 +87,7 @@ pub(crate) fn module_with_source_map_query(
     let ident = hir_file.data[module_id.value].ident.clone();
     let mut module_decl = ModuleDecl {
         ident,
-        param_port_list: Arena::default(),
+        param_port_list: None,
         ansi_port_decls: Arena::default(),
         non_ansi_ports: Arena::default(),
         module_items: Arena::default(),
@@ -90,7 +95,7 @@ pub(crate) fn module_with_source_map_query(
     };
     let mut module_src_map = ModuleSourceMap::default();
 
-    let module_ptr = &file_source_map.module.idx2src[module_id.value];
+    let module_ptr = &file_source_map.module.hir2src[module_id.value];
 
     try_! {
         let tree = db.hir_syntax_tree(module_id.file_id)?;

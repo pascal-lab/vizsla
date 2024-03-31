@@ -1,5 +1,6 @@
 use crate::hir_def::{
     expr::{ExprId, LowerExpr, MinTypMaxExpr},
+    module::port::{AnsiPortDecl, PortDecl},
     try_match, Ident, InFile, SourceMap,
 };
 use la_arena::{Arena, Idx, IdxRange, RawIdx};
@@ -222,6 +223,14 @@ pub struct DataSubDecl {
     pub ident: Ident,
     pub dimensions: Option<SmallVec<[Dimension; 1]>>,
     pub expr: Option<ExprId>,
+    pub full_decl: DataFullDecl,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub enum DataFullDecl {
+    DataDecl(Idx<DataDecl>),
+    AnsiPortDecl(Idx<AnsiPortDecl>),
+    PortDecl(Idx<PortDecl>),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -250,6 +259,7 @@ pub(crate) trait LowerDataSubDecl: LowerDimension + LowerExpr {
     fn lower_net_sub_decl(
         &mut self,
         net_assign: &ast::NetDeclAssignment,
+        full_decl: Idx<DataDecl>,
     ) -> Option<Idx<DataSubDecl>> {
         let ident = self.lower_ident(&net_assign.identifier()?)?;
         let expr = net_assign.expression().and_then(|expr| self.lower_expr(&expr));
@@ -259,7 +269,9 @@ pub(crate) trait LowerDataSubDecl: LowerDimension + LowerExpr {
         }
         let dimensions = if dimensions.is_empty() { None } else { Some(dimensions) };
         let src = self.in_file(LocalDataSubDeclSrc::NetDeclAssign(net_assign.to_ptr()));
-        let idx = self.arena_data_sub_decl().alloc(DataSubDecl { ident, dimensions, expr });
+        let full_decl = DataFullDecl::DataDecl(full_decl);
+        let idx =
+            self.arena_data_sub_decl().alloc(DataSubDecl { ident, dimensions, expr, full_decl });
         self.src_map_data_sub_decl().insert(src, idx);
         Some(idx)
     }
@@ -267,10 +279,11 @@ pub(crate) trait LowerDataSubDecl: LowerDimension + LowerExpr {
     fn lower_net_sub_decl_list(
         &mut self,
         net_decl_list: &ast::ListOfNetDeclAssignment,
+        full_decl: Idx<DataDecl>,
     ) -> IdxRange<DataSubDecl> {
         let begin_idx = self.next_data_sub_decl_idx();
         for net_decl in net_decl_list.net_decl_assignments() {
-            self.lower_net_sub_decl(&net_decl);
+            self.lower_net_sub_decl(&net_decl, full_decl);
         }
         let end_idx = self.next_data_sub_decl_idx();
         IdxRange::new(begin_idx..end_idx)
@@ -279,6 +292,7 @@ pub(crate) trait LowerDataSubDecl: LowerDimension + LowerExpr {
     fn lower_var_sub_decl(
         &mut self,
         var_assign: &ast::VariableDeclAssignment,
+        full_decl: Idx<DataDecl>,
     ) -> Option<Idx<DataSubDecl>> {
         let ident = self.lower_ident(&var_assign.identifier()?)?;
         let expr = var_assign.expression().and_then(|expr| self.lower_expr(&expr));
@@ -288,7 +302,9 @@ pub(crate) trait LowerDataSubDecl: LowerDimension + LowerExpr {
         }
         let dimensions = if dimensions.is_empty() { None } else { Some(dimensions) };
         let src = self.in_file(LocalDataSubDeclSrc::VarDeclAssign(var_assign.to_ptr()));
-        let idx = self.arena_data_sub_decl().alloc(DataSubDecl { ident, dimensions, expr });
+        let full_decl = DataFullDecl::DataDecl(full_decl);
+        let idx =
+            self.arena_data_sub_decl().alloc(DataSubDecl { ident, dimensions, expr, full_decl });
         self.src_map_data_sub_decl().insert(src, idx);
         Some(idx)
     }
@@ -296,10 +312,11 @@ pub(crate) trait LowerDataSubDecl: LowerDimension + LowerExpr {
     fn lower_var_sub_decl_list(
         &mut self,
         var_decl_list: &ast::ListOfVariableDeclAssignment,
+        full_decl: Idx<DataDecl>,
     ) -> IdxRange<DataSubDecl> {
         let begin_idx = self.next_data_sub_decl_idx();
         for var_decl in var_decl_list.variable_decl_assignments() {
-            self.lower_var_sub_decl(&var_decl);
+            self.lower_var_sub_decl(&var_decl, full_decl);
         }
         let end_idx = self.next_data_sub_decl_idx();
         IdxRange::new(begin_idx..end_idx)
@@ -308,6 +325,7 @@ pub(crate) trait LowerDataSubDecl: LowerDimension + LowerExpr {
     fn lower_param_sub_decl(
         &mut self,
         param_assign: &ast::ParamAssignment,
+        full_decl: Idx<DataDecl>,
     ) -> Option<Idx<DataSubDecl>> {
         let ident = self.lower_ident(&param_assign.identifier()?)?;
         let expr = param_assign
@@ -319,7 +337,9 @@ pub(crate) trait LowerDataSubDecl: LowerDimension + LowerExpr {
         }
         let dimensions = if dimensions.is_empty() { None } else { Some(dimensions) };
         let src = self.in_file(LocalDataSubDeclSrc::ParamAssign(param_assign.to_ptr()));
-        let idx = self.arena_data_sub_decl().alloc(DataSubDecl { ident, dimensions, expr });
+        let full_decl = DataFullDecl::DataDecl(full_decl);
+        let idx =
+            self.arena_data_sub_decl().alloc(DataSubDecl { ident, dimensions, expr, full_decl });
         self.src_map_data_sub_decl().insert(src, idx);
         Some(idx)
     }
@@ -327,10 +347,11 @@ pub(crate) trait LowerDataSubDecl: LowerDimension + LowerExpr {
     fn lower_param_sub_decl_list(
         &mut self,
         param_decl_list: &ast::ListOfParamAssignment,
+        full_decl: Idx<DataDecl>,
     ) -> IdxRange<DataSubDecl> {
         let begin_idx = self.next_data_sub_decl_idx();
         for param_decl in param_decl_list.param_assignments() {
-            self.lower_param_sub_decl(&param_decl);
+            self.lower_param_sub_decl(&param_decl, full_decl);
         }
         let end_idx = self.next_data_sub_decl_idx();
         IdxRange::new(begin_idx..end_idx)
@@ -339,6 +360,7 @@ pub(crate) trait LowerDataSubDecl: LowerDimension + LowerExpr {
     fn lower_ansi_port_decl(
         &mut self,
         ansi_port_decl: &ast::AnsiPortDeclaration,
+        full_decl: Idx<AnsiPortDecl>,
     ) -> Option<Idx<DataSubDecl>> {
         let ident = self.lower_ident(&ansi_port_decl.identifier()?)?;
         let expr = ansi_port_decl
@@ -353,7 +375,9 @@ pub(crate) trait LowerDataSubDecl: LowerDimension + LowerExpr {
         }
         let dimensions = if dimensions.is_empty() { None } else { Some(dimensions) };
         let src = self.in_file(LocalDataSubDeclSrc::AnsiPortDecl(ansi_port_decl.to_ptr()));
-        let idx = self.arena_data_sub_decl().alloc(DataSubDecl { ident, dimensions, expr });
+        let full_decl = DataFullDecl::AnsiPortDecl(full_decl);
+        let idx =
+            self.arena_data_sub_decl().alloc(DataSubDecl { ident, dimensions, expr, full_decl });
         self.src_map_data_sub_decl().insert(src, idx);
         Some(idx)
     }
@@ -361,6 +385,7 @@ pub(crate) trait LowerDataSubDecl: LowerDimension + LowerExpr {
     fn lower_port_ident_decl(
         &mut self,
         port_ident_decl: &ast::PortIdentifierDeclaration,
+        full_decl: Idx<PortDecl>,
     ) -> Option<Idx<DataSubDecl>> {
         let ident = self.lower_ident(&port_ident_decl.identifier()?)?;
         let mut dimensions: SmallVec<[Dimension; 1]> = SmallVec::new();
@@ -369,7 +394,13 @@ pub(crate) trait LowerDataSubDecl: LowerDimension + LowerExpr {
         }
         let dimensions = if dimensions.is_empty() { None } else { Some(dimensions) };
         let src = self.in_file(LocalDataSubDeclSrc::PortIdentDecl(port_ident_decl.to_ptr()));
-        let idx = self.arena_data_sub_decl().alloc(DataSubDecl { ident, dimensions, expr: None });
+        let full_decl = DataFullDecl::PortDecl(full_decl);
+        let idx = self.arena_data_sub_decl().alloc(DataSubDecl {
+            ident,
+            dimensions,
+            expr: None,
+            full_decl,
+        });
         self.src_map_data_sub_decl().insert(src, idx);
         Some(idx)
     }
@@ -377,10 +408,11 @@ pub(crate) trait LowerDataSubDecl: LowerDimension + LowerExpr {
     fn lower_port_ident_list(
         &mut self,
         port_ident_list: &ast::ListOfPortIdentifier,
+        full_decl: Idx<PortDecl>,
     ) -> IdxRange<DataSubDecl> {
         let begin_idx = self.next_data_sub_decl_idx();
         for port_ident_decl in port_ident_list.port_identifier_declarations() {
-            self.lower_port_ident_decl(&port_ident_decl);
+            self.lower_port_ident_decl(&port_ident_decl, full_decl);
         }
         let end_idx = self.next_data_sub_decl_idx();
         IdxRange::new(begin_idx..end_idx)
@@ -389,6 +421,7 @@ pub(crate) trait LowerDataSubDecl: LowerDimension + LowerExpr {
     fn lower_var_ident_decl(
         &mut self,
         var_ident_decl: &ast::VariableIdentifierDeclaration,
+        full_decl: Idx<PortDecl>,
     ) -> Option<Idx<DataSubDecl>> {
         let ident = self.lower_ident(&var_ident_decl.identifier()?)?;
         let mut dimensions: SmallVec<[Dimension; 1]> = SmallVec::new();
@@ -397,7 +430,13 @@ pub(crate) trait LowerDataSubDecl: LowerDimension + LowerExpr {
         }
         let dimensions = if dimensions.is_empty() { None } else { Some(dimensions) };
         let src = self.in_file(LocalDataSubDeclSrc::VarIdentDecl(var_ident_decl.to_ptr()));
-        let idx = self.arena_data_sub_decl().alloc(DataSubDecl { ident, dimensions, expr: None });
+        let full_decl = DataFullDecl::PortDecl(full_decl);
+        let idx = self.arena_data_sub_decl().alloc(DataSubDecl {
+            ident,
+            dimensions,
+            expr: None,
+            full_decl,
+        });
         self.src_map_data_sub_decl().insert(src, idx);
         Some(idx)
     }
@@ -405,10 +444,11 @@ pub(crate) trait LowerDataSubDecl: LowerDimension + LowerExpr {
     fn lower_var_ident_list(
         &mut self,
         var_ident_list: &ast::ListOfVariableIdentifier,
+        full_decl: Idx<PortDecl>,
     ) -> IdxRange<DataSubDecl> {
         let begin_idx = self.next_data_sub_decl_idx();
         for var_ident_decl in var_ident_list.variable_identifier_declarations() {
-            self.lower_var_ident_decl(&var_ident_decl);
+            self.lower_var_ident_decl(&var_ident_decl, full_decl);
         }
         let end_idx = self.next_data_sub_decl_idx();
         IdxRange::new(begin_idx..end_idx)
@@ -417,6 +457,7 @@ pub(crate) trait LowerDataSubDecl: LowerDimension + LowerExpr {
     fn lower_var_port_ident_decl(
         &mut self,
         var_port_ident_decl: &ast::VariablePortIdentifierDeclaration,
+        full_decl: Idx<PortDecl>,
     ) -> Option<Idx<DataSubDecl>> {
         let ident = self.lower_ident(&var_port_ident_decl.identifier()?)?;
         let expr = var_port_ident_decl
@@ -428,7 +469,9 @@ pub(crate) trait LowerDataSubDecl: LowerDimension + LowerExpr {
         }
         let dimensions = if dimensions.is_empty() { None } else { Some(dimensions) };
         let src = self.in_file(LocalDataSubDeclSrc::VarPortIdentDecl(var_port_ident_decl.to_ptr()));
-        let idx = self.arena_data_sub_decl().alloc(DataSubDecl { ident, dimensions, expr });
+        let full_decl = DataFullDecl::PortDecl(full_decl);
+        let idx =
+            self.arena_data_sub_decl().alloc(DataSubDecl { ident, dimensions, expr, full_decl });
         self.src_map_data_sub_decl().insert(src, idx);
         Some(idx)
     }
@@ -436,10 +479,11 @@ pub(crate) trait LowerDataSubDecl: LowerDimension + LowerExpr {
     fn lower_var_port_ident_list(
         &mut self,
         var_port_ident_list: &ast::ListOfVariablePortIdentifier,
+        full_decl: Idx<PortDecl>,
     ) -> IdxRange<DataSubDecl> {
         let begin_idx = self.next_data_sub_decl_idx();
         for var_port_ident_decl in var_port_ident_list.variable_port_identifier_declarations() {
-            self.lower_var_port_ident_decl(&var_port_ident_decl);
+            self.lower_var_port_ident_decl(&var_port_ident_decl, full_decl);
         }
         let end_idx = self.next_data_sub_decl_idx();
         IdxRange::new(begin_idx..end_idx)
@@ -554,8 +598,52 @@ pub struct NetDecl {
     pub sub_decls: IdxRange<DataSubDecl>,
 }
 
-pub(crate) trait LowerNetDecl: LowerDataType + LowerDataSubDecl + LowerDelay {
-    fn lower_net_decl(&mut self, net_decl: &ast::NetDeclaration) -> Option<NetDecl> {
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct VarDecl {
+    // TODO: lifetime
+    pub konst: bool,
+    pub data_type: DataType,
+    pub sub_decls: IdxRange<DataSubDecl>,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct ParamDecl {
+    pub local: bool,
+    // 6.20.2
+    pub data_type: Option<DataType>,
+    pub sub_decls: IdxRange<DataSubDecl>,
+}
+
+// TODO: TypeDecl, NetTypeDecl, package_import_declaration11, event
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum DataDecl {
+    NetDecl(NetDecl),
+    VarDecl(VarDecl),
+    ParamDecl(ParamDecl),
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub enum LocalDataDeclSrc {
+    NetDecl(ptr::NetDeclarationPtr),
+    VarDecl(ptr::VariableDeclarationPtr),
+    ParamDecl(ptr::ParameterDeclarationPtr),
+    LocalParamDecl(ptr::LocalParameterDeclarationPtr),
+    ParamAssignList(ptr::ListOfParamAssignmentPtr),
+    ParamPortDecl(ptr::ParameterPortDeclarationPtr),
+}
+
+pub type DataDeclSrc = InFile<LocalDataDeclSrc>;
+
+pub(crate) trait LowerDataDecl: LowerDataSubDecl + LowerDataType + LowerDelay {
+    fn arena_data_decl(&mut self) -> &mut Arena<DataDecl>;
+
+    fn src_map_data_decl(&mut self) -> &mut SourceMap<DataDeclSrc, DataDecl>;
+
+    fn next_data_decl_idx(&mut self) -> Idx<DataDecl> {
+        Idx::from_raw(RawIdx::from(self.arena_data_decl().len() as u32))
+    }
+
+    fn lower_net_decl(&mut self, net_decl: &ast::NetDeclaration) -> Option<Idx<DataDecl>> {
         try_match! {
             net_decl.net_type(), net_type => {
                 let net_type = lower_net_type(&net_type)?;
@@ -563,15 +651,20 @@ pub(crate) trait LowerNetDecl: LowerDataType + LowerDataSubDecl + LowerDelay {
                     let data_type = net_decl.data_type_or_implicit()?;
                     self.lower_data_type_or_implicit(&data_type)?
                 };
-                Some(NetDecl{
+                let src = self.in_file(LocalDataDeclSrc::NetDecl(net_decl.to_ptr()));
+                let idx = self.next_data_decl_idx();
+                let data_decl = DataDecl::NetDecl(NetDecl {
                     net_kind: NetKind::Default{net_type, data_type},
                     drive_strength: net_decl.drive_strength().and_then(|drive_strength| lower_drive_strength(&drive_strength)),
                     charge_strength: net_decl.charge_strength().and_then(|charge_strength| lower_charge_strength(&charge_strength)),
                     vectored: net_decl.token_vectored().is_some(),
                     scalared: net_decl.token_scalared().is_some(),
                     delay: net_decl.delay3().and_then(|delay3| self.lower_delay3(&delay3)),
-                    sub_decls: self.lower_net_sub_decl_list(&net_decl.list_of_net_decl_assignments()?),
-                })
+                    sub_decls: self.lower_net_sub_decl_list(&net_decl.list_of_net_decl_assignments()?, idx),
+                });
+                self.arena_data_decl().alloc(data_decl);
+                self.src_map_data_decl().insert(src, idx);
+                Some(idx)
             },
             net_decl.net_declaration_with_net_type_identifier(), _net_decl_with_net_type_identifier => {
                 unimplemented!("net_declaration ::= net_type_identifier [delay_control]
@@ -584,84 +677,76 @@ pub(crate) trait LowerNetDecl: LowerDataType + LowerDataSubDecl + LowerDelay {
             _ => None
         }
     }
-}
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct VarDecl {
-    // TODO: lifetime
-    pub konst: bool,
-    pub data_type: DataType,
-    pub sub_decls: IdxRange<DataSubDecl>,
-}
-
-pub(crate) trait LowerVarDecl: LowerDataType + LowerDataSubDecl {
-    fn lower_var_decl(&mut self, var_decl: &ast::VariableDeclaration) -> Option<VarDecl> {
-        Some(VarDecl {
+    fn lower_var_decl(&mut self, var_decl: &ast::VariableDeclaration) -> Option<Idx<DataDecl>> {
+        let src = self.in_file(LocalDataDeclSrc::VarDecl(var_decl.to_ptr()));
+        let idx = self.next_data_decl_idx();
+        let data_decl = DataDecl::VarDecl(VarDecl {
             konst: var_decl.token_const().is_some(),
             data_type: {
                 let data_type = var_decl.data_type_or_implicit()?;
                 self.lower_data_type_or_implicit(&data_type)?
             },
-            sub_decls: self.lower_var_sub_decl_list(&var_decl.list_of_variable_decl_assignments()?),
-        })
+            sub_decls: self
+                .lower_var_sub_decl_list(&var_decl.list_of_variable_decl_assignments()?, idx),
+        });
+        self.arena_data_decl().alloc(data_decl);
+        self.src_map_data_decl().insert(src, idx);
+        Some(idx)
     }
-}
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct ParamDecl {
-    pub local: bool,
-    // 6.20.2
-    pub data_type: Option<DataType>,
-    pub sub_decls: IdxRange<DataSubDecl>,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub enum LocalParamPortDeclSrc {
-    ParamAssignList(ptr::ListOfParamAssignmentPtr),
-    ParamPortDecl(ptr::ParameterPortDeclarationPtr),
-}
-
-pub type ParamPortDeclSrc = InFile<LocalParamPortDeclSrc>;
-
-pub(crate) trait LowerParamDecl: LowerDataType + LowerDataSubDecl {
-    fn lower_param_decl(&mut self, param_decl: &ast::ParameterDeclaration) -> Option<ParamDecl> {
+    fn lower_param_decl(
+        &mut self,
+        param_decl: &ast::ParameterDeclaration,
+    ) -> Option<Idx<DataDecl>> {
         if param_decl.token_type().is_some() {
             unimplemented!("Parameter Type");
         } else {
-            try_!(ParamDecl {
+            let src = self.in_file(LocalDataDeclSrc::ParamDecl(param_decl.to_ptr()));
+            let idx = self.next_data_decl_idx();
+            let data_decl = DataDecl::ParamDecl(ParamDecl {
                 local: false,
                 data_type: {
                     let data_type = param_decl.data_type_or_implicit()?;
                     Some(self.lower_data_type_or_implicit(&data_type)?)
                 },
-                sub_decls: self.lower_param_sub_decl_list(&param_decl.list_of_param_assignments()?),
-            })
+                sub_decls: self
+                    .lower_param_sub_decl_list(&param_decl.list_of_param_assignments()?, idx),
+            });
+            self.arena_data_decl().alloc(data_decl);
+            self.src_map_data_decl().insert(src, idx);
+            Some(idx)
         }
     }
 
     fn lower_local_param_decl(
         &mut self,
         localparam_decl: &ast::LocalParameterDeclaration,
-    ) -> Option<ParamDecl> {
+    ) -> Option<Idx<DataDecl>> {
         if localparam_decl.token_type().is_some() {
             unimplemented!("Parameter Type");
         } else {
-            Some(ParamDecl {
+            let src = self.in_file(LocalDataDeclSrc::LocalParamDecl(localparam_decl.to_ptr()));
+            let idx = self.next_data_decl_idx();
+            let data_decl = DataDecl::ParamDecl(ParamDecl {
                 local: true,
                 data_type: {
                     let data_type = localparam_decl.data_type_or_implicit()?;
                     Some(self.lower_data_type_or_implicit(&data_type)?)
                 },
                 sub_decls: self
-                    .lower_param_sub_decl_list(&localparam_decl.list_of_param_assignments()?),
-            })
+                    .lower_param_sub_decl_list(&localparam_decl.list_of_param_assignments()?, idx),
+            });
+            self.arena_data_decl().alloc(data_decl);
+            self.src_map_data_decl().insert(src, idx);
+            Some(idx)
         }
     }
 
     fn lower_any_param_decl(
         &mut self,
         any_param_decl: &ast::AnyParameterDeclaration,
-    ) -> Option<ParamDecl> {
+    ) -> Option<Idx<DataDecl>> {
         if let Some(param_decl) = any_param_decl.parameter_declaration() {
             self.lower_param_decl(&param_decl)
         } else if let Some(localparam_decl) = any_param_decl.local_parameter_declaration() {
@@ -670,21 +755,11 @@ pub(crate) trait LowerParamDecl: LowerDataType + LowerDataSubDecl {
             None
         }
     }
-}
 
-// TODO: TypeDecl, NetTypeDecl, package_import_declaration11
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum DataDecl {
-    NetDecl(NetDecl),
-    VarDecl(VarDecl),
-    ParamDecl(ParamDecl),
-}
-
-pub(crate) trait LowerDataDecl: LowerNetDecl + LowerVarDecl + LowerParamDecl {
-    fn lower_data_decl(&mut self, data_decl: &ast::DataDeclaration) -> Option<DataDecl> {
+    fn lower_data_decl(&mut self, data_decl: &ast::DataDeclaration) -> Option<Idx<DataDecl>> {
         try_match! {
             data_decl.variable_declaration(), var_decl => {
-                Some(DataDecl::VarDecl(self.lower_var_decl(&var_decl)?))
+                self.lower_var_decl(&var_decl)
             },
             data_decl.type_declaration(), _type_decl => {
                 unimplemented!("Type Declaration");
