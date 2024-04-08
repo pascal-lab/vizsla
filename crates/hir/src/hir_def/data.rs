@@ -128,8 +128,9 @@ pub(crate) trait LowerDimension: LowerExpr {
     ) -> Option<Dimension> {
         try_match! {
             packed_dimension.constant_range(), range => {
-                let left_expr_node = range.constant_expressions().next()?;
-                let right_expr_node = range.constant_expressions().next()?;
+                let mut iter = range.constant_expressions();
+                let left_expr_node = iter.next()?;
+                let right_expr_node = iter.next()?;
                 Some(Dimension::Range(
                     self.lower_const_expr(&left_expr_node),
                     self.lower_const_expr(&right_expr_node),
@@ -146,8 +147,9 @@ pub(crate) trait LowerDimension: LowerExpr {
     ) -> Option<Dimension> {
         try_match! {
             unpacked_dimension.constant_range(), range => {
-                let left_expr_node = range.constant_expressions().next()?;
-                let right_expr_node = range.constant_expressions().next()?;
+                let mut iter = range.constant_expressions();
+                let left_expr_node = iter.next()?;
+                let right_expr_node = iter.next()?;
                 Some(Dimension::Range(
                     self.lower_const_expr(&left_expr_node),
                     self.lower_const_expr(&right_expr_node),

@@ -73,8 +73,9 @@ pub(crate) trait LowerEventExpr: LowerExpr {
                 Some(idx)
             },
             event_expr.token_or(), _ => {
-                let lhs = self.lower_event_expr(&event_expr.event_expressions().next()?)?;
-                let rhs = self.lower_event_expr(&event_expr.event_expressions().next()?)?;
+                let mut iter = event_expr.event_expressions();
+                let lhs = self.lower_event_expr(&iter.next()?)?;
+                let rhs = self.lower_event_expr(&iter.next()?)?;
                 let src = self.in_file(event_expr.to_ptr());
                 let idx = self.arena_event_exprs().alloc(EventExpr::Or(lhs, rhs));
                 self.src_map_event_expr().insert(src, idx);
