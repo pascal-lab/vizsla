@@ -7,7 +7,7 @@ use la_arena::{Arena, Idx, IdxRange, RawIdx};
 use syntax::ast::{self, ptr};
 use utils::try_;
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub enum PortDirection {
     Input,
     Output,
@@ -63,7 +63,7 @@ pub struct AnsiIODecl {
 pub(crate) fn lower_port_direction(port_direction: &ast::PortDirection) -> Option<PortDirection> {
     try_match! {
         port_direction.token_input(), _ => Some(PortDirection::Input),
-        port_direction.token_input(), _ => Some(PortDirection::Output),
+        port_direction.token_output(), _ => Some(PortDirection::Output),
         port_direction.token_inout(), _ => Some(PortDirection::Inout),
         port_direction.token_ref(), _ => Some(PortDirection::Ref),
         _ => None
@@ -248,12 +248,10 @@ pub(crate) trait LowerPortDecl: LowerDataType + LowerDataSubDecl + LowerExpr {
                             }
                         };
                         port_kind = self.lower_net_port_type(&net_port_header.net_port_type()?)?;
-                        let direction = direction.clone();
-                        let port_kind = port_kind.clone();
                         let sub_decl = self.lower_ansi_port_decl(&port_decl, idx)?;
                         self.arena_ansi_port_decl().alloc(
                             AnsiPortDecl::IODecl(AnsiIODecl {
-                                direction, port_kind, sub_decl,
+                                direction, port_kind: port_kind.clone(), sub_decl,
                             })
                         );
                         self.src_map_ansi_port_decl().insert(src, idx);
@@ -267,12 +265,10 @@ pub(crate) trait LowerPortDecl: LowerDataType + LowerDataSubDecl + LowerExpr {
                             }
                         };
                         port_kind = self.lower_var_port_type(&var_port_header.variable_port_type()?)?;
-                        let direction = direction.clone();
-                        let port_kind = port_kind.clone();
                         let sub_decl = self.lower_ansi_port_decl(&port_decl, idx)?;
                         self.arena_ansi_port_decl().alloc(
                             AnsiPortDecl::IODecl(AnsiIODecl {
-                                direction, port_kind, sub_decl,
+                                direction, port_kind: port_kind.clone(), sub_decl,
                             })
                         );
                         self.src_map_ansi_port_decl().insert(src, idx);
@@ -287,12 +283,10 @@ pub(crate) trait LowerPortDecl: LowerDataType + LowerDataSubDecl + LowerExpr {
                     _ => {
                         let src = self.in_file(port_decl.to_ptr());
                         let idx = self.next_anis_port_decl_idx();
-                        let direction = direction.clone();
-                        let port_kind = port_kind.clone();
                         let sub_decl = self.lower_ansi_port_decl(&port_decl, idx)?;
                         self.arena_ansi_port_decl().alloc(
                             AnsiPortDecl::IODecl(AnsiIODecl {
-                                direction, port_kind, sub_decl,
+                                direction, port_kind: port_kind.clone(), sub_decl,
                             })
                         );
                         self.src_map_ansi_port_decl().insert(src, idx);
