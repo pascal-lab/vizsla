@@ -14,7 +14,8 @@ use crate::line_index_db::LineIndexDbStorage;
 #[salsa::database(
     base_db::source_db::SourceDbStorage,
     base_db::source_db::SourceRootDbStorage,
-    LineIndexDbStorage
+    hir::db::HirDbStorage,
+    LineIndexDbStorage,
 )]
 pub struct RootDb {
     // `ManuallyDrop` is used to avoid duplicating drop glue like `Weak::drop'

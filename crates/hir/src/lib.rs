@@ -6,6 +6,12 @@ use vfs::vfs::FileId;
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub struct HirFileId(FileId);
 
+impl From<FileId> for HirFileId {
+    fn from(file_id: FileId) -> HirFileId {
+        HirFileId(file_id)
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub struct InFile<T> {
     pub file_id: HirFileId,
