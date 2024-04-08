@@ -659,7 +659,7 @@ pub(crate) trait LowerExpr: LowerLiteral {
             primary.cast_(), cast => {
                 let expr = map_or_missing!(self, cast.expression(), lower_expr);
                 let ty = cast.casting_type();
-                unimplemented!("casting type");
+                // todo!("casting type");
                 Expr::Missing
             },
             _ => {

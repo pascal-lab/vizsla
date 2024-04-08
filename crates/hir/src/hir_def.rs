@@ -157,9 +157,16 @@ pub(crate) fn hir_file_with_source_map_query(
             if let Some(module) = description.module_declaration() {
                 try_! {
                     let ptr = module.to_ptr();
-                    let module_id = hir_file.data.modules.alloc(ModuleInFile {
-                        ident: module.identifier()?.to_text(&file_text)?.into(),
-                    });
+                    let ident = try_match! {
+                        module.module_ansi_header(), header => {
+                            header.identifier()?.to_text(&file_text)?.into()
+                        },
+                        module.module_nonansi_header(), header => {
+                            header.identifier()?.to_text(&file_text)?.into()
+                        },
+                        _ => return None,
+                    };
+                    let module_id = hir_file.data.modules.alloc(ModuleInFile { ident });
                     hir_file.items.push(FileItem::Module(module_id));
 
                     let module_source = InFile::new(file_id, ptr);
