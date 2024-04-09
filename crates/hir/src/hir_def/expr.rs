@@ -15,6 +15,8 @@ use utils::{try_, try_or_default};
 pub enum LocalExprSrc {
     Expr(ptr::ExpressionPtr),
     Primary(ptr::PrimaryPtr),
+    NetLValue(ptr::NetLvaluePtr),
+    VarLValue(ptr::VariableLvaluePtr),
     ConstExpr(ptr::ConstantExpressionPtr),
     ConstPrimary(ptr::ConstantPrimaryPtr),
     ParamExpr(ptr::ParamExpressionPtr),
@@ -201,7 +203,7 @@ pub enum Expr {
     Unary { op: UnaryOp, expr: ExprId },
     Binary { op: BinaryOp, lhs: ExprId, rhs: ExprId },
     Cond { cond: ExprId, true_expr: ExprId, false_expr: ExprId },
-    IncDec { op: IncDecOp, lv: LValue, is_post: bool },
+    IncDec { op: IncDecOp, lv: ExprId, is_post: bool },
 
     // Primary
     Literal(Literal),
@@ -210,10 +212,7 @@ pub enum Expr {
     Cast { data_type: DataType, expr: ExprId },
     MinTypMax(MinTypMaxExpr),
     Call { callee: Path, args: Box<[Arg]> },
-    LValue(LValue),
-    // This,
-    // Dollar,
-    // Null,
+    LValue { path: Path, select: Option<Select> },
     // TODO: add more primary expressions
 }
 
@@ -255,12 +254,6 @@ pub enum PartSelectExpr {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Path(Box<[Ident]>);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct LValue {
-    path: Path,
-    select: Option<Select>,
-}
-
 pub type ExprId = Idx<Expr>;
 
 macro_rules! map_or_missing {
@@ -287,7 +280,7 @@ pub(crate) trait LowerExpr: LowerLiteral + Lower {
         ident.to_text(self.file_text()).map(|s| s.into())
     }
 
-    fn lower_net_lvalue(&mut self, netlv: &ast::NetLvalue) -> Option<LValue> {
+    fn lower_net_lvalue(&mut self, netlv: &ast::NetLvalue) -> Option<ExprId> {
         let path = netlv
             .identifiers()
             .map(|ident| self.lower_ident(&ident))
@@ -299,10 +292,15 @@ pub(crate) trait LowerExpr: LowerLiteral + Lower {
             None
         };
 
-        Some(LValue { path: Path(path), select })
+        let expr = Expr::LValue { path: Path(path), select };
+        let expr_id = self.arena_expr().alloc(expr);
+        let src = self.in_file(LocalExprSrc::NetLValue(netlv.to_ptr()));
+        self.src_map_expr().insert(src, expr_id);
+
+        Some(expr_id)
     }
 
-    fn lower_var_lvalue(&mut self, varlv: &ast::VariableLvalue) -> Option<LValue> {
+    fn lower_var_lvalue(&mut self, varlv: &ast::VariableLvalue) -> Option<ExprId> {
         let path = varlv
             .identifiers()
             .map(|ident| self.lower_ident(&ident))
@@ -314,7 +312,12 @@ pub(crate) trait LowerExpr: LowerLiteral + Lower {
             None
         };
 
-        Some(LValue { path: Path(path), select })
+        let expr = Expr::LValue { path: Path(path), select };
+        let expr_id = self.arena_expr().alloc(expr);
+        let src = self.in_file(LocalExprSrc::VarLValue(varlv.to_ptr()));
+        self.src_map_expr().insert(src, expr_id);
+
+        Some(expr_id)
     }
 
     fn lower_const_select(&mut self, select: &ast::ConstantSelect) -> Option<Select> {
@@ -669,7 +672,7 @@ pub(crate) trait LowerExpr: LowerLiteral + Lower {
                             None
                         };
 
-                        Expr::LValue(LValue { path, select })
+                        Expr::LValue { path, select }
                     }
                 } else {
                     Expr::Missing
@@ -840,9 +843,11 @@ pub(crate) trait LowerExpr: LowerLiteral + Lower {
                         }
                     }
                 };
-                let Some(lv) = try_!(self.lower_var_lvalue(&inc_or_dec.variable_lvalue()?)?) else {
-                    return self.alloc_missing();
-                };
+
+                let lv = try_! {
+                    self.lower_var_lvalue(&inc_or_dec.variable_lvalue()?)?
+                }.unwrap_or_else(|| self.alloc_missing());
+
                 let expr_id = self.arena_expr().alloc(Expr::IncDec {
                     op: if is_inc { IncDecOp::Inc } else { IncDecOp::Dec },
                     lv,

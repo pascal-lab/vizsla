@@ -8,11 +8,11 @@ use la_arena::{Arena, Idx};
 use smallvec::SmallVec;
 use syntax::ast::{self, ptr};
 
-use super::{data::LowerDataDecl, expr::LValue};
+use super::data::LowerDataDecl;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Assign {
-    pub lhs: LValue,
+    pub lhs: ExprId,
     pub rhs: ExprId,
     pub op: AssignOp,
 }
@@ -20,9 +20,9 @@ pub struct Assign {
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum ProceduralContinuousAssign {
     Assign(Assign),
-    Deassign(LValue),
+    Deassign(ExprId),
     Force(Assign),
-    Release(LValue),
+    Release(ExprId),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
