@@ -162,8 +162,8 @@ pub(crate) trait LowerLiteral: Lower {
                             let (len, res) = text.split_once('\'').unwrap();
                             let len = len.parse::<usize>().ok().unwrap();
                             let signed = res.starts_with('s') || res.starts_with('S');
-                            assert!(res.chars().nth( if signed { 1 } else {0} ) == Some('b') ||
-                                    res.chars().nth( if signed { 1 } else {0} ) == Some('B'));
+                            assert!(res.chars().nth( if signed { 1 } else {0} ) == Some('d') ||
+                                    res.chars().nth( if signed { 1 } else {0} ) == Some('D'));
                             let bits = {
                                 let start = if signed { 2 } else { 1 };
                                 let sym = res.chars().nth(start);
