@@ -125,7 +125,7 @@ pub(crate) trait LowerPortDecl: LowerDataType + LowerDataSubDecl + LowerExpr {
                     net_port_type.net_type(), net_type => data::lower_net_type(&net_type)?,
                     _ => data::DEFAULT_NET_TYPE,
                 };
-                let data_type = self.lower_data_type_or_implicit(&data_type_or_implicit)?;
+                let data_type = self.lower_data_type_or_implicit(&Some(data_type_or_implicit))?;
                 NetKind::Default { net_type, data_type }
             },
             net_port_type.identifier(), _ident => {
@@ -145,7 +145,8 @@ pub(crate) trait LowerPortDecl: LowerDataType + LowerDataSubDecl + LowerExpr {
             var_data_type.data_type(), data_type => {
                 self.lower_data_type(&data_type)?
             },
-            var_data_type.data_type_or_implicit(), data_type_or_implicit => {
+            var_data_type.token_var(), _ => {
+                let data_type_or_implicit = var_data_type.data_type_or_implicit();
                 self.lower_data_type_or_implicit(&data_type_or_implicit)?
             },
             _ => {return None;}

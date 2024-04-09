@@ -87,28 +87,31 @@ pub(crate) trait LowerDataType: LowerDimension {
 
     fn lower_data_type_or_implicit(
         &mut self,
-        data_type_or_implicit: &ast::DataTypeOrImplicit,
+        data_type_or_implicit: &Option<ast::DataTypeOrImplicit>,
     ) -> Option<DataType> {
-        try_match! {
-            data_type_or_implicit.data_type(), data_type => {
-                self.lower_data_type(&data_type)
-            },
-            data_type_or_implicit.implicit_data_type(), implicit_data_type => {
-                Some(DataType::Implicit{
-                    dimensions: {
-                        let mut dimensions: SmallVec<[Dimension; 1]> = SmallVec::new();
-                        for packed_dimension in implicit_data_type.packed_dimensions() {
-                            dimensions.push(self.lower_packed_dimension(&packed_dimension)?);
+        match data_type_or_implicit {
+            Some(data_type_or_implicit) => try_match! {
+                data_type_or_implicit.data_type(), data_type => {
+                    self.lower_data_type(&data_type)
+                },
+                data_type_or_implicit.implicit_data_type(), implicit_data_type => {
+                    Some(DataType::Implicit{
+                        dimensions: {
+                            let mut dimensions: SmallVec<[Dimension; 1]> = SmallVec::new();
+                            for packed_dimension in implicit_data_type.packed_dimensions() {
+                                dimensions.push(self.lower_packed_dimension(&packed_dimension)?);
+                            }
+                            if dimensions.is_empty() { None } else { Some(dimensions) }
+                        },
+                        sign:try_match!{
+                            implicit_data_type.signing(), signing => lower_signing(&signing)?,
+                            _ => false,
                         }
-                        if dimensions.is_empty() { None } else { Some(dimensions) }
-                    },
-                    sign:try_match!{
-                        implicit_data_type.signing(), signing => lower_signing(&signing)?,
-                        _ => false,
-                    }
-                })
+                    })
+                },
+                _ => None
             },
-            _ => None
+            None => Some(DataType::Implicit { dimensions: None, sign: false }),
         }
     }
 }
@@ -643,8 +646,8 @@ pub(crate) trait LowerDataDecl: LowerDataSubDecl + LowerDataType + LowerDelay {
             net_decl.net_type(), net_type => {
                 let net_type = lower_net_type(&net_type)?;
                 let data_type = {
-                    let data_type = net_decl.data_type_or_implicit()?;
-                    self.lower_data_type_or_implicit(&data_type)?
+                    let data_type_or_implicit = net_decl.data_type_or_implicit();
+                    self.lower_data_type_or_implicit(&data_type_or_implicit)?
                 };
                 let src = self.in_file(LocalDataDeclSrc::NetDecl(net_decl.to_ptr()));
                 let idx = self.next_data_decl_idx();
@@ -679,8 +682,8 @@ pub(crate) trait LowerDataDecl: LowerDataSubDecl + LowerDataType + LowerDelay {
         let data_decl = DataDecl::VarDecl(VarDecl {
             konst: var_decl.token_const().is_some(),
             data_type: {
-                let data_type = var_decl.data_type_or_implicit()?;
-                self.lower_data_type_or_implicit(&data_type)?
+                let data_type_or_implicit = var_decl.data_type_or_implicit();
+                self.lower_data_type_or_implicit(&data_type_or_implicit)?
             },
             sub_decls: self
                 .lower_var_sub_decl_list(&var_decl.list_of_variable_decl_assignments()?, idx),
@@ -702,8 +705,8 @@ pub(crate) trait LowerDataDecl: LowerDataSubDecl + LowerDataType + LowerDelay {
             let data_decl = DataDecl::ParamDecl(ParamDecl {
                 local: false,
                 data_type: {
-                    let data_type = param_decl.data_type_or_implicit()?;
-                    Some(self.lower_data_type_or_implicit(&data_type)?)
+                    let data_type_or_implicit = param_decl.data_type_or_implicit();
+                    Some(self.lower_data_type_or_implicit(&data_type_or_implicit)?)
                 },
                 sub_decls: self
                     .lower_param_sub_decl_list(&param_decl.list_of_param_assignments()?, idx),
@@ -726,8 +729,8 @@ pub(crate) trait LowerDataDecl: LowerDataSubDecl + LowerDataType + LowerDelay {
             let data_decl = DataDecl::ParamDecl(ParamDecl {
                 local: true,
                 data_type: {
-                    let data_type = localparam_decl.data_type_or_implicit()?;
-                    Some(self.lower_data_type_or_implicit(&data_type)?)
+                    let data_type_or_implicit = localparam_decl.data_type_or_implicit();
+                    Some(self.lower_data_type_or_implicit(&data_type_or_implicit)?)
                 },
                 sub_decls: self
                     .lower_param_sub_decl_list(&localparam_decl.list_of_param_assignments()?, idx),
