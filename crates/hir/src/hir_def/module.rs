@@ -10,7 +10,7 @@ use crate::hir_def::{
     //tf::TFDecl,
     impl_index,
     module::{
-        module_item::{HierarchicalInst, ModuleInst, ModuleItem, ModuleItemSrc},
+        module_item::{HierarchicalInst, Inst, ModuleItem, ModuleItemSrc},
         port::{AnsiPortDecl, NonAnsiPort, PortDecl},
     },
     stmt::{Stmt, StmtSrc},
@@ -46,7 +46,7 @@ impl_index!(ModuleDecl for
     Stmt, data,
     Block, data,
     HierarchicalInst, data,
-    ModuleInst, data,
+    Inst, data,
 );
 
 #[derive(Default, Debug, PartialEq, Eq, Clone)]
@@ -59,7 +59,7 @@ pub struct ModuleData {
     pub stmts: Arena<Stmt>,
     pub blocks: Arena<Block>,
     pub hierarchical_insts: Arena<HierarchicalInst>,
-    pub module_insts: Arena<ModuleInst>,
+    pub insts: Arena<Inst>,
 }
 
 impl_index!(ModuleData for
@@ -71,7 +71,7 @@ impl_index!(ModuleData for
     Stmt, stmts,
     Block, blocks,
     HierarchicalInst, hierarchical_insts,
-    ModuleInst, module_insts,
+    Inst, insts,
 );
 
 #[derive(Default, Debug, PartialEq, Eq, Clone)]
@@ -87,7 +87,7 @@ pub struct ModuleSourceMap {
     pub stmt: SourceMap<StmtSrc, Stmt>,
     pub block: SourceMap<BlockSrc, Block>,
     pub hierarchical_inst: SourceMap<InFile<ptr::HierarchicalInstancePtr>, HierarchicalInst>,
-    pub module_inst: SourceMap<InFile<ptr::ModuleInstantiationPtr>, ModuleInst>,
+    pub inst: SourceMap<InFile<ptr::InstantiationPtr>, Inst>,
 }
 
 pub(crate) fn module_with_source_map_query(

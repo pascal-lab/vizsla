@@ -21,7 +21,7 @@ use utils::try_;
 pub enum ModuleItem {
     PortDecl(Idx<PortDecl>),
     PackOrGenItemDecl(PackOrGenItemDecl),
-    ModuleInst(Idx<ModuleInst>),
+    ModuleInst(Idx<Inst>),
     ContinuousAssignment(ContinuousAssignment),
     ProcessConstruct(ProcessConstruct),
     // TODO: Add more module items
@@ -45,9 +45,9 @@ pub type ModuleItemSrc = InFile<LocalModuleItemSrc>;
 // }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct ModuleInst {
+pub struct Inst {
     pub ident: Ident,
-    pub param_assigns: ParamAssigns,
+    pub param_assigns: Option<ParamAssigns>,
     pub hierarchical_insts: IdxRange<HierarchicalInst>,
 }
 
@@ -62,7 +62,7 @@ pub struct HierarchicalInst {
     pub ident: Ident,
     pub dimensions: Option<SmallVec<[Dimension; 1]>>,
     pub port_connects: Option<PortConnects>,
-    pub full_decl: Idx<ModuleInst>,
+    pub full_decl: Idx<Inst>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -185,8 +185,8 @@ impl<'a> ModuleLowerCtx<'a> {
             item.module_common_item(), module_common_item => {
                 self.lower_module_common_item(&module_common_item)?
             },
-            item.module_instantiation(), module_instantiation => {
-                self.lower_module_instantiation(&module_instantiation)?
+            item.instantiation(), inst => {
+                self.lower_instantiation(&inst)?
             },
             item.parameter_override(), _param_override => {
                 unimplemented!("parameter_override")
@@ -232,11 +232,8 @@ impl<'a> ModuleLowerCtx<'a> {
                     stmt: Some(self.lower_stmt(&final_construct.function_statement()?.statement()?)?)
                 })
             },
-            item.interface_instantiation(), _ => {
-                unimplemented!("interface_instantiation")
-            },
-            item.program_instantiation(), _ => {
-                unimplemented!("program_instantiation")
+            item.instantiation(), inst => {
+                self.lower_instantiation(&inst)?
             },
             item.assertion_item(), _ => {
                 unimplemented!("assertion_item")
@@ -288,35 +285,33 @@ impl<'a> ModuleLowerCtx<'a> {
         Some(module_item)
     }
 
-    fn lower_module_instantiation(
-        &mut self,
-        module_inst: &ast::ModuleInstantiation,
-    ) -> Option<ModuleItem> {
+    fn lower_instantiation(&mut self, module_inst: &ast::Instantiation) -> Option<ModuleItem> {
         let ident = self.lower_ident(&module_inst.identifier()?)?;
-        let param_value_assigns = module_inst.parameter_value_assignment()?;
-        let param_assigns_node = param_value_assigns.list_of_parameter_assignments()?;
-        let param_assigns = try_match! {
-            param_assigns_node.list_of_ordered_parameter_assignments(), ordered => {
-                let mut assigns: SmallVec<[ExprId; 1]> = SmallVec::new();
-                for assign in ordered.ordered_parameter_assignments() {
-                    assigns.push(self.lower_param_expr(&assign.param_expression()?)?)
-                }
-                ParamAssigns::Ordered(assigns)
-            },
-            param_assigns_node.list_of_named_parameter_assignments(), named => {
-                let mut assigns: SmallVec<[(Ident, Option<ExprId>); 1]> = SmallVec::new();
-                for assign in named.named_parameter_assignments() {
-                    let ident = self.lower_ident(&assign.identifier()?)?;
-                    let expr = assign.param_expression().map(|param_expr| self.lower_param_expr(&param_expr))?;
-                    assigns.push((ident, expr))
-                }
-                ParamAssigns::Named(assigns)
-            },
-            _ => { return None; }
+        let param_assigns = try_! {
+            let param_value_assigns = module_inst.parameter_value_assignment()?;
+            let param_assigns_node = param_value_assigns.list_of_parameter_assignments()?;
+            try_match! {
+                param_assigns_node.list_of_ordered_parameter_assignments(), ordered => {
+                    let mut assigns: SmallVec<[ExprId; 1]> = SmallVec::new();
+                    for assign in ordered.ordered_parameter_assignments() {
+                        assigns.push(self.lower_param_expr(&assign.param_expression()?)?)
+                    }
+                    ParamAssigns::Ordered(assigns)
+                },
+                param_assigns_node.list_of_named_parameter_assignments(), named => {
+                    let mut assigns: SmallVec<[(Ident, Option<ExprId>); 1]> = SmallVec::new();
+                    for assign in named.named_parameter_assignments() {
+                        let ident = self.lower_ident(&assign.identifier()?)?;
+                        let expr = assign.param_expression().map(|param_expr| self.lower_param_expr(&param_expr))?;
+                        assigns.push((ident, expr))
+                    }
+                    ParamAssigns::Named(assigns)
+                },
+                _ => { return None; }
+            }
         };
         let module_inst_src = self.in_file(module_inst.to_ptr());
-        let module_inst_idx =
-            Idx::from_raw(RawIdx::from(self.module_decl.data.module_insts.len() as u32));
+        let module_inst_idx = Idx::from_raw(RawIdx::from(self.module_decl.data.insts.len() as u32));
 
         let begin_idx = self.module_decl.data.hierarchical_insts.len();
         let begin_idx = Idx::from_raw(RawIdx::from(begin_idx as u32));
@@ -332,12 +327,8 @@ impl<'a> ModuleLowerCtx<'a> {
         let end_idx = Idx::from_raw(RawIdx::from(end_idx as u32));
         let hierarchical_insts = IdxRange::new(begin_idx..end_idx);
 
-        self.module_decl.data.module_insts.alloc(ModuleInst {
-            ident,
-            param_assigns,
-            hierarchical_insts,
-        });
-        self.module_src_map.module_inst.insert(module_inst_src, module_inst_idx);
+        self.module_decl.data.insts.alloc(Inst { ident, param_assigns, hierarchical_insts });
+        self.module_src_map.inst.insert(module_inst_src, module_inst_idx);
 
         Some(ModuleItem::ModuleInst(module_inst_idx))
     }
@@ -345,7 +336,7 @@ impl<'a> ModuleLowerCtx<'a> {
     fn lower_hierarchy_instance(
         &mut self,
         instance: &ast::HierarchicalInstance,
-        full_decl: Idx<ModuleInst>,
+        full_decl: Idx<Inst>,
     ) -> Option<HierarchicalInst> {
         let name = instance.name_of_instance()?;
         let ident = self.lower_ident(&name.identifier()?)?;
