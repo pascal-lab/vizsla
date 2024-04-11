@@ -1,5 +1,6 @@
 pub mod db;
 pub mod hir_def;
+pub mod scope;
 
 use vfs::vfs::FileId;
 
