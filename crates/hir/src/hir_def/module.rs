@@ -2,21 +2,24 @@ pub(crate) mod lower;
 pub mod module_item;
 pub mod port;
 
-use crate::{file::InFile, hir_def::{
-    block::{Block, BlockSrc},
-    control::EventExpr,
-    data::{DataDecl, DataDeclSrc, DataSubDecl, DataSubDeclSrc},
-    expr::{Expr, ExprSrc},
-    //tf::TFDecl,
-    impl_index,
-    module::{
-        module_item::{HierarchicalInst, Inst, ModuleItem, ModuleItemSrc},
-        port::{AnsiPortDecl, NonAnsiPort, PortDecl},
+use crate::{
+    hir_def::{
+        block::{Block, BlockSrc},
+        control::EventExpr,
+        data::{DataDecl, DataDeclSrc, DataSubDecl, DataSubDeclSrc},
+        expr::{Expr, ExprSrc},
+        //tf::TFDecl,
+        impl_index,
+        module::{
+            module_item::{HierarchicalInst, Inst, ModuleItem, ModuleItemSrc},
+            port::{AnsiPortDecl, NonAnsiPort, PortDecl},
+        },
+        stmt::{Stmt, StmtSrc},
+        Ident,
+        SourceMap,
     },
-    stmt::{Stmt, StmtSrc},
-    Ident,
-    SourceMap,
-}};
+    in_file::InFile,
+};
 use la_arena::{Arena, Idx, IdxRange};
 use std::ops::Index;
 use syntax::ast::ptr;

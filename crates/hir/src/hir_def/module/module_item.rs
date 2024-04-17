@@ -1,17 +1,20 @@
-use crate::{file::InFile, hir_def::{
-    block::{Block, BlockSrc},
-    control::{DelayControl, EventExpr, LowerDelayControl, LowerEventExpr, LowerTimingControl},
-    data::{self, Delay, Dimension, DriveStrength, LowerDelay, LowerDimension},
-    expr::{AssignOp, ExprId, LowerExpr},
-    lower::Lower,
-    module::{
-        lower::ModuleLowerCtx,
-        port::{LowerPortDecl, PortDecl},
+use crate::{
+    hir_def::{
+        block::{Block, BlockSrc},
+        control::{DelayControl, EventExpr, LowerDelayControl, LowerEventExpr, LowerTimingControl},
+        data::{self, Delay, Dimension, DriveStrength, LowerDelay, LowerDimension},
+        expr::{AssignOp, ExprId, LowerExpr},
+        lower::Lower,
+        module::{
+            lower::ModuleLowerCtx,
+            port::{LowerPortDecl, PortDecl},
+        },
+        pack_or_gen_item::{LowerPackOrGenItemDecl, PackOrGenItemDecl},
+        stmt::{Assign, LowerStmt, Stmt, StmtId, StmtSrc},
+        try_match, Ident, SourceMap,
     },
-    pack_or_gen_item::{LowerPackOrGenItemDecl, PackOrGenItemDecl},
-    stmt::{Assign, LowerStmt, Stmt, StmtId, StmtSrc},
-    try_match, Ident, SourceMap,
-}};
+    in_file::InFile,
+};
 use la_arena::{Arena, Idx, IdxRange, RawIdx};
 use smallvec::SmallVec;
 use syntax::ast::{self, ptr};

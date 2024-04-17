@@ -1,4 +1,7 @@
-use crate::{file::{HirFileId, InFile}, hir_def::Ident};
+use crate::{
+    hir_def::Ident,
+    in_file::{HirFileId, InFile},
+};
 use syntax::ast::{self, AstNode};
 
 pub(crate) trait Lower {

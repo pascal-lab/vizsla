@@ -3,7 +3,9 @@ use super::{
     lower::Lower,
 };
 use crate::{
-    file::InFile, hir_def::{data::DataType, Ident, SourceMap}, try_match
+    hir_def::{data::DataType, Ident, SourceMap},
+    in_file::InFile,
+    try_match,
 };
 use la_arena::{Arena, Idx};
 use smallvec::SmallVec;
@@ -856,7 +858,7 @@ pub(crate) trait LowerExpr: LowerLiteral + Lower {
                 self.src_map_expr().insert(src, expr_id);
                 expr_id
             },
-            expr.operator_assignment(), op_assign => {
+            expr.operator_assignment(), _ => {
                 return self.alloc_missing();
                 todo!("Unsupported")
             },

@@ -65,7 +65,10 @@ macro_rules! try_match {
 
 pub(crate) use try_match;
 
-use crate::{db::HirDb, file::{HirFileId, InFile}};
+use crate::{
+    db::HirDb,
+    in_file::{HirFileId, InFile},
+};
 
 pub type Ident = SmolStr;
 

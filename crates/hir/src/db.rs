@@ -1,11 +1,12 @@
 use crate::{
-    file::HirFileId,
     hir_def::{
         self,
+        block::BlockId,
         module::{self, ModuleDecl, ModuleSourceMap},
         FileSourceMap, HirFile, ModuleId,
     },
-    scope::{ModuleScope, UnitScope},
+    in_file::HirFileId,
+    scope::{BlockScope, ModuleScope, UnitScope},
 };
 use base_db::source_db::SourceDb;
 use syntax::parse::SyntaxTree;
@@ -35,6 +36,9 @@ pub trait HirDb: SourceDb {
 
     #[salsa::invoke(ModuleScope::module_scope_query)]
     fn module_scope(&self, module_id: ModuleId) -> Arc<ModuleScope>;
+
+    #[salsa::invoke(BlockScope::block_scope_query)]
+    fn block_scope(&self, block_id: BlockId) -> Arc<BlockScope>;
 }
 
 pub fn hir_syntax_tree(db: &dyn HirDb, file_id: HirFileId) -> Option<SyntaxTree> {

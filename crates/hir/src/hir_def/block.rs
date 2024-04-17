@@ -1,4 +1,8 @@
-use crate::{file::InFile, hir_def::{data::DataDecl, stmt::StmtId, try_match, Ident}};
+use crate::{
+    hir_def::{data::DataDecl, stmt::StmtId, try_match, Ident},
+    in_file::InFile,
+    in_module::InModule,
+};
 use la_arena::Idx;
 use smallvec::SmallVec;
 use syntax::ast::{self, ptr};
@@ -20,6 +24,7 @@ pub enum LocalBlockSrc {
 pub type BlockSrc = InFile<LocalBlockSrc>;
 
 pub type LocalBlockId = Idx<Block>;
+pub type BlockId = InModule<Idx<Block>>;
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum BlockKind {

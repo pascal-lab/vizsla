@@ -1,17 +1,20 @@
-use crate::{file::{HirFileId, InFile}, hir_def::{
-    data::{
-        DataDecl, DataDeclSrc, DataSubDecl, DataSubDeclSrc, LocalDataDeclSrc, LowerDataDecl,
-        LowerDataSubDecl, LowerDataType, LowerDimension, ParamDecl,
+use crate::{
+    hir_def::{
+        data::{
+            DataDecl, DataDeclSrc, DataSubDecl, DataSubDeclSrc, LocalDataDeclSrc, LowerDataDecl,
+            LowerDataSubDecl, LowerDataType, LowerDimension, ParamDecl,
+        },
+        expr::{Expr, ExprSrc, LowerExpr},
+        literal::LowerLiteral,
+        lower::Lower,
+        module::{
+            port::{AnsiPortDecl, LowerPortDecl, NonAnsiPort, PortDecl},
+            ModuleDecl, ModuleSourceMap,
+        },
+        try_match, SourceMap,
     },
-    expr::{Expr, ExprSrc, LowerExpr},
-    literal::LowerLiteral,
-    lower::Lower,
-    module::{
-        port::{AnsiPortDecl, LowerPortDecl, NonAnsiPort, PortDecl},
-        ModuleDecl, ModuleSourceMap,
-    },
-    try_match, SourceMap,
-}};
+    in_file::{HirFileId, InFile},
+};
 use la_arena::{Arena, IdxRange};
 use syntax::ast::{self, ptr};
 use utils::try_;

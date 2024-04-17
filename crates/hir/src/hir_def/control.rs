@@ -1,7 +1,10 @@
-use crate::{file::InFile, hir_def::{
-    expr::{ExprId, LowerExpr, MinTypMaxExpr, Path},
-    try_match, SourceMap,
-}};
+use crate::{
+    hir_def::{
+        expr::{ExprId, LowerExpr, MinTypMaxExpr, Path},
+        try_match, SourceMap,
+    },
+    in_file::InFile,
+};
 use la_arena::{Arena, Idx};
 use syntax::ast::{self, ptr};
 

@@ -1,6 +1,7 @@
 use crate::{
-    db::HirDb, file::{HirFileId, InFile}, hir_def::{
-        block::{Block, BlockItemDecl},
+    db::HirDb,
+    hir_def::{
+        block::{Block, BlockId, BlockItemDecl},
         data::{DataDecl, DataSubDecl},
         module::{
             module_item::{HierarchicalInst, Inst, ModuleItem},
@@ -10,9 +11,10 @@ use crate::{
         pack_or_gen_item::PackOrGenItemDecl,
         stmt::StmtItem,
         FileItem, Ident, ModuleId,
-    }
+    },
+    in_file::{HirFileId, InFile},
 };
-use la_arena::{Arena, ArenaMap, Idx};
+use la_arena::{Arena, Idx};
 use rustc_hash::FxHashMap;
 use std::collections::hash_map::Entry;
 use triomphe::Arc;
@@ -27,20 +29,13 @@ pub enum IdxOrUnknown<Entry> {
 pub enum Scope {
     Unit(UnitScope),
     Module(ModuleScope),
-    Block{
-        owner: BlockScopeOwner,
-        id: Idx<Block>,
-    },
+    Block { owner: BlockScopeOwner, id: Idx<Block> },
 }
 
 #[derive(Debug, Clone)]
 pub enum BlockScopeOwner {
-    Module{
-        id: ModuleId,
-        scope: Arc<ModuleScope>,
-    }
+    Module { id: ModuleId, scope: Arc<ModuleScope> },
 }
-
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnitScope {
@@ -97,49 +92,9 @@ impl UnitScope {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct BlockScope {
-    pub block_id: Idx<Block>,
-    pub ident: Option<Ident>,
-    pub parent: Option<Idx<Block>>,
-    pub entries: Arena<BlockScopeEntry>,
-    pub entry_map: FxHashMap<Ident, IdxOrUnknown<BlockScopeEntry>>,
-}
-
-impl BlockScope {
-    pub fn new(block_id: Idx<Block>, ident: Option<Ident>, parent: Option<Idx<Block>>) -> Self {
-        BlockScope {
-            block_id,
-            ident,
-            parent,
-            entries: Arena::default(),
-            entry_map: FxHashMap::default(),
-        }
-    }
-
-    pub fn insert_entry(&mut self, ident: Ident, entry: BlockScopeEntry) {
-        let idx = self.entries.alloc(entry);
-        match self.entry_map.entry(ident.clone()) {
-            Entry::Occupied(_entry) => {
-                self.entry_map.insert(ident, IdxOrUnknown::Unknown);
-            }
-            Entry::Vacant(entry) => {
-                entry.insert(IdxOrUnknown::Idx(idx));
-            }
-        };
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum BlockScopeEntry {
-    Data(Idx<DataSubDecl>),
-    Block(Idx<Block>),
-    // TODO?: Stmt(Idx<Stmt>)
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModuleScope {
     pub module_id: ModuleId,
-    pub block_scopes: ArenaMap<Idx<Block>, BlockScope>,
+    // pub block_scopes: ArenaMap<Idx<Block>, BlockScope>,
     pub entries: Arena<ModuleScopeEntry>,
     pub entry_map: FxHashMap<Ident, IdxOrUnknown<ModuleScopeEntry>>,
 }
@@ -161,7 +116,7 @@ impl ModuleScope {
         let module = module.as_ref();
         let mut scope = ModuleScope {
             module_id,
-            block_scopes: ArenaMap::default(),
+            // block_scopes: ArenaMap::default(),
             entries: Arena::default(),
             entry_map: FxHashMap::default(),
         };
@@ -263,14 +218,11 @@ impl ModuleScope {
                 },
                 ModuleItem::ProcessConstruct(pc) => {
                     if let Some(stmt) = pc.stmt {
-                        match module[stmt].item {
-                            StmtItem::Block(blk) => {
-                                self.collect_block_scope(module, blk, None);
-                                if let Some(ident) = &module[blk].ident {
-                                    self.insert_entry(ident.clone(), ModuleScopeEntry::Block(blk));
-                                }
+                        if let StmtItem::Block(blk) = module[stmt].item {
+                            // self.collect_block_scope(module, blk, None);
+                            if let Some(ident) = &module[blk].ident {
+                                self.insert_entry(ident.clone(), ModuleScopeEntry::Block(blk));
                             }
-                            _ => {}
                         }
                     }
                 }
@@ -281,16 +233,45 @@ impl ModuleScope {
             };
         });
     }
+}
 
-    fn collect_block_scope(
-        &mut self,
-        module: &ModuleDecl,
-        blk_idx: Idx<Block>,
-        parent: Option<Idx<Block>>,
-    ) {
-        let blk = &module[blk_idx];
-        let ident = blk.ident.clone();
-        let mut block_scope = BlockScope::new(blk_idx, ident, parent);
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BlockScope {
+    pub block_id: BlockId,
+    pub ident: Option<Ident>,
+    // pub parent: Option<Idx<Block>>,
+    pub entries: Arena<BlockScopeEntry>,
+    pub entry_map: FxHashMap<Ident, IdxOrUnknown<BlockScopeEntry>>,
+}
+
+impl BlockScope {
+    pub fn new(block_id: BlockId, ident: Option<Ident>) -> Self {
+        BlockScope {
+            block_id,
+            ident,
+            // parent,
+            entries: Arena::default(),
+            entry_map: FxHashMap::default(),
+        }
+    }
+
+    pub fn insert_entry(&mut self, ident: Ident, entry: BlockScopeEntry) {
+        let idx = self.entries.alloc(entry);
+        match self.entry_map.entry(ident.clone()) {
+            Entry::Occupied(_entry) => {
+                self.entry_map.insert(ident, IdxOrUnknown::Unknown);
+            }
+            Entry::Vacant(entry) => {
+                entry.insert(IdxOrUnknown::Idx(idx));
+            }
+        };
+    }
+
+    pub fn block_scope_query(db: &dyn HirDb, block_id: BlockId) -> Arc<BlockScope> {
+        let module = db.module(block_id.module_id);
+        let module = module.as_ref();
+        let blk = &module[block_id.value];
+        let mut block_scope = BlockScope::new(block_id, blk.ident.clone());
 
         for item in &blk.item_decls {
             match item {
@@ -313,17 +294,22 @@ impl ModuleScope {
 
         for stmt_idx in &blk.stmts {
             let stmt = &module[*stmt_idx];
-            match stmt.item {
-                StmtItem::Block(ch_idx) => {
-                    self.collect_block_scope(module, ch_idx, Some(blk_idx));
-                    if let Some(ident) = &module[ch_idx].ident {
-                        block_scope.insert_entry(ident.clone(), BlockScopeEntry::Block(ch_idx));
-                    }
+            if let StmtItem::Block(ch_idx) = stmt.item {
+                // self.collect_block_scope(module, ch_idx, Some(blk_idx));
+                if let Some(ident) = &module[ch_idx].ident {
+                    block_scope.insert_entry(ident.clone(), BlockScopeEntry::Block(ch_idx));
                 }
-                _ => {}
             }
         }
 
-        self.block_scopes.insert(blk_idx, block_scope);
+        // self.block_scopes.insert(blk_idx, block_scope);
+        Arc::new(block_scope)
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum BlockScopeEntry {
+    Data(Idx<DataSubDecl>),
+    Block(Idx<Block>),
+    // TODO?: Stmt(Idx<Stmt>)
 }
