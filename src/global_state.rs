@@ -22,7 +22,7 @@ use utils::{
 };
 
 use crate::config::{Config, ConfigError};
-use ide::{self, analysis_host::AnalysisHost};
+use ide::analysis_host::AnalysisHost;
 use vfs::{
     self,
     vfs::{FileId, Vfs},
@@ -106,8 +106,7 @@ pub(crate) struct GlobalState {
 
     // workspaces
     pub(crate) workspaces: Arc<Vec<Workspace>>,
-    pub(crate) fetch_workspaces_task:
-        ExclTask<Option<(Arc<Vec<Workspace>>, Vec<anyhow::Error>)>>,
+    pub(crate) fetch_workspaces_task: ExclTask<Option<(Arc<Vec<Workspace>>, Vec<anyhow::Error>)>>,
 }
 
 impl GlobalState {

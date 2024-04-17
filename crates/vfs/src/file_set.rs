@@ -19,6 +19,10 @@ impl FileSet {
         self.files.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.files.is_empty()
+    }
+
     pub fn get_file(&self, path: &VfsPath) -> Option<&FileId> {
         self.files.get(path)
     }

@@ -1,7 +1,6 @@
 use std::{fmt, mem::ManuallyDrop};
 
 use base_db::{
-    self,
     salsa::{self, Durability},
     source_db::{FileLoader, SourceDb, SourceRootDb},
 };

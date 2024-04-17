@@ -72,7 +72,7 @@ impl Pool {
     where
         F: FnOnce() + Send + 'static,
     {
-        let f = Box::new(move || f());
+        let f = Box::new(f);
 
         let job = Job { requested_intent: intent, f };
         self.job_sender.send(job).unwrap();
@@ -121,7 +121,7 @@ impl Builder {
         F: Send + 'static,
         T: Send + 'static,
     {
-        let inner_handle = self.inner.spawn(move || f())?;
+        let inner_handle = self.inner.spawn(f)?;
 
         Ok(JoinHandle { inner: Some(inner_handle), allow_leak: self.allow_leak })
     }

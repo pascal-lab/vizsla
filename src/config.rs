@@ -139,7 +139,7 @@ impl Config {
     }
 
     pub fn main_loop_threads_num(&self) -> usize {
-        num_cpus::get_physical().try_into().unwrap_or(1)
+        num_cpus::get_physical()
     }
 
     pub fn files(&self) -> FilesConfig {

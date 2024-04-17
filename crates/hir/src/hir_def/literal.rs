@@ -109,13 +109,7 @@ pub(crate) trait LowerLiteral: Lower {
     }
 
     fn lower_number(&self, number: &ast::Number) -> Option<Literal> {
-        fn lower_int_num<'a>(
-            text: &'a str,
-            wid: u8,
-            base: Base,
-            b1: char,
-            b2: char,
-        ) -> Option<Literal> {
+        fn lower_int_num(text: &str, wid: u8, base: Base, b1: char, b2: char) -> Option<Literal> {
             let mut len = 0;
             let mut bits = vec![];
             let mut has_met_base = false;

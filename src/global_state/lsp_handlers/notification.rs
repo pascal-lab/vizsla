@@ -75,7 +75,7 @@ pub(crate) fn handle_did_change_text_document(
         // TODO: we can calculate the line ending from the edits to speed up
         let (text, line_ending) = LineEnding::normalize(text);
 
-        *data = text.clone();
+        data.clone_from(&text);
 
         state.vfs.write().0.set_file_contents(&path, Ok((text, line_ending)), edits);
     }
