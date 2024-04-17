@@ -108,7 +108,7 @@ pub(crate) fn handle_did_save_text_document(
         && reload::should_refresh_for_change(abs_path, false)
     {
         // Re-fetch workspaces if a workspace related file has changed
-        state.fetch_workspaces_task.request(format!("DidSaveTextDocument {abs_path}"), ());
+        state.fetch_workspaces_task.request(format!("DidSaveTextDocument {abs_path}"));
     }
 
     Ok(())
@@ -171,7 +171,7 @@ pub(crate) fn handle_did_change_workspace_folders(
 
     if config.detached_files.is_empty() {
         config.rediscover_manifest();
-        state.fetch_workspaces_task.request("client workspaces changed".to_string(), ())
+        state.fetch_workspaces_task.request("client workspaces changed".to_string())
     }
 
     Ok(())
@@ -191,7 +191,7 @@ pub(crate) fn handle_did_change_watched_files(
 }
 
 pub(crate) fn handle_workspace_reload(state: &mut GlobalState, _: ()) -> anyhow::Result<()> {
-    state.fetch_workspaces_task.request("reload workspace request".to_string(), ());
+    state.fetch_workspaces_task.request("reload workspace request".to_string());
     Ok(())
 }
 

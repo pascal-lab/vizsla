@@ -1,9 +1,4 @@
-
-
-use crate::{
-    global_state::snapshot::GlobalStateSnapshot,
-    lsp_ext::{from_proto},
-};
+use crate::{global_state::snapshot::GlobalStateSnapshot, lsp_ext::from_proto};
 
 pub(crate) fn handle_goto_definition(
     snap: GlobalStateSnapshot,

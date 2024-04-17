@@ -1,18 +1,18 @@
 // Exclusive task, make sure only one long-running operation is being executed
 
 #[derive(Debug, Default)]
-pub struct ExclTask<Args, Output, Cause = String> {
-    requested: Option<(Cause, Args)>,
+pub struct ExclTask<Output, Cause = String> {
+    requested: Option<Cause>,
     in_process: bool,
     last_result: Output,
 }
 
-impl<Args, Output, Cause> ExclTask<Args, Output, Cause> {
-    pub fn request(&mut self, reason: Cause, args: Args) {
-        self.requested = Some((reason, args));
+impl<Output, Cause> ExclTask<Output, Cause> {
+    pub fn request(&mut self, reason: Cause) {
+        self.requested = Some(reason);
     }
 
-    pub fn should_start(&mut self) -> Option<(Cause, Args)> {
+    pub fn should_start(&mut self) -> Option<Cause> {
         if self.in_process {
             return None;
         }

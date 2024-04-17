@@ -58,8 +58,8 @@ impl GlobalState {
             self.register_did_save_cap();
         }
 
-        self.fetch_workspaces_task.request("Start".into(), ());
-        if let Some((cause, ())) = self.fetch_workspaces_task.should_start() {
+        self.fetch_workspaces_task.request("Start".into());
+        if let Some(cause) = self.fetch_workspaces_task.should_start() {
             self.fetch_workspaces(cause);
         }
 
@@ -141,7 +141,7 @@ impl GlobalState {
         let state_changed = self.process_changes();
 
         if self.config.user_config.workspace_auto_reload
-            && let Some((cause, ())) = self.fetch_workspaces_task.should_start()
+            && let Some(cause) = self.fetch_workspaces_task.should_start()
         {
             self.fetch_workspaces(cause);
         }

@@ -48,7 +48,7 @@ impl GlobalState {
         self.analysis_host.apply_change(change);
 
         if let Some(path) = workspace_structure_change {
-            self.fetch_workspaces_task.request(format!("workspace vfs change: {:?}", path), ());
+            self.fetch_workspaces_task.request(format!("workspace vfs change: {:?}", path));
         }
 
         true

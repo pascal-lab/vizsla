@@ -75,8 +75,6 @@ pub(crate) struct VfsProgress {
     pub(crate) n_total: usize,
 }
 
-
-
 impl VfsProgress {
     fn in_progress(&self) -> bool {
         self.n_done < self.n_total
@@ -109,7 +107,7 @@ pub(crate) struct GlobalState {
     // workspaces
     pub(crate) workspaces: Arc<Vec<Workspace>>,
     pub(crate) fetch_workspaces_task:
-        ExclTask<(), Option<(Arc<Vec<Workspace>>, Vec<anyhow::Error>)>>,
+        ExclTask<Option<(Arc<Vec<Workspace>>, Vec<anyhow::Error>)>>,
 }
 
 impl GlobalState {
