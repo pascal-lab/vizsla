@@ -14,22 +14,22 @@ use crate::{
     },
     in_file::{HirFileId, InFile},
 };
-use la_arena::{Arena, Idx};
+use la_arena::Idx;
 use rustc_hash::FxHashMap;
 use std::collections::hash_map::Entry;
 use triomphe::Arc;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum IdxOrUnknown<Entry> {
-    Idx(Idx<Entry>),
-    Unknown,
-}
+trait Scope {
+    type Entry;
 
-#[derive(Debug, Clone)]
-pub enum Scope {
-    Unit(UnitScope),
-    Module(ModuleScope),
-    Block { owner: BlockScopeOwner, id: Idx<Block> },
+    fn entries(&mut self) -> &mut FxHashMap<Ident, Self::Entry>;
+
+    fn insert_entry(&mut self, ident: Ident, entry: Self::Entry) {
+        match self.entries().entry(ident) {
+            Entry::Occupied(_) => todo!("diagnostics"),
+            Entry::Vacant(e) => e.insert(entry),
+        };
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -39,8 +39,7 @@ pub enum BlockScopeOwner {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnitScope {
-    pub entries: Arena<UnitScopeEntry>,
-    pub entry_map: FxHashMap<Ident, IdxOrUnknown<UnitScopeEntry>>,
+    pub entries: FxHashMap<Ident, UnitScopeEntry>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -50,27 +49,23 @@ pub enum UnitScopeEntry {
     //TF()
 }
 
+impl Scope for UnitScope {
+    type Entry = UnitScopeEntry;
+
+    fn entries(&mut self) -> &mut FxHashMap<Ident, UnitScopeEntry> {
+        &mut self.entries
+    }
+}
+
 impl UnitScope {
     pub fn unit_scope_query(db: &dyn HirDb) -> Arc<UnitScope> {
-        let mut scope = UnitScope { entries: Arena::default(), entry_map: FxHashMap::default() };
+        let mut scope = UnitScope { entries: FxHashMap::default() };
 
         db.files().iter().map(|file_id| HirFileId(*file_id)).for_each(|file_id| {
             scope.collect_hir_file(db, &file_id);
         });
 
         Arc::new(scope)
-    }
-
-    pub fn insert_entry(&mut self, ident: Ident, entry: UnitScopeEntry) {
-        let idx = self.entries.alloc(entry);
-        match self.entry_map.entry(ident.clone()) {
-            Entry::Occupied(_entry) => {
-                self.entry_map.insert(ident, IdxOrUnknown::Unknown);
-            }
-            Entry::Vacant(entry) => {
-                entry.insert(IdxOrUnknown::Idx(idx));
-            }
-        };
     }
 
     fn collect_hir_file(&mut self, db: &dyn HirDb, file_id: &HirFileId) {
@@ -95,8 +90,7 @@ impl UnitScope {
 pub struct ModuleScope {
     pub module_id: ModuleId,
     // pub block_scopes: ArenaMap<Idx<Block>, BlockScope>,
-    pub entries: Arena<ModuleScopeEntry>,
-    pub entry_map: FxHashMap<Ident, IdxOrUnknown<ModuleScopeEntry>>,
+    pub entries: FxHashMap<Ident, ModuleScopeEntry>
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -110,6 +104,14 @@ pub enum ModuleScopeEntry {
     // TODO: TF()
 }
 
+impl Scope for ModuleScope {
+    type Entry = ModuleScopeEntry;
+
+    fn entries(&mut self) -> &mut FxHashMap<Ident, ModuleScopeEntry> {
+        &mut self.entries
+    }
+}
+
 impl ModuleScope {
     pub fn module_scope_query(db: &dyn HirDb, module_id: ModuleId) -> Arc<ModuleScope> {
         let module = db.module(module_id);
@@ -117,8 +119,7 @@ impl ModuleScope {
         let mut scope = ModuleScope {
             module_id,
             // block_scopes: ArenaMap::default(),
-            entries: Arena::default(),
-            entry_map: FxHashMap::default(),
+            entries: FxHashMap::default(),
         };
 
         scope.collect_param_port_list(module);
@@ -126,20 +127,6 @@ impl ModuleScope {
         scope.collect_module_items(module);
 
         Arc::new(scope)
-    }
-
-    fn insert_entry(&mut self, ident: Ident, entry: ModuleScopeEntry) {
-        let idx = self.entries.alloc(entry);
-        match self.entry_map.entry(ident.clone()) {
-            Entry::Occupied(_entry) => {
-                // TODO: Allow decl of NonAnsiPort with DataSubDecl
-                // if let IdxOrUnknown::Idx(idx) = entry.get() {...}
-                self.entry_map.insert(ident, IdxOrUnknown::Unknown);
-            }
-            Entry::Vacant(entry) => {
-                entry.insert(IdxOrUnknown::Idx(idx));
-            }
-        };
     }
 
     fn collect_data_sub_decl(&mut self, module: &ModuleDecl, idx: Idx<DataSubDecl>) {
@@ -240,8 +227,22 @@ pub struct BlockScope {
     pub block_id: BlockId,
     pub ident: Option<Ident>,
     // pub parent: Option<Idx<Block>>,
-    pub entries: Arena<BlockScopeEntry>,
-    pub entry_map: FxHashMap<Ident, IdxOrUnknown<BlockScopeEntry>>,
+    pub entries: FxHashMap<Ident, BlockScopeEntry>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum BlockScopeEntry {
+    Data(Idx<DataSubDecl>),
+    Block(Idx<Block>),
+    // TODO?: Stmt(Idx<Stmt>)
+}
+
+impl Scope for BlockScope {
+    type Entry = BlockScopeEntry;
+
+    fn entries(&mut self) -> &mut FxHashMap<Ident, BlockScopeEntry> {
+        &mut self.entries
+    }
 }
 
 impl BlockScope {
@@ -250,21 +251,8 @@ impl BlockScope {
             block_id,
             ident,
             // parent,
-            entries: Arena::default(),
-            entry_map: FxHashMap::default(),
+            entries: FxHashMap::default(),
         }
-    }
-
-    pub fn insert_entry(&mut self, ident: Ident, entry: BlockScopeEntry) {
-        let idx = self.entries.alloc(entry);
-        match self.entry_map.entry(ident.clone()) {
-            Entry::Occupied(_entry) => {
-                self.entry_map.insert(ident, IdxOrUnknown::Unknown);
-            }
-            Entry::Vacant(entry) => {
-                entry.insert(IdxOrUnknown::Idx(idx));
-            }
-        };
     }
 
     pub fn block_scope_query(db: &dyn HirDb, block_id: BlockId) -> Arc<BlockScope> {
@@ -305,11 +293,4 @@ impl BlockScope {
         // self.block_scopes.insert(blk_idx, block_scope);
         Arc::new(block_scope)
     }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum BlockScopeEntry {
-    Data(Idx<DataSubDecl>),
-    Block(Idx<Block>),
-    // TODO?: Stmt(Idx<Stmt>)
 }
