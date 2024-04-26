@@ -1,10 +1,10 @@
 use crate::{
+    file::InFile,
     hir_def::{
         data::{self, DataSubDecl, DataType, LowerDataSubDecl, LowerDataType, NetKind},
         expr::{LowerExpr, Select},
         try_match, Ident, SourceMap,
     },
-    in_file::InFile,
 };
 use la_arena::{Arena, Idx, IdxRange, RawIdx};
 use syntax::ast::{self, ptr};

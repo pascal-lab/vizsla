@@ -1,4 +1,2 @@
 #[derive(Debug, PartialEq, Eq)]
-pub struct DefMap {
-
-}
+pub struct DefMap {}

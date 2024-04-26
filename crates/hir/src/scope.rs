@@ -1,18 +1,18 @@
 use crate::{
     db::HirDb,
+    file::{HirFileId, InFile},
     hir_def::{
-        block::{Block, BlockId, BlockItemDecl},
+        block::{BlockId, BlockInfo, BlockItemDecl},
         data::{DataDecl, DataSubDecl},
         module::{
             module_item::{HierarchicalInst, Inst, ModuleItem},
             port::{AnsiPortDecl, PortDecl},
-            ModuleDecl,
+            Module,
         },
         pack_or_gen_item::PackOrGenItemDecl,
         stmt::StmtItem,
         FileItem, Ident, ModuleId,
     },
-    in_file::{HirFileId, InFile},
 };
 use la_arena::Idx;
 use rustc_hash::FxHashMap;
@@ -90,7 +90,7 @@ impl UnitScope {
 pub struct ModuleScope {
     pub module_id: ModuleId,
     // pub block_scopes: ArenaMap<Idx<Block>, BlockScope>,
-    pub entries: FxHashMap<Ident, ModuleScopeEntry>
+    pub entries: FxHashMap<Ident, ModuleScopeEntry>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -98,7 +98,7 @@ pub enum ModuleScopeEntry {
     Data(Idx<DataSubDecl>),
     NonAnsiPort { port_decl: Idx<DataSubDecl>, data_sub_decl: Option<Idx<DataSubDecl>> },
     ModuleInst(Idx<HierarchicalInst>),
-    Block(Idx<Block>),
+    BlockInfo(Idx<BlockInfo>),
     // TODO?: Stmt(Idx<Stmt>)
     // TODO?: Module(ModuleId)
     // TODO: TF()
@@ -129,14 +129,14 @@ impl ModuleScope {
         Arc::new(scope)
     }
 
-    fn collect_data_sub_decl(&mut self, module: &ModuleDecl, idx: Idx<DataSubDecl>) {
+    fn collect_data_sub_decl(&mut self, module: &Module, idx: Idx<DataSubDecl>) {
         let sub_decl = &module[idx];
         let ident = sub_decl.ident.clone();
         let entry = ModuleScopeEntry::Data(idx);
         self.insert_entry(ident, entry);
     }
 
-    fn collect_data_decl(&mut self, module: &ModuleDecl, idx: Idx<DataDecl>) {
+    fn collect_data_decl(&mut self, module: &Module, idx: Idx<DataDecl>) {
         let data_decl = &module[idx];
         let sub_decls = match data_decl {
             DataDecl::NetDecl(net_decl) => &net_decl.sub_decls,
@@ -149,7 +149,7 @@ impl ModuleScope {
         }
     }
 
-    fn collect_param_port_list(&mut self, module: &ModuleDecl) {
+    fn collect_param_port_list(&mut self, module: &Module) {
         if let Some(param_port_list) = &module.param_port_list {
             let param_port_list = param_port_list.clone();
             for idx in param_port_list {
@@ -158,7 +158,7 @@ impl ModuleScope {
         }
     }
 
-    fn collect_ansi_port_decls(&mut self, module: &ModuleDecl) {
+    fn collect_ansi_port_decls(&mut self, module: &Module) {
         module.ansi_port_decls.iter().for_each(|(_, port)| {
             match port {
                 AnsiPortDecl::IODecl(io_decl) => {
@@ -168,7 +168,7 @@ impl ModuleScope {
         });
     }
 
-    fn collect_non_ansi_port_decl(&mut self, module: &ModuleDecl, idx: Idx<PortDecl>) {
+    fn collect_non_ansi_port_decl(&mut self, module: &Module, idx: Idx<PortDecl>) {
         let port_decl = &module[idx];
         match port_decl {
             PortDecl::IODecl(io_decl) => {
@@ -180,21 +180,21 @@ impl ModuleScope {
         }
     }
 
-    fn collect_hierarchy_inst(&mut self, module: &ModuleDecl, idx: Idx<HierarchicalInst>) {
+    fn collect_hierarchy_inst(&mut self, module: &Module, idx: Idx<HierarchicalInst>) {
         let inst = &module[idx];
         let ident = inst.ident.clone();
         let entry = ModuleScopeEntry::ModuleInst(idx);
         self.insert_entry(ident, entry);
     }
 
-    fn collect_module_inst(&mut self, module: &ModuleDecl, idx: Idx<Inst>) {
+    fn collect_module_inst(&mut self, module: &Module, idx: Idx<Inst>) {
         let inst = &module[idx];
         for hinst_idx in inst.hierarchical_insts.clone() {
             self.collect_hierarchy_inst(module, hinst_idx);
         }
     }
 
-    fn collect_module_items(&mut self, module: &ModuleDecl) {
+    fn collect_module_items(&mut self, module: &Module) {
         module.module_items.iter().for_each(|(_, item)| {
             match item {
                 ModuleItem::PortDecl(idx) => {
@@ -205,10 +205,10 @@ impl ModuleScope {
                 },
                 ModuleItem::ProcessConstruct(pc) => {
                     if let Some(stmt) = pc.stmt {
-                        if let StmtItem::Block(blk) = module[stmt].item {
+                        if let StmtItem::BlockInfo(blk) = module[stmt].item {
                             // self.collect_block_scope(module, blk, None);
                             if let Some(ident) = &module[blk].ident {
-                                self.insert_entry(ident.clone(), ModuleScopeEntry::Block(blk));
+                                self.insert_entry(ident.clone(), ModuleScopeEntry::BlockInfo(blk));
                             }
                         }
                     }
@@ -233,7 +233,7 @@ pub struct BlockScope {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum BlockScopeEntry {
     Data(Idx<DataSubDecl>),
-    Block(Idx<Block>),
+    Block(Idx<BlockInfo>),
     // TODO?: Stmt(Idx<Stmt>)
 }
 
@@ -256,15 +256,13 @@ impl BlockScope {
     }
 
     pub fn block_scope_query(db: &dyn HirDb, block_id: BlockId) -> Arc<BlockScope> {
-        let module = db.module(block_id.module_id);
-        let module = module.as_ref();
-        let blk = &module[block_id.value];
-        let mut block_scope = BlockScope::new(block_id, blk.ident.clone());
+        let block = db.block(block_id);
+        let mut block_scope = BlockScope::new(block_id, block.info.ident.clone());
 
-        for item in &blk.item_decls {
+        for item in &block.data.block_item_decls {
             match item {
                 BlockItemDecl::DataDecl(idx) => {
-                    let data_decl = &module[*idx];
+                    let data_decl = &block[*idx];
                     let sub_decls = match data_decl {
                         DataDecl::NetDecl(net_decl) => &net_decl.sub_decls,
                         DataDecl::ParamDecl(param_decl) => &param_decl.sub_decls,
@@ -272,7 +270,7 @@ impl BlockScope {
                     }
                     .clone();
                     for idx in sub_decls {
-                        let sub_decl = &module[idx];
+                        let sub_decl = &block[idx];
                         let ident = sub_decl.ident.clone();
                         block_scope.insert_entry(ident, BlockScopeEntry::Data(idx));
                     }
@@ -280,17 +278,14 @@ impl BlockScope {
             }
         }
 
-        for stmt_idx in &blk.stmts {
-            let stmt = &module[*stmt_idx];
-            if let StmtItem::Block(ch_idx) = stmt.item {
-                // self.collect_block_scope(module, ch_idx, Some(blk_idx));
-                if let Some(ident) = &module[ch_idx].ident {
-                    block_scope.insert_entry(ident.clone(), BlockScopeEntry::Block(ch_idx));
+        for (_, stmt) in block.data.stmts.iter() {
+            if let StmtItem::BlockInfo(idx) = stmt.item {
+                if let Some(ident) = &block[idx].ident {
+                    block_scope.insert_entry(ident.clone(), BlockScopeEntry::Block(idx));
                 }
             }
         }
 
-        // self.block_scopes.insert(blk_idx, block_scope);
         Arc::new(block_scope)
     }
 }

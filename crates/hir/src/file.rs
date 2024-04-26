@@ -9,6 +9,10 @@ impl From<FileId> for HirFileId {
     }
 }
 
+// Although `InFile` is similar to `InContainer`, we do not merge them because
+// they are used in different contexts. `InFile` is used to represent a value
+// that is associated with a file, while `InContainer` is used to represent a
+// value that is associated with a container (semantically).
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub struct InFile<T> {
     pub file_id: HirFileId,
@@ -31,10 +35,6 @@ impl<T> InFile<T> {
     pub fn as_ref(&self) -> InFile<&T> {
         self.with_value(&self.value)
     }
-
-    // pub fn file_syntax(&self, db: &dyn db::ExpandDatabase) -> SyntaxNode {
-    //     db.parse_or_expand(self.file_id)
-    // }
 }
 
 impl<T: Clone> InFile<&T> {

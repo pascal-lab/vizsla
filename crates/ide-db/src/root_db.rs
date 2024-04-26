@@ -13,6 +13,7 @@ use crate::line_index_db::LineIndexDbStorage;
     base_db::source_db::SourceDbStorage,
     base_db::source_db::SourceRootDbStorage,
     hir::db::HirDbStorage,
+    hir::db::InternDbStorage,
     LineIndexDbStorage
 )]
 pub struct RootDb {

@@ -1,17 +1,23 @@
 use crate::{
+    file::InFile,
     hir_def::{
-        block::{self, Block, BlockItemDecl, BlockKind, BlockSrc, LocalBlockId, LocalBlockSrc},
+        block::BlockInfo,
         control::{DelayOrEventControl, LowerTimingControl, ProceduralTimingControlControl},
         expr::{self, AssignOp, ExprId, LowerExpr},
         try_match, Ident, SourceMap,
     },
-    in_file::InFile,
 };
 use la_arena::{Arena, Idx};
 use smallvec::SmallVec;
 use syntax::ast::{self, ptr};
 
-use super::data::LowerDataDecl;
+use super::{
+    block::{
+        block_src::{BlockSrc, LocalBlockSrc},
+        BlockItemDecl, BlockLoc,
+    },
+    data::LowerDataDecl,
+};
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Assign {
@@ -111,7 +117,7 @@ pub enum StmtItem {
         stmt: Option<StmtId>,
         else_stmt: Option<StmtId>,
     },
-    Block(LocalBlockId),
+    BlockInfo(Idx<BlockInfo>),
     ProceduralTimingControlStmt {
         control: ProceduralTimingControlControl,
         stmt: Option<StmtId>,
@@ -124,11 +130,11 @@ pub type StmtSrc = InFile<ptr::StatementPtr>;
 pub(crate) trait LowerStmt: LowerTimingControl + LowerExpr + LowerDataDecl {
     fn arena_stmts(&mut self) -> &mut Arena<Stmt>;
 
-    fn arena_blocks(&mut self) -> &mut Arena<Block>;
+    fn arena_blocks(&mut self) -> &mut Arena<BlockInfo>;
 
     fn src_map_stmt(&mut self) -> &mut SourceMap<StmtSrc, Stmt>;
 
-    fn src_map_block(&mut self) -> &mut SourceMap<BlockSrc, Block>;
+    fn src_map_blocks(&mut self) -> &mut SourceMap<BlockSrc, BlockInfo>;
 
     fn lower_stmt(&mut self, stmt: &ast::Statement) -> Option<StmtId> {
         let ident = stmt.identifier().and_then(|ident| self.lower_ident(&ident));
@@ -283,10 +289,10 @@ pub(crate) trait LowerStmt: LowerTimingControl + LowerExpr + LowerDataDecl {
                 Some(StmtItem::CondStmt { unique_priority, cond_predict, stmt, else_stmt })
             },
             stmt.seq_block(), seq_block => {
-                Some(StmtItem::Block(self.lower_seq_block(&seq_block)?))
+                Some(StmtItem::BlockInfo(self.lower_seq_block(&seq_block)?))
             },
             stmt.par_block(), par_block => {
-                Some(StmtItem::Block(self.lower_par_block(&par_block)?))
+                Some(StmtItem::BlockInfo(self.lower_par_block(&par_block)?))
             },
             stmt.inc_or_dec_expression(), _inc_or_dec => {
                 unimplemented!("inc_or_dec_expression")
@@ -368,42 +374,27 @@ pub(crate) trait LowerStmt: LowerTimingControl + LowerExpr + LowerDataDecl {
         }
     }
 
-    fn lower_seq_block(&mut self, block: &ast::SeqBlock) -> Option<LocalBlockId> {
-        let kind = BlockKind::Sequential;
+    fn lower_seq_block(&mut self, block: &ast::SeqBlock) -> Option<Idx<BlockInfo>> {
         let ident = block.identifiers().next().and_then(|ident| self.lower_ident(&ident));
-        let mut item_decls: SmallVec<[BlockItemDecl; 1]> = SmallVec::new();
-        for item in block.block_item_declarations() {
-            item_decls.push(self.lower_block_item_decl(&item)?);
-        }
-        let mut stmts: SmallVec<[StmtId; 1]> = SmallVec::new();
-        for stmt in block.statement_or_nulls() {
-            if let Some(stmt) = self.lower_stmt_or_null(&stmt) {
-                stmts.push(stmt);
-            }
-        }
-        let idx = self.arena_blocks().alloc(Block { kind, ident, item_decls, stmts });
+        let block_id = self.db().intern_block(BlockLoc {
+            container: self.container_id().into(),
+            block_src: self.in_file(LocalBlockSrc::SeqBlock(block.to_ptr())),
+        });
+        let idx = self.arena_blocks().alloc(BlockInfo { ident, block_id });
         let src = self.in_file(LocalBlockSrc::SeqBlock(block.to_ptr()));
-        self.src_map_block().insert(src, idx);
+        self.src_map_blocks().insert(src, idx);
         Some(idx)
     }
 
-    fn lower_par_block(&mut self, block: &ast::ParBlock) -> Option<LocalBlockId> {
-        let join_keyword = block::lower_join_keyword(&block.join_keyword()?);
-        let kind = BlockKind::Parallel(join_keyword?);
+    fn lower_par_block(&mut self, block: &ast::ParBlock) -> Option<Idx<BlockInfo>> {
         let ident = block.identifiers().next().and_then(|ident| self.lower_ident(&ident));
-        let mut item_decls: SmallVec<[BlockItemDecl; 1]> = SmallVec::new();
-        for item in block.block_item_declarations() {
-            item_decls.push(self.lower_block_item_decl(&item)?);
-        }
-        let mut stmts: SmallVec<[StmtId; 1]> = SmallVec::new();
-        for stmt in block.statement_or_nulls() {
-            if let Some(stmt) = self.lower_stmt_or_null(&stmt) {
-                stmts.push(stmt);
-            }
-        }
-        let idx = self.arena_blocks().alloc(Block { kind, ident, item_decls, stmts });
+        let block_id = self.db().intern_block(BlockLoc {
+            container: self.container_id().into(),
+            block_src: self.in_file(LocalBlockSrc::ParBlock(block.to_ptr())),
+        });
+        let idx = self.arena_blocks().alloc(BlockInfo { ident, block_id });
         let src = self.in_file(LocalBlockSrc::ParBlock(block.to_ptr()));
-        self.src_map_block().insert(src, idx);
+        self.src_map_blocks().insert(src, idx);
         Some(idx)
     }
 }

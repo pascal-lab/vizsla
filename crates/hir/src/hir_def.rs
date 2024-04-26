@@ -67,7 +67,7 @@ pub(crate) use try_match;
 
 use crate::{
     db::HirDb,
-    in_file::{HirFileId, InFile},
+    file::{HirFileId, InFile},
 };
 
 pub type Ident = SmolStr;
@@ -79,16 +79,16 @@ pub struct HirFile {
 }
 
 // TODO: DataDecl, InterfaceDecl
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub enum FileItem {
-    Module(Idx<ModuleInFile>),
+    Module(Idx<ModuleInfo>),
     // DataDecl(Idx<DataDecl>),
     // InterfaceDecl(Idx<InterfaceDecl>),
 }
 
 #[derive(Default, Debug, PartialEq, Eq, Clone, Hash)]
 pub struct FileData {
-    pub modules: Arena<ModuleInFile>,
+    pub modules: Arena<ModuleInfo>,
     // pub data_decls: Arena<DataDecl>,
     // pub interface_decls: Arena<InterfaceDecl>,
 }
@@ -101,15 +101,16 @@ impl FileData {
     }
 }
 
-impl_index! {FileData for ModuleInFile, modules}
+impl_index! {FileData for ModuleInfo, modules}
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct ModuleInFile {
+pub struct ModuleInfo {
     pub ident: Ident,
 }
 
-pub type ModuleSource = InFile<ptr::ModuleDeclarationPtr>;
-pub type LocalModuleId = Idx<ModuleInFile>;
+pub type LocalModuleSrc = ptr::ModuleDeclarationPtr;
+pub type ModuleSrc = InFile<LocalModuleSrc>;
+pub type LocalModuleId = Idx<ModuleInfo>;
 pub type ModuleId = InFile<LocalModuleId>;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -130,12 +131,12 @@ where
         self.hir2src.insert(idx, src);
     }
 
-    pub fn get_idx(&self, src: &Src) -> &Idx<Hir> {
-        &self.src2hir[src]
+    pub fn get_idx(&self, src: &Src) -> Option<&Idx<Hir>> {
+        self.src2hir.get(src)
     }
 
-    pub fn get_src(&self, idx: Idx<Hir>) -> &Src {
-        &self.hir2src[idx]
+    pub fn get_src(&self, idx: Idx<Hir>) -> Option<&Src> {
+        self.hir2src.get(idx)
     }
 }
 
@@ -150,7 +151,7 @@ where
 
 #[derive(Default, Debug, PartialEq, Eq)]
 pub struct FileSourceMap {
-    pub module: SourceMap<ModuleSource, ModuleInFile>,
+    pub modules: SourceMap<ModuleSrc, ModuleInfo>,
 }
 
 pub(crate) fn hir_file_with_source_map_query(
@@ -177,12 +178,12 @@ pub(crate) fn hir_file_with_source_map_query(
                         },
                         _ => return None,
                     };
-                    let module_id = hir_file.data.modules.alloc(ModuleInFile { ident });
+                    let module_id = hir_file.data.modules.alloc(ModuleInfo { ident });
                     hir_file.items.push(FileItem::Module(module_id));
 
                     let module_source = InFile::new(file_id, ptr);
 
-                    source_map.module.insert(module_source, module_id);
+                    source_map.modules.insert(module_source, module_id);
                 };
             }
         }

@@ -1,4 +1,6 @@
 use crate::{
+    db::InternDb,
+    file::{HirFileId, InFile},
     hir_def::{
         data::{
             DataDecl, DataDeclSrc, DataSubDecl, DataSubDeclSrc, LocalDataDeclSrc, LowerDataDecl,
@@ -9,45 +11,45 @@ use crate::{
         lower::Lower,
         module::{
             port::{AnsiPortDecl, LowerPortDecl, NonAnsiPort, PortDecl},
-            ModuleDecl, ModuleSourceMap,
+            Module, ModuleSourceMap,
         },
-        try_match, SourceMap,
+        try_match, ModuleId, SourceMap,
     },
-    in_file::{HirFileId, InFile},
 };
 use la_arena::{Arena, IdxRange};
 use syntax::ast::{self, ptr};
 use utils::try_;
 
 pub(crate) struct ModuleLowerCtx<'a> {
-    pub hir_file_id: HirFileId,
-    pub module_decl: &'a mut ModuleDecl,
+    pub db: &'a dyn InternDb,
+    pub module_id: ModuleId,
+    pub module_decl: &'a mut Module,
     pub module_src_map: &'a mut ModuleSourceMap,
     pub file_text: &'a str,
 }
 
 impl<'a> ModuleLowerCtx<'a> {
-    pub(crate) fn lower_module_decl(&mut self, module_node: &ast::ModuleDeclaration) {
+    pub(crate) fn lower_module_decl(&mut self, module_decl_node: &ast::ModuleDeclaration) {
         // TODO: package_import_declaration
 
         try_match! {
-            module_node.module_ansi_header(), ansi_header => {
+            module_decl_node.module_ansi_header(), ansi_header => {
                 if let Some(param_port_list) = ansi_header.parameter_port_list() {
                     self.lower_param_port_list(&param_port_list);
                 }
                 if let Some(port_decl_list) = ansi_header.list_of_port_declarations() {
                     self.lower_ansi_port_decl_list(&port_decl_list);
                 }
-                for non_port_module_item in module_node.non_port_module_items() {
+                for non_port_module_item in module_decl_node.non_port_module_items() {
                     self.lower_non_port_module_item(&non_port_module_item);
                 }
             },
-            module_node.module_nonansi_header(), non_ansi_header => {
+            module_decl_node.module_nonansi_header(), non_ansi_header => {
                 if let Some(param_port_list) = non_ansi_header.parameter_port_list() {
                     self.lower_param_port_list(&param_port_list);
                 }
                 try_!(self.lower_port_list(&non_ansi_header.list_of_ports()?));
-                for module_item in module_node.module_items() {
+                for module_item in module_decl_node.module_items() {
                     self.lower_module_item(&module_item);
                 }
             },
@@ -99,8 +101,18 @@ impl<'a> ModuleLowerCtx<'a> {
 }
 
 impl Lower for ModuleLowerCtx<'_> {
+    type ContainerId = ModuleId;
+
+    fn db(&self) -> &dyn InternDb {
+        self.db
+    }
+
+    fn container_id(&self) -> ModuleId {
+        self.module_id
+    }
+
     fn file_id(&self) -> HirFileId {
-        self.hir_file_id
+        self.module_id.file_id
     }
 
     fn file_text(&self) -> &str {

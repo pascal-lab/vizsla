@@ -3,8 +3,8 @@ use super::{
     lower::Lower,
 };
 use crate::{
+    file::InFile,
     hir_def::{data::DataType, Ident, SourceMap},
-    in_file::InFile,
     try_match,
 };
 use la_arena::{Arena, Idx};
@@ -654,8 +654,6 @@ pub(crate) trait LowerExpr: LowerLiteral + Lower {
                 Expr::MinTypMax(self.lower_min_typ_max_expr(&mintypmax))
             },
             primary.cast_(), cast => {
-                let expr = map_or_missing!(self, cast.expression(), lower_expr);
-                let ty = cast.casting_type();
                 // todo!("casting type");
                 Expr::Missing
             },

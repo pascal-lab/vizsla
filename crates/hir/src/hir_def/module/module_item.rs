@@ -1,6 +1,7 @@
 use crate::{
+    file::InFile,
     hir_def::{
-        block::{Block, BlockSrc},
+        block::{block_src::LocalBlockSrc, BlockInfo},
         control::{DelayControl, EventExpr, LowerDelayControl, LowerEventExpr, LowerTimingControl},
         data::{self, Delay, Dimension, DriveStrength, LowerDelay, LowerDimension},
         expr::{AssignOp, ExprId, LowerExpr},
@@ -13,7 +14,6 @@ use crate::{
         stmt::{Assign, LowerStmt, Stmt, StmtId, StmtSrc},
         try_match, Ident, SourceMap,
     },
-    in_file::InFile,
 };
 use la_arena::{Arena, Idx, IdxRange, RawIdx};
 use smallvec::SmallVec;
@@ -431,15 +431,15 @@ impl LowerStmt for ModuleLowerCtx<'_> {
         &mut self.module_decl.data.stmts
     }
 
-    fn arena_blocks(&mut self) -> &mut Arena<Block> {
-        &mut self.module_decl.data.blocks
+    fn arena_blocks(&mut self) -> &mut Arena<BlockInfo> {
+        &mut self.module_decl.data.block_infos
     }
 
     fn src_map_stmt(&mut self) -> &mut SourceMap<StmtSrc, Stmt> {
         &mut self.module_src_map.stmt
     }
 
-    fn src_map_block(&mut self) -> &mut SourceMap<BlockSrc, Block> {
+    fn src_map_blocks(&mut self) -> &mut SourceMap<InFile<LocalBlockSrc>, BlockInfo> {
         &mut self.module_src_map.block
     }
 }

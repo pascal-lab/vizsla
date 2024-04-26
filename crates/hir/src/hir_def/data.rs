@@ -1,10 +1,10 @@
 use crate::{
+    file::InFile,
     hir_def::{
         expr::{ExprId, LowerExpr, MinTypMaxExpr},
         module::port::{AnsiPortDecl, PortDecl},
         try_match, Ident, SourceMap,
     },
-    in_file::InFile,
 };
 use la_arena::{Arena, Idx, IdxRange, RawIdx};
 use smallvec::SmallVec;

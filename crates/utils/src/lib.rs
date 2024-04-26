@@ -5,4 +5,5 @@ pub mod panic_context;
 pub mod paths;
 pub mod text_edit;
 pub mod thread;
+pub mod uimpl;
 pub mod utry;

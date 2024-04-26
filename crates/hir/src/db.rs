@@ -1,19 +1,36 @@
 use crate::{
+    file::HirFileId,
     hir_def::{
         self,
-        block::BlockId,
-        module::{self, ModuleDecl, ModuleSourceMap},
+        block::{self, Block, BlockId, BlockLoc, BlockSourceMap},
+        module::{self, Module, ModuleSourceMap},
         FileSourceMap, HirFile, ModuleId,
     },
-    in_file::HirFileId,
     scope::{BlockScope, ModuleScope, UnitScope},
 };
-use base_db::source_db::SourceDb;
+use base_db::{impl_intern_key, impl_intern_lookup, salsa, source_db::SourceDb};
+
 use syntax::parse::SyntaxTree;
 use triomphe::Arc;
 
+#[macro_export]
+macro_rules! impl_intern {
+    ($id:ident, $loc:ident, $intern:ident, $lookup:ident) => {
+        impl_intern_key!($id);
+        impl_intern_lookup!(InternDb, $id, $loc, $intern, $lookup);
+    };
+}
+
+#[salsa::query_group(InternDbStorage)]
+pub trait InternDb: SourceDb {
+    #[salsa::interned]
+    fn intern_block(&self, loc: BlockLoc) -> BlockId;
+}
+
+impl_intern!(BlockId, BlockLoc, intern_block, lookup_intern_block);
+
 #[salsa::query_group(HirDbStorage)]
-pub trait HirDb: SourceDb {
+pub trait HirDb: InternDb {
     fn hir_syntax_tree(&self, file_id: HirFileId) -> Option<SyntaxTree>;
 
     fn hir_file_text(&self, file_id: HirFileId) -> Arc<str>;
@@ -24,12 +41,14 @@ pub trait HirDb: SourceDb {
     fn hir_file(&self, file_id: HirFileId) -> Arc<HirFile>;
 
     #[salsa::invoke(module::module_with_source_map_query)]
-    fn module_with_source_map(
-        &self,
-        module_id: ModuleId,
-    ) -> (Arc<ModuleDecl>, Arc<ModuleSourceMap>);
+    fn module_with_source_map(&self, module_id: ModuleId) -> (Arc<Module>, Arc<ModuleSourceMap>);
 
-    fn module(&self, module_id: ModuleId) -> Arc<ModuleDecl>;
+    fn module(&self, module_id: ModuleId) -> Arc<Module>;
+
+    #[salsa::invoke(block::block_with_source_map_query)]
+    fn block_with_source_map(&self, block_id: BlockId) -> (Arc<Block>, Arc<BlockSourceMap>);
+
+    fn block(&self, block_id: BlockId) -> Arc<Block>;
 
     #[salsa::invoke(UnitScope::unit_scope_query)]
     fn unit_scope(&self) -> Arc<UnitScope>;
@@ -53,6 +72,10 @@ fn hir_file(db: &dyn HirDb, file_id: HirFileId) -> Arc<HirFile> {
     db.hir_file_with_source_map(file_id).0
 }
 
-fn module(db: &dyn HirDb, module_id: ModuleId) -> Arc<ModuleDecl> {
+fn module(db: &dyn HirDb, module_id: ModuleId) -> Arc<Module> {
     db.module_with_source_map(module_id).0
+}
+
+fn block(db: &dyn HirDb, block_id: BlockId) -> Arc<Block> {
+    db.block_with_source_map(block_id).0
 }
