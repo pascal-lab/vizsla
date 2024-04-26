@@ -135,5 +135,11 @@ impl SyntaxNodePtr {
     }
 }
 
+impl From<SyntaxNode<'_>> for SyntaxNodePtr {
+    fn from(node: SyntaxNode) -> Self {
+        SyntaxNodePtr::from_node(&node)
+    }
+}
+
 #[cfg(test)]
 mod tests;

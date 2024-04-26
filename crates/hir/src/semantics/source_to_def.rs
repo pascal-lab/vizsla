@@ -1,9 +1,5 @@
 use syntax::{
-    ast::{
-        self,
-        ptr::AstNodePtr,
-        AstNode,
-    },
+    ast::{self, ptr::AstNodePtr, AstNode},
     syntax_kind, SyntaxAncestors, SyntaxNode, SyntaxNodePtr,
 };
 
@@ -15,7 +11,8 @@ use crate::{
         block::{
             block_src::{BlockSrc, LocalBlockSrc},
             BlockId,
-        }, FileItem, LocalModuleSrc, ModuleId, ModuleSrc
+        },
+        FileItem, LocalModuleSrc, ModuleId, ModuleSrc,
     },
 };
 
@@ -24,7 +21,10 @@ struct Source2DefCtx<'a> {
 }
 
 impl Source2DefCtx<'_> {
-    pub(super) fn module_to_def(&mut self, module_src: &InFile<LocalModuleSrc>) -> Option<ModuleId> {
+    pub(super) fn module_to_def(
+        &mut self,
+        module_src: &InFile<LocalModuleSrc>,
+    ) -> Option<ModuleId> {
         let file_id = module_src.file_id;
         let (_, file_source_map) = self.db.hir_file_with_source_map(file_id);
         file_source_map
@@ -56,7 +56,6 @@ impl Source2DefCtx<'_> {
         &mut self,
         InFile { file_id, value: node }: InFile<SyntaxNode<'a>>,
     ) -> Option<ContainerId> {
-        let node_ptr = SyntaxNodePtr::from_node(&node);
         let container_id = match node.kind_id() {
             syntax_kind::MODULE_DECLARATION => {
                 let value = ast::ModuleDeclaration::cast(node).unwrap().to_ptr();
@@ -64,7 +63,7 @@ impl Source2DefCtx<'_> {
                 self.module_to_def(&module_src)?.into()
             }
             syntax_kind::SEQ_BLOCK | syntax_kind::PAR_BLOCK => {
-                let value = LocalBlockSrc::cast(node_ptr).unwrap();
+                let value = LocalBlockSrc::cast(node.into()).unwrap();
                 let block_src = BlockSrc { file_id, value };
                 self.block_to_def(&block_src)?.into()
             }
