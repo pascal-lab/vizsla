@@ -16,10 +16,10 @@ use crate::{
 };
 use la_arena::Idx;
 use rustc_hash::FxHashMap;
-use std::collections::hash_map::Entry;
+use std::{collections::hash_map::Entry, ops::Index};
 use triomphe::Arc;
 
-trait Scope {
+trait Scope: Index<Ident, Output = Self::Entry> {
     type Entry;
 
     fn entries(&mut self) -> &mut FxHashMap<Ident, Self::Entry>;
@@ -32,9 +32,23 @@ trait Scope {
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum BlockScopeOwner {
-    Module { id: ModuleId, scope: Arc<ModuleScope> },
+macro_rules! impl_scope {
+    ($scope:ident[$entry:ident]) => {
+        impl Index<Ident> for $scope {
+            type Output = $entry;
+
+            fn index(&self, ident: Ident) -> &$entry {
+                &self.entries[&ident]
+            }
+        }
+        impl Scope for $scope {
+            type Entry = $entry;
+
+            fn entries(&mut self) -> &mut FxHashMap<Ident, $entry> {
+                &mut self.entries
+            }
+        }
+    };
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -49,13 +63,7 @@ pub enum UnitScopeEntry {
     //TF()
 }
 
-impl Scope for UnitScope {
-    type Entry = UnitScopeEntry;
-
-    fn entries(&mut self) -> &mut FxHashMap<Ident, UnitScopeEntry> {
-        &mut self.entries
-    }
-}
+impl_scope!(UnitScope[UnitScopeEntry]);
 
 impl UnitScope {
     pub fn unit_scope_query(db: &dyn HirDb) -> Arc<UnitScope> {
@@ -104,13 +112,7 @@ pub enum ModuleScopeEntry {
     // TODO: TF()
 }
 
-impl Scope for ModuleScope {
-    type Entry = ModuleScopeEntry;
-
-    fn entries(&mut self) -> &mut FxHashMap<Ident, ModuleScopeEntry> {
-        &mut self.entries
-    }
-}
+impl_scope!(ModuleScope[ModuleScopeEntry]);
 
 impl ModuleScope {
     pub fn module_scope_query(db: &dyn HirDb, module_id: ModuleId) -> Arc<ModuleScope> {
@@ -237,13 +239,7 @@ pub enum BlockScopeEntry {
     // TODO?: Stmt(Idx<Stmt>)
 }
 
-impl Scope for BlockScope {
-    type Entry = BlockScopeEntry;
-
-    fn entries(&mut self) -> &mut FxHashMap<Ident, BlockScopeEntry> {
-        &mut self.entries
-    }
-}
+impl_scope!(BlockScope[BlockScopeEntry]);
 
 impl BlockScope {
     pub fn new(block_id: BlockId, ident: Option<Ident>) -> Self {
