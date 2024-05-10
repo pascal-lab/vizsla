@@ -1,7 +1,7 @@
 use crate::{
     file::InFile,
     hir_def::{
-        expr::{ExprId, LowerExpr, MinTypMaxExpr, Path},
+        expr::{ExprId, LowerExpr, MinTypMaxExpr},
         try_match, SourceMap,
     },
 };
@@ -99,7 +99,7 @@ pub(crate) trait LowerEventExpr: LowerExpr {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum EventControl {
-    Path(Path),
+    Path(ExprId),
     EventExpr(Idx<EventExpr>),
     Star,
 }

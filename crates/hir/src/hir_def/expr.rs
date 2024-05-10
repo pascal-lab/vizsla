@@ -7,9 +7,10 @@ use crate::{
     hir_def::{data::DataType, Ident, SourceMap},
     try_match,
 };
+use itertools::Itertools;
 use la_arena::{Arena, Idx};
 use smallvec::SmallVec;
-use syntax::ast::{self, ptr, AstNode};
+use syntax::ast::{self, ptr, support::AstChildren, AstNode};
 use utils::{try_, try_or_default};
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -22,6 +23,8 @@ pub enum LocalExprSrc {
     ConstPrimary(ptr::ConstantPrimaryPtr),
     ParamExpr(ptr::ParamExpressionPtr),
     ConstParamExpr(ptr::ConstantParamExpressionPtr),
+    Ident(ptr::IdentifierPtr),
+    SystfIdent(ptr::SystemTfIdentifierPtr),
     // NetLValue(ptr::NetLvaluePtr),
     // VarLValue(ptr::VariableLvaluePtr),
     // TODO: NoneRangeVarLValue(ptr::NonerangeVariableLvaluePtr),
@@ -239,12 +242,17 @@ pub enum Expr {
     },
     MinTypMax(MinTypMaxExpr),
     Call {
-        callee: Path,
+        callee: ExprId,
         args: Box<[Arg]>,
     },
     LValue {
-        path: Path,
+        path: ExprId,
         select: Option<Select>,
+    },
+    Path(Ident),
+    Field {
+        receiver: ExprId,
+        field: Ident,
     },
     // TODO: add more primary expressions
 }
@@ -278,9 +286,6 @@ pub enum PartSelectExpr {
     Range { lsb: ExprId, msb: ExprId },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Path(Box<[Ident]>);
-
 pub type ExprId = Idx<Expr>;
 
 macro_rules! map_or_missing {
@@ -302,16 +307,34 @@ pub(crate) trait LowerExpr: LowerLiteral + Lower {
         self.arena_expr().alloc(expr)
     }
 
-    fn lower_systf_identifier(&self, ident: &ast::SystemTfIdentifier) -> Option<Ident> {
-        // TODO: will to_text be too slow?
-        ident.to_text(self.file_text()).map(|s| s.into())
+    fn lower_path(&mut self, idents: AstChildren<ast::Identifier>) -> Option<ExprId> {
+        let mut idents = idents.collect_vec().into_iter().rev();
+        let last_ident = idents.next()?;
+        let path_expr = Expr::Path(self.lower_ident(&last_ident)?);
+        let path_expr_id = self.arena_expr().alloc(path_expr);
+        let src = self.in_file(LocalExprSrc::Ident(last_ident.to_ptr()));
+        self.src_map_expr().insert(src, path_expr_id);
+
+        idents.try_fold(path_expr_id, |receiver, field| {
+            let field_expr = Expr::Field { receiver, field: self.lower_ident(&field)? };
+            let field_expr_id = self.arena_expr().alloc(field_expr);
+            let src = self.in_file(LocalExprSrc::Ident(field.to_ptr()));
+            self.src_map_expr().insert(src, field_expr_id);
+            Some(field_expr_id)
+        })
+    }
+
+    fn lower_systf_path(&mut self, ident: &ast::SystemTfIdentifier) -> Option<ExprId> {
+        let path = self.lower_systf_identifier(ident)?;
+        let path_expr = Expr::Path(path);
+        let path_expr_id = self.arena_expr().alloc(path_expr);
+        let src = self.in_file(LocalExprSrc::SystfIdent(ident.to_ptr()));
+        self.src_map_expr().insert(src, path_expr_id);
+        Some(path_expr_id)
     }
 
     fn lower_net_lvalue(&mut self, netlv: &ast::NetLvalue) -> Option<ExprId> {
-        let path = netlv
-            .identifiers()
-            .map(|ident| self.lower_ident(&ident))
-            .collect::<Option<Box<[_]>>>()?;
+        let path = self.lower_path(netlv.identifiers())?;
 
         let select = if let Some(select) = netlv.constant_select() {
             Some(self.lower_const_select(&select)?)
@@ -319,7 +342,7 @@ pub(crate) trait LowerExpr: LowerLiteral + Lower {
             None
         };
 
-        let expr = Expr::LValue { path: Path(path), select };
+        let expr = Expr::LValue { path, select };
         let expr_id = self.arena_expr().alloc(expr);
         let src = self.in_file(LocalExprSrc::NetLValue(netlv.to_ptr()));
         self.src_map_expr().insert(src, expr_id);
@@ -328,10 +351,7 @@ pub(crate) trait LowerExpr: LowerLiteral + Lower {
     }
 
     fn lower_var_lvalue(&mut self, varlv: &ast::VariableLvalue) -> Option<ExprId> {
-        let path = varlv
-            .identifiers()
-            .map(|ident| self.lower_ident(&ident))
-            .collect::<Option<Box<[_]>>>()?;
+        let path = self.lower_path(varlv.identifiers())?;
 
         let select = if let Some(select) = varlv.select() {
             Some(self.lower_select(&select)?)
@@ -339,7 +359,7 @@ pub(crate) trait LowerExpr: LowerLiteral + Lower {
             None
         };
 
-        let expr = Expr::LValue { path: Path(path), select };
+        let expr = Expr::LValue { path, select };
         let expr_id = self.arena_expr().alloc(expr);
         let src = self.in_file(LocalExprSrc::VarLValue(varlv.to_ptr()));
         self.src_map_expr().insert(src, expr_id);
@@ -648,29 +668,24 @@ pub(crate) trait LowerExpr: LowerLiteral + Lower {
                     let call = call.subroutine_call()?;
                     try_match! {
                         call.tf_call(), tf_call => {
-                            let path = tf_call
-                                .identifiers()
-                                .map(|ident| self.lower_ident(&ident))
-                                .collect::<Option<Box<[_]>>>()?;
+                            let path = self.lower_path(tf_call.identifiers())?;
                             let args = tf_call
                                 .list_of_arguments_parent()
                                 .map_or_else(
                                     || Box::new([]) as Box<[_]>,
                                     |arg_list| self.lower_list_of_args(&arg_list)
                                 );
-                            Expr::Call { callee: Path(path), args }
+                            Expr::Call { callee: path, args }
                         },
                         call.system_tf_call(), sys_tf_call => {
-                            let path = sys_tf_call
-                                .system_tf_identifier()
-                                .and_then(|ident| self.lower_systf_identifier(&ident))?;
+                            let path = self.lower_systf_path(&sys_tf_call.system_tf_identifier()?)?;
                             let args = sys_tf_call
                                 .list_of_arguments_parent()
                                 .map_or_else::<Box<[Arg]>, _, _>(
                                     || Box::new([]),
                                     |arg_list| self.lower_list_of_args(&arg_list)
                                 );
-                            Expr::Call { callee: Path(Box::new([path])), args }
+                            Expr::Call { callee: path, args }
                         },
                         _ => Expr::Missing,
                     }
@@ -686,11 +701,7 @@ pub(crate) trait LowerExpr: LowerLiteral + Lower {
             _ => {
                 if primary.identifiers().count() != 0 {
                     try_or_default! {
-                        let path = primary.identifiers()
-                            .map(|ident| self.lower_ident(&ident))
-                            .collect::<Option<Box<[_]>>>()
-                            .map(Path)?;
-
+                        let path = self.lower_path(primary.identifiers())?;
                         let select = if let Some(select) = primary.select() {
                             Some(self.lower_select(&select)?)
                         } else {

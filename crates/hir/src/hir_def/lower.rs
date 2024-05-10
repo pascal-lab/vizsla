@@ -28,4 +28,8 @@ pub(crate) trait Lower {
     fn lower_ident(&self, ident: &ast::Identifier) -> Option<Ident> {
         lower_ident(ident, self.file_text())
     }
+
+    fn lower_systf_identifier(&self, ident: &ast::SystemTfIdentifier) -> Option<Ident> {
+        ident.to_text(self.file_text()).map(|s| s.into())
+    }
 }
