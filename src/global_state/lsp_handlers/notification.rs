@@ -218,8 +218,8 @@ fn apply_document_changes(
     // Here's an optimization: we only rebuild the index if we have to, iff
     // the change's start line is greater than the last valid line.
     // The VFS will normalize the end of lines to `\n`.
-    // TODO: make line_index incremental?
-    let mut line_index = LineInfo {
+    // TODO: make line_info incremental?
+    let mut line_info = LineInfo {
         index: Arc::new(LineIndex::new(&text)),
         // We don't care about line endings here.
         ending: LineEnding::Unix,
@@ -234,11 +234,11 @@ fn apply_document_changes(
         // The None case can't happen
         let range = change.range.unwrap();
         if index_valid_until <= range.end.line {
-            *Arc::make_mut(&mut line_index.index) = LineIndex::new(&text);
+            *Arc::make_mut(&mut line_info.index) = LineIndex::new(&text);
         }
         index_valid_until = range.start.line;
         // TODO: Use rope for better performance?
-        if let Ok(range) = from_proto::text_range(&line_index, range) {
+        if let Ok(range) = from_proto::text_range(&line_info, range) {
             // TODO: The positions is not correct, but it doesn't matter for now.
             // Maybe we should fix it?
             let range = Range::<usize>::from(range);

@@ -35,7 +35,7 @@ impl GlobalStateSnapshot {
         Ok(file_id)
     }
 
-    pub(crate) fn line_index(&self, file_id: FileId) -> Cancellable<LineInfo> {
+    pub(crate) fn line_info(&self, file_id: FileId) -> Cancellable<LineInfo> {
         let ending = self.vfs.read().1[&file_id];
         let index = self.analysis.line_index(file_id)?;
         let encoding = self.config.position_encoding();

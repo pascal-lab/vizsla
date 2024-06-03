@@ -58,8 +58,8 @@ impl ProjectManifest {
         let entities = fs::read_dir(path)?
             .filter_map(Result::ok)
             .map(|it| it.path().join(MANIFEST_FILE_NAME))
-            .filter(|x| x.exists())
-            .filter_map(|x| Self::from_toml(AbsPathBuf::assert(x)).ok())
+            .filter(|it| it.exists())
+            .filter_map(|it| Self::from_toml(AbsPathBuf::assert_utf8(it)).ok())
             .collect_vec();
 
         if entities.is_empty() {

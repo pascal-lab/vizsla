@@ -20,30 +20,30 @@ pub(crate) fn abs_path(url: &lsp_types::Url) -> anyhow::Result<AbsPathBuf> {
 
 // convert position (line, col) to Offset
 pub(crate) fn offset(
-    line_index: &LineInfo,
+    line_info: &LineInfo,
     position: lsp_types::Position,
 ) -> anyhow::Result<TextSize> {
-    let line_col = match line_index.encoding {
+    let line_col = match line_info.encoding {
         PositionEncoding::Utf8 => LineCol { line: position.line, col: position.character },
         PositionEncoding::Wide(enc) => {
             let line_col = WideLineCol { line: position.line, col: position.character };
-            line_index
+            line_info
                 .index
                 .to_utf8(enc, line_col)
                 .ok_or_else(|| anyhow::format_err!("Invalid wide col offset"))?
         }
     };
     let text_size =
-        line_index.index.offset(line_col).ok_or_else(|| anyhow::format_err!("Invalid offset"))?;
+        line_info.index.offset(line_col).ok_or_else(|| anyhow::format_err!("Invalid offset"))?;
     Ok(text_size)
 }
 
 pub(crate) fn text_range(
-    line_index: &LineInfo,
+    line_info: &LineInfo,
     range: lsp_types::Range,
 ) -> anyhow::Result<TextRange> {
-    let start = offset(line_index, range.start)?;
-    let end = offset(line_index, range.end)?;
+    let start = offset(line_info, range.start)?;
+    let end = offset(line_info, range.end)?;
 
     if end < start {
         return Err(anyhow::format_err!("Invalid Range"));
@@ -57,7 +57,7 @@ pub(crate) fn file_position(
     pos_params: lsp_types::TextDocumentPositionParams,
 ) -> anyhow::Result<FilePosition> {
     let file_id = snap.file_id(&pos_params.text_document.uri)?;
-    let line_index = snap.line_index(file_id)?;
+    let line_index = snap.line_info(file_id)?;
     let offset = offset(&line_index, pos_params.position)?;
     Ok(FilePosition { file_id, offset })
 }
