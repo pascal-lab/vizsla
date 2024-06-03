@@ -20,30 +20,28 @@ pub(crate) fn abs_path(url: &lsp_types::Url) -> anyhow::Result<AbsPathBuf> {
 
 // convert position (line, col) to Offset
 pub(crate) fn offset(
-    line_info: &LineInfo,
-    position: lsp_types::Position,
+    LineInfo { index, encoding, .. }: &LineInfo,
+    pos: lsp_types::Position,
 ) -> anyhow::Result<TextSize> {
-    let line_col = match line_info.encoding {
-        PositionEncoding::Utf8 => LineCol { line: position.line, col: position.character },
+    let line_col = match *encoding {
+        PositionEncoding::Utf8 => LineCol { line: pos.line, col: pos.character },
         PositionEncoding::Wide(enc) => {
-            let line_col = WideLineCol { line: position.line, col: position.character };
-            line_info
-                .index
+            let line_col = WideLineCol { line: pos.line, col: pos.character };
+            index
                 .to_utf8(enc, line_col)
                 .ok_or_else(|| anyhow::format_err!("Invalid wide col offset"))?
         }
     };
-    let text_size =
-        line_info.index.offset(line_col).ok_or_else(|| anyhow::format_err!("Invalid offset"))?;
+    let text_size = index.offset(line_col).ok_or_else(|| anyhow::format_err!("Invalid offset"))?;
     Ok(text_size)
 }
 
 pub(crate) fn text_range(
     line_info: &LineInfo,
-    range: lsp_types::Range,
+    lsp_types::Range { start, end }: lsp_types::Range,
 ) -> anyhow::Result<TextRange> {
-    let start = offset(line_info, range.start)?;
-    let end = offset(line_info, range.end)?;
+    let start = offset(line_info, start)?;
+    let end = offset(line_info, end)?;
 
     if end < start {
         return Err(anyhow::format_err!("Invalid Range"));

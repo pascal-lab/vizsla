@@ -18,13 +18,13 @@ pub(crate) fn goto_definition_response(
     src: Option<FileRange>,
     targets: Vec<NavTarget>,
 ) -> Cancellable<lsp_types::GotoDefinitionResponse> {
-    if snap.config.location_link() {
+    let res = if snap.config.location_link() {
         let links = targets
             .into_iter()
             .unique_by(|nav| (nav.file_id, nav.full_range, nav.focus_range))
             .map(|nav| location_link(snap, src, nav))
             .collect::<Cancellable<Vec<_>>>()?;
-        Ok(links.into())
+        links.into()
     } else {
         let locations = targets
             .into_iter()
@@ -32,8 +32,9 @@ pub(crate) fn goto_definition_response(
             .unique()
             .map(|range| location(snap, range))
             .collect::<Cancellable<Vec<_>>>()?;
-        Ok(locations.into())
-    }
+        locations.into()
+    };
+    Ok(res)
 }
 
 fn location(
@@ -67,14 +68,14 @@ fn location_link(
 
 fn location_info(
     snap: &GlobalStateSnapshot,
-    target: NavTarget,
+    NavTarget { file_id, full_range, focus_range, .. }: NavTarget,
 ) -> Cancellable<(lsp_types::Url, lsp_types::Range, lsp_types::Range)> {
-    let line_info = snap.line_info(target.file_id)?;
+    let line_info = snap.line_info(file_id)?;
 
-    let target_uri = url(snap, target.file_id);
-    let target_range = lsp_range(&line_info, target.full_range);
+    let target_uri = url(snap, file_id);
+    let target_range = lsp_range(&line_info, full_range);
     let target_selection_range =
-        target.focus_range.map(|it| lsp_range(&line_info, it)).unwrap_or(target_range);
+        focus_range.map(|it| lsp_range(&line_info, it)).unwrap_or(target_range);
     Ok((target_uri, target_range, target_selection_range))
 }
 
