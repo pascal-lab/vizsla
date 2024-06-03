@@ -1,5 +1,6 @@
-use crate::{ast::AstNode, syntax_kind, SyntaxChildren, SyntaxNode};
 use std::marker::PhantomData;
+
+use crate::{ast::AstNode, syntax_kind, SyntaxChildren, SyntaxNode};
 
 pub struct AstChildren<'a, N> {
     syntax_children: SyntaxChildren<'a>,
@@ -14,6 +15,7 @@ impl<'a, N: AstNode<'a>> AstChildren<'a, N> {
 
 impl<'a, N: AstNode<'a>> Iterator for AstChildren<'a, N> {
     type Item = N;
+
     fn next(&mut self) -> Option<N> {
         self.syntax_children.find_map(N::cast)
     }

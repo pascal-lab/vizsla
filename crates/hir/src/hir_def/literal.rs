@@ -7,7 +7,6 @@ use super::{
     bit::{Bit, BoxBasedBitVector},
     lower::Lower,
 };
-
 use crate::try_match;
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]

@@ -7,28 +7,28 @@ pub mod reload;
 pub mod respond;
 pub(crate) mod snapshot;
 
+use std::time::Instant;
+
 use base_db::source_root::SourceRootConfig;
 use crossbeam_channel::{unbounded, Receiver, Sender};
+use ide::analysis_host::AnalysisHost;
 use lsp_server::{Message, ReqQueue, Request};
 use nohash_hasher::IntMap;
 use parking_lot::RwLock;
 use project_model::workspace::Workspace;
-use std::time::Instant;
 use triomphe::Arc;
 use utils::{
     excl_task::ExclTask,
     lines::LineEnding,
     thread::{Pool, ThreadIntent},
 };
-
-use crate::config::{Config, ConfigError};
-use ide::analysis_host::AnalysisHost;
 use vfs::{
     self,
     vfs::{FileId, Vfs},
 };
 
 use self::{main_loop::Task, mem_docs::MemDocs, snapshot::GlobalStateSnapshot};
+use crate::config::{Config, ConfigError};
 
 pub(crate) struct TaskPool<T> {
     pub(crate) sender: Sender<T>,

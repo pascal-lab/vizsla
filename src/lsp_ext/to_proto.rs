@@ -82,7 +82,8 @@ pub(crate) fn url(snap: &GlobalStateSnapshot, file_id: FileId) -> lsp_types::Url
     snap.url(file_id)
 }
 
-// Returns a `Url` object from a given path, will lowercase drive letters if present.
+// Returns a `Url` object from a given path, will lowercase drive letters if
+// present.
 //
 // This will only happen when processing windows paths.
 // When processing non-windows path, this is the same as `Url::from_file_path`.

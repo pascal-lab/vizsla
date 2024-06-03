@@ -9,9 +9,8 @@ use syntax::{
 };
 use vfs::vfs::FileId;
 
-use crate::{container::ContainerId, db::HirDb, file::HirFileId, scope::Scope};
-
 use self::source_to_def::Source2DefCtx;
+use crate::{container::ContainerId, db::HirDb, file::HirFileId, scope::Scope};
 
 pub mod pathres;
 mod source_to_def;

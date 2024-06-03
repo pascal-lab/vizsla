@@ -1,9 +1,10 @@
+use std::collections::hash_map::Entry::{Occupied, Vacant};
+
 use base_db::change::Change;
 use itertools::Itertools;
 use nohash_hasher::IntMap;
 use parking_lot::{RwLockUpgradableReadGuard, RwLockWriteGuard};
 use rustc_hash::FxHashMap;
-use std::collections::hash_map::Entry::{Occupied, Vacant};
 use utils::{lines::LineEnding, text_edit::SourceEditKind};
 use vfs::vfs::{ChangedFile, FileId, Vfs};
 

@@ -1,11 +1,11 @@
-use crate::{goto_definition, navigation_target::NavTarget, Cancellable};
 use base_db::{salsa, Cancelled};
-use ide_db::line_index_db::LineIndexDb;
-use ide_db::root_db::RootDb;
+use ide_db::{line_index_db::LineIndexDb, root_db::RootDb};
 use line_index::LineIndex;
 use span::{FilePosition, RangeInfo};
 use triomphe::Arc;
 use vfs::vfs::FileId;
+
+use crate::{goto_definition, navigation_target::NavTarget, Cancellable};
 
 #[derive(Debug)]
 pub struct Analysis {

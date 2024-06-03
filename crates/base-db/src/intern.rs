@@ -17,6 +17,7 @@ macro_rules! impl_intern_key {
             fn from_intern_id(v: $crate::salsa::InternId) -> Self {
                 $name(v)
             }
+
             fn as_intern_id(&self) -> $crate::salsa::InternId {
                 self.0
             }
@@ -30,14 +31,16 @@ macro_rules! impl_intern_lookup {
         impl $crate::intern::Intern for $loc {
             type Database<'db> = dyn $db + 'db;
             type ID = $id;
+
             fn intern(self, db: &Self::Database<'_>) -> $id {
                 db.$intern(self)
             }
         }
 
         impl $crate::intern::Lookup for $id {
-            type Database<'db> = dyn $db + 'db;
             type Data = $loc;
+            type Database<'db> = dyn $db + 'db;
+
             fn lookup(&self, db: &Self::Database<'_>) -> $loc {
                 db.$lookup(*self)
             }

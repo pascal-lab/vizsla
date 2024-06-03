@@ -1,9 +1,10 @@
 #[cfg(test)]
 mod test {
-    use crate::*;
     use ast::{self, AstNode};
     use tree_sitter::Parser;
     use tree_sitter_verilog;
+
+    use crate::*;
 
     #[test]
     fn test_ast_src() {

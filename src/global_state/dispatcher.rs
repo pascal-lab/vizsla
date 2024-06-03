@@ -1,16 +1,16 @@
-use ide::Cancelled;
-use lsp_server::{ExtractError, Request, Response};
-use serde::{de::DeserializeOwned, Serialize};
 use std::{
     fmt,
     panic::{self, UnwindSafe},
     thread,
 };
+
+use ide::Cancelled;
+use lsp_server::{ExtractError, Request, Response};
+use serde::{de::DeserializeOwned, Serialize};
 use utils::{json::from_json, thread::ThreadIntent};
 
-use crate::{global_state::GlobalState, lsp_ext::lsp_error::LspError};
-
 use super::{main_loop::Task, snapshot::GlobalStateSnapshot};
+use crate::{global_state::GlobalState, lsp_ext::lsp_error::LspError};
 
 pub(crate) struct ReqDispatcher<'a> {
     pub(crate) req: Option<Request>,

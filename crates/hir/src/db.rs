@@ -1,3 +1,7 @@
+use base_db::{impl_intern_key, impl_intern_lookup, salsa, source_db::SourceDb};
+use syntax::parse::SyntaxTree;
+use triomphe::Arc;
+
 use crate::{
     file::HirFileId,
     hir_def::{
@@ -8,10 +12,6 @@ use crate::{
     },
     scope::{BlockScope, ModuleScope, UnitScope},
 };
-use base_db::{impl_intern_key, impl_intern_lookup, salsa, source_db::SourceDb};
-
-use syntax::parse::SyntaxTree;
-use triomphe::Arc;
 
 #[macro_export]
 macro_rules! impl_intern {

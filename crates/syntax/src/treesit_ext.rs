@@ -1,6 +1,7 @@
-use crate::{syntax_kind::SyntaxKindId, SyntaxAncestors, SyntaxNode};
 use line_index::TextSize;
 use utils::text_edit::to_text_range;
+
+use crate::{syntax_kind::SyntaxKindId, SyntaxAncestors, SyntaxNode};
 
 #[derive(Clone, Debug)]
 pub enum TokenAtOffset<'a> {

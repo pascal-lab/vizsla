@@ -24,6 +24,7 @@ impl<'a> SyntaxChildren<'a> {
 
 impl<'a> Iterator for SyntaxChildren<'a> {
     type Item = SyntaxNode<'a>;
+
     fn next(&mut self) -> Option<SyntaxNode<'a>> {
         let cursor = self.cursor.as_mut()?;
         let cur_node = cursor.node();
@@ -50,6 +51,7 @@ impl<'a> SyntaxAncestors<'a> {
 
 impl<'a> Iterator for SyntaxAncestors<'a> {
     type Item = SyntaxNode<'a>;
+
     fn next(&mut self) -> Option<SyntaxNode<'a>> {
         let node = self.node.take()?;
         self.node = node.parent();

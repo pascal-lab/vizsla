@@ -2,6 +2,18 @@ mod lower;
 pub mod module_item;
 pub mod port;
 
+use std::ops::Index;
+
+use itertools::Either;
+use la_arena::{Arena, Idx, IdxRange};
+use syntax::ast::ptr;
+use triomphe::Arc;
+use utils::try_;
+
+use super::{
+    block::{block_src::BlockSrc, BlockInfo},
+    ModuleId,
+};
 use crate::{
     container::InFile,
     db::HirDb,
@@ -19,17 +31,6 @@ use crate::{
         Ident,
         SourceMap,
     },
-};
-use itertools::Either;
-use la_arena::{Arena, Idx, IdxRange};
-use std::ops::Index;
-use syntax::ast::ptr;
-use triomphe::Arc;
-use utils::try_;
-
-use super::{
-    block::{block_src::BlockSrc, BlockInfo},
-    ModuleId,
 };
 
 #[derive(Debug, PartialEq, Eq, Clone)]

@@ -1,3 +1,9 @@
+use la_arena::{Arena, Idx, IdxRange, RawIdx};
+use smallvec::SmallVec;
+use syntax::ast::{self, ptr};
+use utils::try_;
+
+use super::{literal::Literal, ModuleId};
 use crate::{
     container::InFile,
     hir_def::{
@@ -6,12 +12,6 @@ use crate::{
         try_match, Ident, SourceMap,
     },
 };
-use la_arena::{Arena, Idx, IdxRange, RawIdx};
-use smallvec::SmallVec;
-use syntax::ast::{self, ptr};
-use utils::try_;
-
-use super::{literal::Literal, ModuleId};
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum DataType {

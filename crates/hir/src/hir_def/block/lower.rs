@@ -2,6 +2,9 @@ use la_arena::Arena;
 use syntax::ast::{self, ptr::EventExpressionPtr};
 use utils::try_;
 
+use super::{
+    block_src::BlockSrc, Block, BlockId, BlockInfo, BlockKind, BlockSourceMap, JoinKeyword,
+};
 use crate::{
     container::InFile,
     db::InternDb,
@@ -19,10 +22,6 @@ use crate::{
         SourceMap,
     },
     try_match,
-};
-
-use super::{
-    block_src::BlockSrc, Block, BlockId, BlockInfo, BlockKind, BlockSourceMap, JoinKeyword,
 };
 
 pub fn lower_join_keyword(keyword: &ast::JoinKeyword) -> Option<JoinKeyword> {

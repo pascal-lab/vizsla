@@ -1,12 +1,13 @@
 use std::{fmt, hash::BuildHasherDefault, mem};
 
+use indexmap::IndexSet;
+use rustc_hash::FxHasher;
+use utils::{lines::LineEnding, text_edit::SourceEditKind};
+
 use crate::{
     loader::{VfsLoadError, VfsLoadResult},
     vfs_path::VfsPath,
 };
-use indexmap::IndexSet;
-use rustc_hash::FxHasher;
-use utils::{lines::LineEnding, text_edit::SourceEditKind};
 
 #[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct FileId(pub u32);

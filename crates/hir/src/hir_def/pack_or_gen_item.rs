@@ -1,9 +1,10 @@
+use la_arena::Idx;
+use syntax::ast;
+
 use crate::hir_def::{
     data::{DataDecl, LowerDataDecl},
     try_match,
 };
-use la_arena::Idx;
-use syntax::ast;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum PackOrGenItemDecl {

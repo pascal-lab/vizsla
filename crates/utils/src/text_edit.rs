@@ -23,9 +23,11 @@ impl TextEditItem {
     pub fn insert(offset: TextSize, text: String) -> TextEditItem {
         TextEditItem::replace(TextRange::empty(offset), text)
     }
+
     pub fn delete(range: TextRange) -> TextEditItem {
         TextEditItem::replace(range, String::new())
     }
+
     pub fn replace(range: TextRange, replace_with: String) -> TextEditItem {
         TextEditItem { del: range, ins: replace_with }
     }
@@ -138,8 +140,8 @@ impl TextEdit {
 }
 
 impl IntoIterator for TextEdit {
-    type Item = TextEditItem;
     type IntoIter = std::vec::IntoIter<TextEditItem>;
+    type Item = TextEditItem;
 
     fn into_iter(self) -> Self::IntoIter {
         self.changes.into_iter()
@@ -147,8 +149,8 @@ impl IntoIterator for TextEdit {
 }
 
 impl<'a> IntoIterator for &'a TextEdit {
-    type Item = &'a TextEditItem;
     type IntoIter = std::slice::Iter<'a, TextEditItem>;
+    type Item = &'a TextEditItem;
 
     fn into_iter(self) -> Self::IntoIter {
         self.changes.iter()

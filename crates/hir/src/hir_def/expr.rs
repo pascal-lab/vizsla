@@ -1,3 +1,9 @@
+use itertools::Itertools;
+use la_arena::{Arena, Idx};
+use smallvec::SmallVec;
+use syntax::ast::{self, ptr, support::AstChildren, AstNode};
+use utils::{try_, try_or_default};
+
 use super::{
     literal::{Literal, LowerLiteral},
     lower::Lower,
@@ -7,11 +13,6 @@ use crate::{
     hir_def::{data::DataType, Ident, SourceMap},
     try_match,
 };
-use itertools::Itertools;
-use la_arena::{Arena, Idx};
-use smallvec::SmallVec;
-use syntax::ast::{self, ptr, support::AstChildren, AstNode};
-use utils::{try_, try_or_default};
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum LocalExprSrc {

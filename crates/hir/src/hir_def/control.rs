@@ -1,3 +1,7 @@
+use la_arena::{Arena, Idx};
+use syntax::ast::{self, ptr};
+
+use super::literal::Literal;
 use crate::{
     container::InFile,
     hir_def::{
@@ -5,10 +9,6 @@ use crate::{
         try_match, SourceMap,
     },
 };
-use la_arena::{Arena, Idx};
-use syntax::ast::{self, ptr};
-
-use super::literal::Literal;
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum DelayControl {

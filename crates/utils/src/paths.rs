@@ -27,6 +27,7 @@ impl From<AbsPathBuf> for PathBuf {
 
 impl ops::Deref for AbsPathBuf {
     type Target = AbsPath;
+
     fn deref(&self) -> &AbsPath {
         self.as_path()
     }
@@ -58,6 +59,7 @@ impl Borrow<AbsPath> for AbsPathBuf {
 
 impl TryFrom<Utf8PathBuf> for AbsPathBuf {
     type Error = Utf8PathBuf;
+
     fn try_from(path_buf: Utf8PathBuf) -> Result<AbsPathBuf, Utf8PathBuf> {
         if !path_buf.is_absolute() {
             return Err(path_buf);
@@ -68,6 +70,7 @@ impl TryFrom<Utf8PathBuf> for AbsPathBuf {
 
 impl TryFrom<PathBuf> for AbsPathBuf {
     type Error = PathBuf;
+
     fn try_from(path_buf: PathBuf) -> Result<AbsPathBuf, PathBuf> {
         if !path_buf.is_absolute() {
             return Err(path_buf);
@@ -78,6 +81,7 @@ impl TryFrom<PathBuf> for AbsPathBuf {
 
 impl TryFrom<&str> for AbsPathBuf {
     type Error = PathBuf;
+
     fn try_from(path: &str) -> Result<AbsPathBuf, PathBuf> {
         AbsPathBuf::try_from(PathBuf::from(path))
     }
@@ -148,6 +152,7 @@ impl ToOwned for AbsPath {
 
 impl<'a> TryFrom<&'a Utf8Path> for &'a AbsPath {
     type Error = &'a Utf8Path;
+
     fn try_from(path: &'a Utf8Path) -> Result<&'a AbsPath, &'a Utf8Path> {
         if !path.is_absolute() {
             return Err(path);
@@ -185,9 +190,11 @@ impl AbsPath {
     pub fn strip_prefix(&self, base: &AbsPath) -> Option<&RelPath> {
         self.0.strip_prefix(base).ok().map(RelPath::new_unchecked)
     }
+
     pub fn starts_with(&self, base: &AbsPath) -> bool {
         self.0.starts_with(&base.0)
     }
+
     pub fn ends_with(&self, suffix: &RelPath) -> bool {
         self.0.ends_with(&suffix.0)
     }
@@ -234,6 +241,7 @@ impl From<RelPathBuf> for Utf8PathBuf {
 
 impl ops::Deref for RelPathBuf {
     type Target = RelPath;
+
     fn deref(&self) -> &RelPath {
         self.as_path()
     }
@@ -253,6 +261,7 @@ impl AsRef<Path> for RelPathBuf {
 
 impl TryFrom<Utf8PathBuf> for RelPathBuf {
     type Error = Utf8PathBuf;
+
     fn try_from(path_buf: Utf8PathBuf) -> Result<RelPathBuf, Utf8PathBuf> {
         if !path_buf.is_relative() {
             return Err(path_buf);
@@ -263,6 +272,7 @@ impl TryFrom<Utf8PathBuf> for RelPathBuf {
 
 impl TryFrom<&str> for RelPathBuf {
     type Error = Utf8PathBuf;
+
     fn try_from(path: &str) -> Result<RelPathBuf, Utf8PathBuf> {
         RelPathBuf::try_from(Utf8PathBuf::from(path))
     }

@@ -1,8 +1,9 @@
-use std::fmt;
-
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc,
+use std::{
+    fmt,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
 };
 
 use crossbeam_channel::{Receiver, Sender};

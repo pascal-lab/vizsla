@@ -16,34 +16,35 @@ use crate::config::Config;
 
 impl Config {
     pub fn cli_completion_label_details_support(&self) -> bool {
-        try_!(self
-            .client_caps
-            .text_document
-            .as_ref()?
-            .completion
-            .as_ref()?
-            .completion_item
-            .as_ref()?
-            .label_details_support
-            .as_ref()?)
+        try_!(
+            self.client_caps
+                .text_document
+                .as_ref()?
+                .completion
+                .as_ref()?
+                .completion_item
+                .as_ref()?
+                .label_details_support
+                .as_ref()?
+        )
         .is_some()
     }
 
     pub fn cli_completion_item_edit_resolve(&self) -> bool {
-        try_!(self
-            .client_caps
-            .text_document
-            .as_ref()?
-            .completion
-            .as_ref()?
-            .completion_item
-            .as_ref()?
-            .resolve_support
-            .as_ref()?
-            .properties
-            .iter()
-            .any(|cap_string| cap_string.as_str() == "additionalTextEdits"))
-            == Some(true)
+        try_!(
+            self.client_caps
+                .text_document
+                .as_ref()?
+                .completion
+                .as_ref()?
+                .completion_item
+                .as_ref()?
+                .resolve_support
+                .as_ref()?
+                .properties
+                .iter()
+                .any(|cap_string| cap_string.as_str() == "additionalTextEdits")
+        ) == Some(true)
     }
 
     pub fn location_link(&self) -> bool {
@@ -139,14 +140,15 @@ impl Config {
             document_symbol_provider: OneOf::Left(true).into(),
             workspace_symbol_provider: OneOf::Left(true).into(),
             code_action_provider: Some({
-                try_!(self
-                    .client_caps
-                    .text_document
-                    .as_ref()?
-                    .code_action
-                    .as_ref()?
-                    .code_action_literal_support
-                    .as_ref()?)
+                try_!(
+                    self.client_caps
+                        .text_document
+                        .as_ref()?
+                        .code_action
+                        .as_ref()?
+                        .code_action_literal_support
+                        .as_ref()?
+                )
                 .map_or(true.into(), |_| {
                     CodeActionOptions {
                         code_action_kinds: vec![

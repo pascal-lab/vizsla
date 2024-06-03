@@ -1,12 +1,3 @@
-use crate::{
-    container::InFile,
-    hir_def::{
-        block::BlockInfo,
-        control::{DelayOrEventControl, LowerTimingControl, ProceduralTimingControlControl},
-        expr::{self, AssignOp, ExprId, LowerExpr},
-        try_match, Ident, SourceMap,
-    },
-};
 use la_arena::{Arena, Idx};
 use smallvec::SmallVec;
 use syntax::ast::{self, ptr};
@@ -17,6 +8,15 @@ use super::{
         BlockItemDecl, BlockLoc,
     },
     data::LowerDataDecl,
+};
+use crate::{
+    container::InFile,
+    hir_def::{
+        block::BlockInfo,
+        control::{DelayOrEventControl, LowerTimingControl, ProceduralTimingControlControl},
+        expr::{self, AssignOp, ExprId, LowerExpr},
+        try_match, Ident, SourceMap,
+    },
 };
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]

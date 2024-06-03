@@ -8,11 +8,7 @@ pub enum Bit {
 
 impl From<bool> for Bit {
     fn from(b: bool) -> Self {
-        if b {
-            Bit::H
-        } else {
-            Bit::L
-        }
+        if b { Bit::H } else { Bit::L }
     }
 }
 

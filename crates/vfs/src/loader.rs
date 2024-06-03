@@ -87,8 +87,8 @@ impl Directories {
     ///
     /// It is included if
     ///   - An element in `self.include` is a prefix of `path`.
-    ///   - This path is longer than any element in `self.exclude` that is a prefix
-    ///     of `path`. In case of equality, exclusion wins.
+    ///   - This path is longer than any element in `self.exclude` that is a
+    ///     prefix of `path`. In case of equality, exclusion wins.
     fn includes_path(&self, path: &AbsPath) -> bool {
         let mut longest_incl: Option<&AbsPathBuf> = None;
         for incl in &self.include {

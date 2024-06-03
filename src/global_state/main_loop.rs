@@ -10,8 +10,6 @@ use triomphe::Arc;
 use utils::text_edit::SourceEditKind;
 use vfs::vfs_path::VfsPath;
 
-use crate::config::Config;
-
 use super::{
     dispatcher::{NotifDispatcher, ReqDispatcher},
     lsp_handlers,
@@ -19,6 +17,7 @@ use super::{
     respond::Progress,
     GlobalState, VfsProgress,
 };
+use crate::config::Config;
 
 #[derive(Debug)]
 enum Event {
@@ -148,7 +147,9 @@ impl GlobalState {
 
         let loop_duration = loop_start.elapsed();
         if loop_duration > Duration::from_millis(100) && was_quiescent {
-            tracing::warn!("overly long loop turn took {loop_duration:?} (event handling took {event_handling_duration:?}): {event_dbg_msg}");
+            tracing::warn!(
+                "overly long loop turn took {loop_duration:?} (event handling took {event_handling_duration:?}): {event_dbg_msg}"
+            );
         }
 
         Ok(())
@@ -181,9 +182,10 @@ impl GlobalState {
     }
 
     fn handle_notification(&mut self, notif: Notification) -> anyhow::Result<()> {
-        use crate::lsp_ext::ext::*;
         use lsp_handlers::notification::*;
         use lsp_types::notification::*;
+
+        use crate::lsp_ext::ext::*;
 
         NotifDispatcher { notif: Some(notif), global_state: self }
             .on_sync_mut::<Cancel>(handle_cancel)?

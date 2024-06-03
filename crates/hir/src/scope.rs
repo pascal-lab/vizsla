@@ -1,3 +1,10 @@
+use std::collections::hash_map;
+
+use la_arena::Idx;
+use rustc_hash::FxHashMap;
+use triomphe::Arc;
+use utils::impl_from;
+
 use crate::{
     container::InFile,
     db::HirDb,
@@ -15,11 +22,6 @@ use crate::{
         FileItem, Ident, ModuleId,
     },
 };
-use la_arena::Idx;
-use rustc_hash::FxHashMap;
-use std::collections::hash_map;
-use triomphe::Arc;
-use utils::impl_from;
 
 trait IntoScope {
     type Entry: Copy;
@@ -243,14 +245,12 @@ impl ModuleScope {
     }
 
     fn collect_port_decls(&mut self, module: &Module) {
-        module.data.port_decls.iter().for_each(|(_, port_decl)| {
-            match port_decl {
-                PortDecl::IOPortDef(io_decl) => {
-                    for sub_decl_idx in io_decl.sub_decls.clone() {
-                        let ident = module[sub_decl_idx].ident.clone();
-                        let entry = ModuleScopeEntry::PortDecl { port: sub_decl_idx, data: None };
-                        self.insert_entry(ident, entry);
-                    }
+        module.data.port_decls.iter().for_each(|(_, port_decl)| match port_decl {
+            PortDecl::IOPortDef(io_decl) => {
+                for sub_decl_idx in io_decl.sub_decls.clone() {
+                    let ident = module[sub_decl_idx].ident.clone();
+                    let entry = ModuleScopeEntry::PortDecl { port: sub_decl_idx, data: None };
+                    self.insert_entry(ident, entry);
                 }
             }
         });

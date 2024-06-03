@@ -1,11 +1,11 @@
 pub mod caps;
 pub mod user_config;
 
-use crate::Opt;
+use std::{fmt, path::PathBuf};
+
 use itertools::Itertools;
 use lsp_types::ClientCapabilities;
 use project_model::project_manifest::ProjectManifest;
-use std::{fmt, path::PathBuf};
 use triomphe::Arc;
 use utils::{
     json::get_field,
@@ -14,6 +14,7 @@ use utils::{
 };
 
 use self::user_config::{FilesWatcherDef, UserConfig};
+use crate::Opt;
 
 #[derive(Debug, Clone)]
 pub struct FilesConfig {
@@ -98,11 +99,7 @@ impl Config {
         self.user_config = user_config;
         self.detached_files = Arc::new(detached_files);
 
-        if errors.is_empty() {
-            Ok(())
-        } else {
-            Err(errors)
-        }
+        if errors.is_empty() { Ok(()) } else { Err(errors) }
     }
 
     pub(crate) fn parse_initialization_options(

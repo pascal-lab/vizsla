@@ -7,12 +7,11 @@ use triomphe::Arc;
 use utils::lines::{LineEnding, LineInfo};
 use vfs::vfs::{FileId, Vfs};
 
+use super::mem_docs::MemDocs;
 use crate::{
     config::Config,
     lsp_ext::{from_proto, to_proto},
 };
-
-use super::mem_docs::MemDocs;
 
 // immutable
 pub(crate) struct GlobalStateSnapshot {

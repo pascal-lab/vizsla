@@ -4,8 +4,7 @@ use syntax::{
 };
 
 use crate::{
-    container::ContainerId,
-    container::InFile,
+    container::{ContainerId, InFile},
     db::HirDb,
     hir_def::{
         block::{

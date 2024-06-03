@@ -12,11 +12,12 @@ pub mod pack_or_gen_item;
 pub mod stmt;
 pub mod tf;
 
+use std::{hash::Hash, ops::Index};
+
 use la_arena::{Arena, ArenaMap, Idx, IdxRange};
 use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
 use smol_str::SmolStr;
-use std::{hash::Hash, ops::Index};
 use syntax::ast::{self, ptr, AstNode};
 use triomphe::Arc;
 use utils::try_;

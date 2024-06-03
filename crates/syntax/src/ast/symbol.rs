@@ -1,11 +1,11 @@
 mod generated;
 
+pub use generated::*;
+
 use crate::{
     ast::{AstNode, SyntaxNode},
     syntax_kind,
 };
-
-pub use generated::*;
 
 pub struct ErrorNode<'a> {
     syntax: SyntaxNode<'a>,

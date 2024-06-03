@@ -1,10 +1,15 @@
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fs,
+    path::Path,
+};
+
+use inflector::Inflector;
+use quote::{format_ident, quote};
+
 use super::ast_src::{
     self, Cardinalikind, Field, Fields, Symbol, SymbolOrToken, TOKEN_REPLACE_PAIR,
 };
-use inflector::Inflector;
-use quote::{format_ident, quote};
-use std::collections::{BTreeMap, BTreeSet};
-use std::{fs, path::Path};
 
 struct Grammar {
     symbols: Vec<Symbol>,

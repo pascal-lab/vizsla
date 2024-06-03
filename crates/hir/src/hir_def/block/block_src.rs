@@ -16,6 +16,7 @@ impl AstNodePtr for LocalBlockSrc {
     fn can_cast(kind_id: syntax_kind::SyntaxKindId) -> bool {
         kind_id == syntax_kind::SEQ_BLOCK || kind_id == syntax_kind::PAR_BLOCK
     }
+
     fn cast(syntax: syntax::SyntaxNodePtr) -> Option<LocalBlockSrc> {
         match syntax.kind_id() {
             syntax_kind::SEQ_BLOCK => Some(ptr::SeqBlockPtr::cast(syntax)?.into()),
@@ -23,6 +24,7 @@ impl AstNodePtr for LocalBlockSrc {
             _ => None,
         }
     }
+
     fn syntax(&self) -> &syntax::SyntaxNodePtr {
         match self {
             LocalBlockSrc::SeqBlock(ptr) => ptr.syntax(),

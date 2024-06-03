@@ -86,8 +86,8 @@ impl VfsPath {
 
     /// Encode the path in the given buffer.
     ///
-    /// The encoding will be `0` if [`AbsPathBuf`], `1` if [`VirtualPath`], followed
-    /// by `self`'s representation.
+    /// The encoding will be `0` if [`AbsPathBuf`], `1` if [`VirtualPath`],
+    /// followed by `self`'s representation.
     ///
     /// Note that this encoding is dependent on the operating system.
     pub(crate) fn encode(&self, buf: &mut Vec<u8>) {
@@ -299,7 +299,8 @@ impl VirtualPath {
     ///
     /// # Returns
     /// - `None` if `self` ends with `"//"`.
-    /// - `Some((name, None))` if `self`'s base contains no `.`, or only one `.` at
+    /// - `Some((name, None))` if `self`'s base contains no `.`, or only one `.`
+    ///   at
     /// the start.
     /// - `Some((name, Some(extension))` else.
     ///

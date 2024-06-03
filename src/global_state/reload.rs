@@ -7,12 +7,11 @@ use rustc_hash::FxHashSet;
 use triomphe::Arc;
 use utils::{paths::AbsPath, thread::ThreadIntent};
 
+use super::main_loop::Task;
 use crate::{
     config::{Config, FilesWatcher},
     global_state::GlobalState,
 };
-
-use super::main_loop::Task;
 
 #[derive(Debug)]
 pub(crate) enum FetchWorkspaceProgress {

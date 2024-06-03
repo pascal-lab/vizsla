@@ -1,30 +1,29 @@
 pub mod block_src;
 pub mod lower;
 
-use crate::{
-    container::ContainerId,
-    container::InFile,
-    db::HirDb,
-    hir_def::{block::block_src::LocalBlockSrc, data::DataDecl, Ident},
-    impl_index,
-};
+use std::ops::Index;
+
 use base_db::intern::Lookup;
 use la_arena::{Arena, Idx, IdxRange};
 use salsa;
 use smallvec::SmallVec;
-use std::ops::Index;
 use syntax::ast::ptr;
 use triomphe::Arc;
 use utils::try_;
 
 use self::block_src::BlockSrc;
-
 use super::{
     control::EventExpr,
     data::{DataDeclSrc, SubDecl, SubDeclSrc},
     expr::{Expr, ExprSrc},
     stmt::{Stmt, StmtSrc},
     SourceMap,
+};
+use crate::{
+    container::{ContainerId, InFile},
+    db::HirDb,
+    hir_def::{block::block_src::LocalBlockSrc, data::DataDecl, Ident},
+    impl_index,
 };
 
 #[derive(Debug, PartialEq, Eq, Clone)]

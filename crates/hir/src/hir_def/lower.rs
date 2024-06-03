@@ -1,10 +1,11 @@
+use syntax::ast::{self, AstNode};
+
 use crate::{
     container::{ContainerId, InFile},
     db::InternDb,
     file::HirFileId,
     hir_def::Ident,
 };
-use syntax::ast::{self, AstNode};
 
 pub(crate) fn lower_ident(ident: &ast::Identifier, file_text: &str) -> Option<Ident> {
     Some(ident.to_text(file_text)?.into())

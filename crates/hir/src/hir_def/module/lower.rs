@@ -1,3 +1,8 @@
+use itertools::Either;
+use la_arena::{Arena, IdxRange};
+use syntax::ast::{self, ptr};
+use utils::try_;
+
 use crate::{
     container::InFile,
     db::InternDb,
@@ -17,10 +22,6 @@ use crate::{
         try_match, ModuleId, SourceMap,
     },
 };
-use itertools::Either;
-use la_arena::{Arena, IdxRange};
-use syntax::ast::{self, ptr};
-use utils::try_;
 
 pub(crate) struct ModuleLowerCtx<'a> {
     pub db: &'a dyn InternDb,

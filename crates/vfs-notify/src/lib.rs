@@ -3,9 +3,11 @@ use std::{collections::HashSet, fs, ops::Not};
 use crossbeam_channel::{never, select, unbounded, Receiver, Sender};
 use itertools::Itertools;
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
-use utils::lines::LineEnding;
-use utils::paths::{AbsPath, AbsPathBuf};
-use utils::thread;
+use utils::{
+    lines::LineEnding,
+    paths::{AbsPath, AbsPathBuf},
+    thread,
+};
 use vfs::loader::{self, VfsLoadError, VfsLoadResult};
 use walkdir::WalkDir;
 

@@ -2,6 +2,7 @@ use itertools::Itertools;
 use la_arena::Idx;
 use syntax::ast::{self, support::AstChildren, AstNode};
 
+use super::SemanticsImpl;
 use crate::{
     container::{ContainerParent, InBlock, InContainer, InFile, InModule},
     hir_def::{
@@ -10,8 +11,6 @@ use crate::{
     },
     scope::{BlockScopeEntry, ModuleScopeEntry, ScopeEntry, ScopeId, UnitScopeEntry},
 };
-
-use super::SemanticsImpl;
 
 impl<'db> SemanticsImpl<'db> {
     pub fn resolve_ident(&self, ident: &ast::Identifier) -> Option<PathResolution> {
@@ -41,11 +40,7 @@ impl<'db> SemanticsImpl<'db> {
         let path = path.collect_vec();
         let last_ident = path.last()?;
 
-        if path.len() == 1 {
-            self.resolve_ident(last_ident)
-        } else {
-            unimplemented!()
-        }
+        if path.len() == 1 { self.resolve_ident(last_ident) } else { unimplemented!() }
     }
 }
 

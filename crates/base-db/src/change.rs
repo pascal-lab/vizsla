@@ -70,9 +70,5 @@ impl Change {
 }
 
 fn durability(source_root: &SourceRoot) -> Durability {
-    if source_root.is_lib {
-        Durability::HIGH
-    } else {
-        Durability::LOW
-    }
+    if source_root.is_lib { Durability::HIGH } else { Durability::LOW }
 }

@@ -1,3 +1,8 @@
+use la_arena::{Arena, Idx, IdxRange, RawIdx};
+use smallvec::SmallVec;
+use syntax::ast::{self, ptr};
+use utils::try_;
+
 use crate::{
     container::InFile,
     hir_def::{
@@ -12,10 +17,6 @@ use crate::{
         try_match, Ident, SourceMap,
     },
 };
-use la_arena::{Arena, Idx, IdxRange, RawIdx};
-use smallvec::SmallVec;
-use syntax::ast::{self, ptr};
-use utils::try_;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ModuleItem {
