@@ -18,4 +18,4 @@ serde.workspace = true
 smol_str.workspace = true
 toml = "0.8.8"
 triomphe.workspace = true
-utils.workspace = true
+utils = { workspace = true, features = ["camino_serde1"] }

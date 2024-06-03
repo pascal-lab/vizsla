@@ -1,7 +1,7 @@
 // Abstract-ish representation of paths for VFS.
 use std::fmt;
 
-use utils::paths::{AbsPath, AbsPathBuf, RelPath};
+use utils::paths::{AbsPath, AbsPathBuf, RelPath, Utf8Path};
 
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct VfsPath(VfsPathKinds);
@@ -267,7 +267,7 @@ impl VirtualPath {
     }
 
     fn strip_prefix(&self, base: &VirtualPath) -> Option<&RelPath> {
-        <_ as AsRef<std::path::Path>>::as_ref(&self.0)
+        <_ as AsRef<Utf8Path>>::as_ref(&self.0)
             .strip_prefix(&base.0)
             .ok()
             .map(RelPath::new_unchecked)

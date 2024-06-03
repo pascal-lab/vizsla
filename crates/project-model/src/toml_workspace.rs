@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use anyhow::Context;
 use const_format::formatcp;
 use itertools::Itertools;
@@ -8,7 +6,7 @@ use regex::Regex;
 use rustc_hash::FxHashSet;
 use serde::Deserialize;
 use smol_str::SmolStr;
-use utils::paths::{sort_and_remove_subfolders, AbsPathBuf};
+use utils::paths::{sort_and_remove_subfolders, AbsPathBuf, Utf8PathBuf};
 
 use crate::macro_def::{MacroAtom, MacroDef};
 
@@ -24,9 +22,9 @@ struct TomlManifestSchema {
     #[serde(deserialize_with = "de_macros", default)]
     pub macros: MacroDef,
     #[serde(default)]
-    pub include: Option<Vec<PathBuf>>,
+    pub include: Option<Vec<Utf8PathBuf>>,
     #[serde(default)]
-    pub exclude: Vec<PathBuf>,
+    pub exclude: Vec<Utf8PathBuf>,
 }
 
 fn de_macros<'de, D>(deserializer: D) -> Result<MacroDef, D::Error>

@@ -118,7 +118,7 @@ impl Config {
         let detached_files =
             get_field::<Vec<PathBuf>>(&mut options, &mut errors, "detachedFiles", "[]")
                 .into_iter()
-                .map(AbsPathBuf::assert)
+                .map(AbsPathBuf::assert_utf8)
                 .collect_vec();
 
         // TODO: user-defined snippets

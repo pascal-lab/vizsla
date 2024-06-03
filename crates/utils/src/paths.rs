@@ -8,12 +8,20 @@ use std::{
     path::{Component, Path, PathBuf, Prefix},
 };
 
+pub use camino::{self, *};
+
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
-pub struct AbsPathBuf(PathBuf);
+pub struct AbsPathBuf(Utf8PathBuf);
+
+impl From<AbsPathBuf> for Utf8PathBuf {
+    fn from(AbsPathBuf(path_buf): AbsPathBuf) -> Utf8PathBuf {
+        path_buf
+    }
+}
 
 impl From<AbsPathBuf> for PathBuf {
     fn from(AbsPathBuf(path_buf): AbsPathBuf) -> PathBuf {
-        path_buf
+        path_buf.into()
     }
 }
 
@@ -24,9 +32,15 @@ impl ops::Deref for AbsPathBuf {
     }
 }
 
+impl AsRef<Utf8Path> for AbsPathBuf {
+    fn as_ref(&self) -> &Utf8Path {
+        self.0.as_path()
+    }
+}
+
 impl AsRef<Path> for AbsPathBuf {
     fn as_ref(&self) -> &Path {
-        self.0.as_path()
+        self.0.as_ref()
     }
 }
 
@@ -42,13 +56,23 @@ impl Borrow<AbsPath> for AbsPathBuf {
     }
 }
 
+impl TryFrom<Utf8PathBuf> for AbsPathBuf {
+    type Error = Utf8PathBuf;
+    fn try_from(path_buf: Utf8PathBuf) -> Result<AbsPathBuf, Utf8PathBuf> {
+        if !path_buf.is_absolute() {
+            return Err(path_buf);
+        }
+        Ok(AbsPathBuf(path_buf))
+    }
+}
+
 impl TryFrom<PathBuf> for AbsPathBuf {
     type Error = PathBuf;
     fn try_from(path_buf: PathBuf) -> Result<AbsPathBuf, PathBuf> {
         if !path_buf.is_absolute() {
             return Err(path_buf);
         }
-        Ok(AbsPathBuf(path_buf))
+        Ok(AbsPathBuf(Utf8PathBuf::from_path_buf(path_buf)?))
     }
 }
 
@@ -66,9 +90,15 @@ impl PartialEq<AbsPath> for AbsPathBuf {
 }
 
 impl AbsPathBuf {
-    pub fn assert(path: PathBuf) -> AbsPathBuf {
+    pub fn assert(path: Utf8PathBuf) -> AbsPathBuf {
         AbsPathBuf::try_from(path)
-            .unwrap_or_else(|path| panic!("expected absolute path, got {}", path.display()))
+            .unwrap_or_else(|path| panic!("expected absolute path, got {}", path))
+    }
+
+    pub fn assert_utf8(path: PathBuf) -> AbsPathBuf {
+        let utf8_path = Utf8PathBuf::from_path_buf(path)
+            .unwrap_or_else(|path| panic!("expected utf8 path, got {}", path.display()));
+        AbsPathBuf::assert(utf8_path)
     }
 
     pub fn as_path(&self) -> &AbsPath {
@@ -82,17 +112,29 @@ impl AbsPathBuf {
 
 impl fmt::Display for AbsPathBuf {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(&self.0.display(), f)
+        fmt::Display::fmt(&self.0, f)
     }
 }
 
-#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
+#[derive(Debug, Ord, PartialOrd, Eq, Hash)]
 #[repr(transparent)]
-pub struct AbsPath(Path);
+pub struct AbsPath(Utf8Path);
+
+impl<P: AsRef<Path> + ?Sized> PartialEq<P> for AbsPath {
+    fn eq(&self, other: &P) -> bool {
+        self.0.as_std_path() == other.as_ref()
+    }
+}
+
+impl AsRef<Utf8Path> for AbsPath {
+    fn as_ref(&self) -> &Utf8Path {
+        &self.0
+    }
+}
 
 impl AsRef<Path> for AbsPath {
     fn as_ref(&self) -> &Path {
-        &self.0
+        self.0.as_ref()
     }
 }
 
@@ -104,9 +146,9 @@ impl ToOwned for AbsPath {
     }
 }
 
-impl<'a> TryFrom<&'a Path> for &'a AbsPath {
-    type Error = &'a Path;
-    fn try_from(path: &'a Path) -> Result<&'a AbsPath, &'a Path> {
+impl<'a> TryFrom<&'a Utf8Path> for &'a AbsPath {
+    type Error = &'a Utf8Path;
+    fn try_from(path: &'a Utf8Path) -> Result<&'a AbsPath, &'a Utf8Path> {
         if !path.is_absolute() {
             return Err(path);
         }
@@ -115,21 +157,21 @@ impl<'a> TryFrom<&'a Path> for &'a AbsPath {
 }
 
 impl AbsPath {
-    pub fn assert(path: &Path) -> &AbsPath {
+    pub fn assert(path: &Utf8Path) -> &AbsPath {
         assert!(path.is_absolute());
-        unsafe { &*(path as *const Path as *const AbsPath) }
+        unsafe { &*(path as *const Utf8Path as *const AbsPath) }
     }
 
     pub fn parent(&self) -> Option<&AbsPath> {
         self.0.parent().map(AbsPath::assert)
     }
 
-    pub fn absolutize(&self, path: impl AsRef<Path>) -> AbsPathBuf {
+    pub fn absolutize(&self, path: impl AsRef<Utf8Path>) -> AbsPathBuf {
         self.join(path).normalize()
     }
 
-    pub fn join(&self, path: impl AsRef<Path>) -> AbsPathBuf {
-        self.as_ref().join(path).try_into().unwrap()
+    pub fn join(&self, path: impl AsRef<Utf8Path>) -> AbsPathBuf {
+        Utf8Path::join(self.as_ref(), path).try_into().unwrap()
     }
 
     pub fn normalize(&self) -> AbsPathBuf {
@@ -151,37 +193,41 @@ impl AbsPath {
     }
 
     pub fn name_and_extension(&self) -> Option<(&str, Option<&str>)> {
-        Some((
-            self.file_stem()?.to_str()?,
-            self.extension().and_then(|extension| extension.to_str()),
-        ))
+        Some((self.file_stem()?, self.extension()))
     }
 
-    pub fn file_name(&self) -> Option<&OsStr> {
+    pub fn file_name(&self) -> Option<&str> {
         self.0.file_name()
     }
-    pub fn extension(&self) -> Option<&OsStr> {
+
+    pub fn extension(&self) -> Option<&str> {
         self.0.extension()
     }
-    pub fn file_stem(&self) -> Option<&OsStr> {
+
+    pub fn file_stem(&self) -> Option<&str> {
         self.0.file_stem()
     }
+
     pub fn as_os_str(&self) -> &OsStr {
         self.0.as_os_str()
+    }
+
+    pub fn components(&self) -> Utf8Components<'_> {
+        self.0.components()
     }
 }
 
 impl fmt::Display for AbsPath {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(&self.0.display(), f)
+        fmt::Display::fmt(&self.0, f)
     }
 }
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
-pub struct RelPathBuf(PathBuf);
+pub struct RelPathBuf(Utf8PathBuf);
 
-impl From<RelPathBuf> for PathBuf {
-    fn from(RelPathBuf(path_buf): RelPathBuf) -> PathBuf {
+impl From<RelPathBuf> for Utf8PathBuf {
+    fn from(RelPathBuf(path_buf): RelPathBuf) -> Utf8PathBuf {
         path_buf
     }
 }
@@ -193,15 +239,21 @@ impl ops::Deref for RelPathBuf {
     }
 }
 
-impl AsRef<Path> for RelPathBuf {
-    fn as_ref(&self) -> &Path {
+impl AsRef<Utf8Path> for RelPathBuf {
+    fn as_ref(&self) -> &Utf8Path {
         self.0.as_path()
     }
 }
 
-impl TryFrom<PathBuf> for RelPathBuf {
-    type Error = PathBuf;
-    fn try_from(path_buf: PathBuf) -> Result<RelPathBuf, PathBuf> {
+impl AsRef<Path> for RelPathBuf {
+    fn as_ref(&self) -> &Path {
+        self.0.as_ref()
+    }
+}
+
+impl TryFrom<Utf8PathBuf> for RelPathBuf {
+    type Error = Utf8PathBuf;
+    fn try_from(path_buf: Utf8PathBuf) -> Result<RelPathBuf, Utf8PathBuf> {
         if !path_buf.is_relative() {
             return Err(path_buf);
         }
@@ -210,9 +262,9 @@ impl TryFrom<PathBuf> for RelPathBuf {
 }
 
 impl TryFrom<&str> for RelPathBuf {
-    type Error = PathBuf;
-    fn try_from(path: &str) -> Result<RelPathBuf, PathBuf> {
-        RelPathBuf::try_from(PathBuf::from(path))
+    type Error = Utf8PathBuf;
+    fn try_from(path: &str) -> Result<RelPathBuf, Utf8PathBuf> {
+        RelPathBuf::try_from(Utf8PathBuf::from(path))
     }
 }
 
@@ -233,31 +285,31 @@ impl AsRef<Path> for RelPath {
 }
 
 impl RelPath {
-    pub fn new_unchecked(path: &Path) -> &RelPath {
-        unsafe { &*(path as *const Path as *const RelPath) }
+    pub fn new_unchecked(path: &Utf8Path) -> &RelPath {
+        unsafe { &*(path as *const Utf8Path as *const RelPath) }
     }
 }
 
-fn normalize(path: &Path) -> PathBuf {
+fn normalize(path: &Utf8Path) -> Utf8PathBuf {
     let mut components = path.components().peekable();
-    let mut ret = if let Some(c @ Component::Prefix(..)) = components.peek().copied() {
+    let mut ret = if let Some(c @ Utf8Component::Prefix(..)) = components.peek().copied() {
         components.next();
-        PathBuf::from(c.as_os_str())
+        Utf8PathBuf::from(c.as_str())
     } else {
-        PathBuf::new()
+        Utf8PathBuf::new()
     };
 
     for component in components {
         match component {
-            Component::Prefix(..) => unreachable!(),
-            Component::RootDir => {
-                ret.push(component.as_os_str());
+            Utf8Component::Prefix(..) => unreachable!(),
+            Utf8Component::RootDir => {
+                ret.push(component.as_str());
             }
-            Component::CurDir => {}
-            Component::ParentDir => {
+            Utf8Component::CurDir => {}
+            Utf8Component::ParentDir => {
                 ret.pop();
             }
-            Component::Normal(c) => {
+            Utf8Component::Normal(c) => {
                 ret.push(c);
             }
         }

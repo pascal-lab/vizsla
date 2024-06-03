@@ -1,6 +1,5 @@
 use serde::Deserialize;
-use std::path::PathBuf;
-use utils::json::get_field;
+use utils::{json::get_field, paths::Utf8PathBuf};
 
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "snake_case")]
@@ -88,7 +87,7 @@ config_data! {
         /// These directories will be ignored. They are relative to the workspace
         /// root, and globs are not supported. You may also need to add the
         /// folders to Code's `files.watcherExclude`.
-        files_excludeDirs: Vec<PathBuf> = "[]",
+        files_excludeDirs: Vec<Utf8PathBuf> = "[]",
         /// Controls file watching.
         files_watcher: FilesWatcherDef = "\"client\"",
         /// Automatically refresh project info on toml changes
