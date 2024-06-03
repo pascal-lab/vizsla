@@ -190,9 +190,8 @@ impl GlobalState {
 }
 
 pub(crate) fn should_refresh_for_change(path: &AbsPath, has_structure_change: bool) -> bool {
-    let file_name = match path.file_name().unwrap_or_default().to_str() {
-        Some(it) => it,
-        None => return false,
+    let Some(file_name) = path.file_name() else {
+        return false;
     };
 
     if file_name == MANIFEST_FILE_NAME {

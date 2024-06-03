@@ -20,4 +20,10 @@ pub struct RangeInfo<T> {
     pub info: T,
 }
 
+impl<T> RangeInfo<T> {
+    pub fn new(range: TextRange, info: T) -> RangeInfo<T> {
+        RangeInfo { range, info }
+    }
+}
+
 pub type ErasedFileAstId = Idx<syntax::SyntaxNodePtr>;

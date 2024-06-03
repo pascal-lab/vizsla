@@ -1,4 +1,9 @@
-use crate::{global_state::snapshot::GlobalStateSnapshot, lsp_ext::from_proto};
+use span::FileRange;
+
+use crate::{
+    global_state::snapshot::GlobalStateSnapshot,
+    lsp_ext::{from_proto, to_proto},
+};
 
 pub(crate) fn handle_goto_definition(
     snap: GlobalStateSnapshot,
@@ -9,8 +14,7 @@ pub(crate) fn handle_goto_definition(
         return Ok(None);
     };
 
-    todo!()
-    // let src = FileRange { file_id: position.file_id, range: nav_info.range };
-    // let res = to_proto::goto_definition_response(&snap, Some(src), nav_info.info)?;
-    // Ok(Some(res))
+    let src = FileRange { file_id: position.file_id, range: nav_info.range };
+    let res = to_proto::goto_definition_response(&snap, Some(src), nav_info.info)?;
+    Ok(Some(res))
 }

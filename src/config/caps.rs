@@ -46,6 +46,10 @@ impl Config {
             == Some(true)
     }
 
+    pub fn location_link(&self) -> bool {
+        try_or_default!(self.client_caps.text_document.as_ref()?.definition?.link_support?)
+    }
+
     pub fn cli_did_save_dyn_reg(&self) -> bool {
         let caps =
             try_or_default!(self.client_caps.text_document.as_ref()?.synchronization.clone()?);

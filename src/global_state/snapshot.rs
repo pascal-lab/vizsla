@@ -1,4 +1,5 @@
 use ide::{analysis::Analysis, Cancellable};
+use lsp_types::Url;
 use nohash_hasher::IntMap;
 use parking_lot::{MappedRwLockReadGuard, RwLock, RwLockReadGuard};
 use project_model::workspace::Workspace;
@@ -6,7 +7,10 @@ use triomphe::Arc;
 use utils::lines::{LineEnding, LineInfo};
 use vfs::vfs::{FileId, Vfs};
 
-use crate::{config::Config, lsp_ext::from_proto};
+use crate::{
+    config::Config,
+    lsp_ext::{from_proto, to_proto},
+};
 
 use super::mem_docs::MemDocs;
 
@@ -41,5 +45,12 @@ impl GlobalStateSnapshot {
         let encoding = self.config.position_encoding();
         let res = LineInfo { index, ending, encoding };
         Ok(res)
+    }
+
+    pub(crate) fn url(&self, id: FileId) -> Url {
+        let vfs = &self.vfs_read();
+        let path = vfs.file_path(id);
+        let path = path.as_abs_path().unwrap();
+        to_proto::url_from_abs_path(path)
     }
 }

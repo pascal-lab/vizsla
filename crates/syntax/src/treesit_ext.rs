@@ -1,4 +1,4 @@
-use crate::{syntax_kind::SyntaxKindId, SyntaxNode};
+use crate::{syntax_kind::SyntaxKindId, SyntaxAncestors, SyntaxNode};
 use line_index::TextSize;
 use utils::text_edit::to_text_range;
 
@@ -79,11 +79,13 @@ pub fn leftmost_leaf(node: SyntaxNode) -> SyntaxNode {
 }
 
 pub fn find_root(node: SyntaxNode) -> SyntaxNode {
-    let mut cursor = node.walk();
-    loop {
-        if !cursor.goto_parent() {
-            break;
-        }
-    }
-    cursor.node()
+    SyntaxAncestors::new_from_node(node).last().unwrap()
+    // TODO: why failed?
+    // let mut cursor = node.walk();
+    // loop {
+    //     if !cursor.goto_parent() {
+    //         break;
+    //     }
+    // }
+    // cursor.node()
 }

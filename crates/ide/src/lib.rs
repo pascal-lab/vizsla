@@ -3,5 +3,6 @@ pub type Cancellable<T> = Result<T, Cancelled>;
 
 pub mod analysis;
 pub mod analysis_host;
+pub mod definitions;
 pub mod goto_definition;
 pub mod navigation_target;
