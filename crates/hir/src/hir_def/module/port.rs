@@ -12,8 +12,9 @@ use crate::{
             DEFAULT_NET_TYPE,
         },
         expr::{LowerExpr, Select},
-        try_match, Ident, SourceMap,
+        try_match, Ident,
     },
+    source_map::SourceMap,
 };
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]

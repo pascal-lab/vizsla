@@ -17,13 +17,13 @@ use super::{
     data::{DataDeclSrc, SubDecl, SubDeclSrc},
     expr::{Expr, ExprSrc},
     stmt::{Stmt, StmtSrc},
-    SourceMap,
 };
 use crate::{
     container::{ContainerId, InFile},
     db::HirDb,
     hir_def::{block::block_src::LocalBlockSrc, data::DataDecl, Ident},
     impl_arena_idx,
+    source_map::SourceMap,
 };
 
 #[derive(Debug, PartialEq, Eq, Clone)]

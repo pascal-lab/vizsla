@@ -14,7 +14,7 @@ pub mod tf;
 
 use std::{fmt::Debug, hash::Hash, ops::Index};
 
-use la_arena::{Arena, ArenaMap, Idx, IdxRange};
+use la_arena::{Arena, Idx, IdxRange};
 use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
 use smol_str::SmolStr;
@@ -66,7 +66,7 @@ macro_rules! try_match {
 
 pub(crate) use try_match;
 
-use crate::{container::InFile, db::HirDb, file::HirFileId};
+use crate::{container::InFile, db::HirDb, file::HirFileId, source_map::SourceMap};
 
 pub type Ident = SmolStr;
 
@@ -111,42 +111,6 @@ pub type ModuleSrc = InFile<LocalModuleSrc>;
 
 pub type LocalModuleId = Idx<ModuleInfo>;
 pub type ModuleId = InFile<LocalModuleId>;
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct SourceMap<Src, Hir>
-where
-    Src: PartialEq + Eq + Hash + Clone,
-{
-    pub src2hir: FxHashMap<Src, Idx<Hir>>,
-    pub hir2src: ArenaMap<Idx<Hir>, Src>,
-}
-
-impl<Src, Hir> SourceMap<Src, Hir>
-where
-    Src: PartialEq + Eq + Hash + Clone,
-{
-    pub fn insert(&mut self, src: Src, idx: Idx<Hir>) {
-        self.src2hir.insert(src.clone(), idx);
-        self.hir2src.insert(idx, src);
-    }
-
-    pub fn get_idx(&self, src: &Src) -> Option<&Idx<Hir>> {
-        self.src2hir.get(src)
-    }
-
-    pub fn get_src(&self, idx: Idx<Hir>) -> Option<&Src> {
-        self.hir2src.get(idx)
-    }
-}
-
-impl<Src, Hir> Default for SourceMap<Src, Hir>
-where
-    Src: PartialEq + Eq + Hash + Clone,
-{
-    fn default() -> Self {
-        SourceMap { src2hir: FxHashMap::default(), hir2src: ArenaMap::default() }
-    }
-}
 
 #[derive(Default, Debug, PartialEq, Eq)]
 pub struct FileSourceMap {

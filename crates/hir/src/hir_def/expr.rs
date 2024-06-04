@@ -10,7 +10,8 @@ use super::{
 };
 use crate::{
     container::InFile,
-    hir_def::{data::DataType, Ident, SourceMap},
+    hir_def::{data::DataType, Ident},
+    source_map::SourceMap,
     try_match,
 };
 

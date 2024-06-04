@@ -19,8 +19,9 @@ use crate::{
             port::{LowerPortDecl, Port, PortDecl},
             Module, ModuleSourceMap,
         },
-        try_match, ModuleId, SourceMap,
+        try_match, ModuleId,
     },
+    source_map::SourceMap,
 };
 
 pub(crate) struct ModuleLowerCtx<'a> {

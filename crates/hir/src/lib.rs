@@ -8,4 +8,5 @@ pub mod has_source;
 pub mod hir_def;
 pub mod scope;
 pub mod semantics;
+mod source_map;
 pub mod type_infer;

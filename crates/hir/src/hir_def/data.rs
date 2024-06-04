@@ -9,8 +9,9 @@ use crate::{
     hir_def::{
         expr::{ExprId, LowerExpr, MinTypMaxExpr},
         module::port::PortDecl,
-        try_match, Ident, SourceMap,
+        try_match, Ident,
     },
+    source_map::SourceMap,
 };
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]

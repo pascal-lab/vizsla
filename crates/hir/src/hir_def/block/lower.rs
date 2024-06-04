@@ -19,8 +19,8 @@ use crate::{
         literal::LowerLiteral,
         lower::Lower,
         stmt::{LowerStmt, Stmt, StmtSrc},
-        SourceMap,
     },
+    source_map::SourceMap,
     try_match,
 };
 

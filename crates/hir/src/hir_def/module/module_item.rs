@@ -14,8 +14,9 @@ use crate::{
         module::{lower::ModuleLowerCtx, port::LowerPortDecl},
         pack_or_gen_item::{LowerPackOrGenItemDecl, PackOrGenItemDecl},
         stmt::{Assign, LowerStmt, Stmt, StmtId, StmtSrc},
-        try_match, Ident, SourceMap,
+        try_match, Ident,
     },
+    source_map::SourceMap,
 };
 
 #[derive(Debug, PartialEq, Eq, Clone)]

@@ -29,8 +29,8 @@ use crate::{
         },
         stmt::{Stmt, StmtSrc},
         Ident,
-        SourceMap,
     },
+    source_map::SourceMap,
 };
 
 #[derive(Debug, PartialEq, Eq, Clone)]

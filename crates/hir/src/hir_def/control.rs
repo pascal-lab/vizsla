@@ -6,8 +6,9 @@ use crate::{
     container::InFile,
     hir_def::{
         expr::{ExprId, LowerExpr, MinTypMaxExpr},
-        try_match, SourceMap,
+        try_match,
     },
+    source_map::SourceMap,
 };
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]

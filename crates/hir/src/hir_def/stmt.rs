@@ -15,8 +15,9 @@ use crate::{
         block::BlockInfo,
         control::{DelayOrEventControl, LowerTimingControl, ProceduralTimingControlControl},
         expr::{self, AssignOp, ExprId, LowerExpr},
-        try_match, Ident, SourceMap,
+        try_match, Ident,
     },
+    source_map::SourceMap,
 };
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
