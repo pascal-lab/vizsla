@@ -4,6 +4,7 @@ use itertools::Itertools;
 use rustc_hash::FxHashMap;
 use syntax::{
     ast::{self, AstNode},
+    parse::SyntaxTree,
     treesit_ext::find_root,
     SyntaxNode,
 };

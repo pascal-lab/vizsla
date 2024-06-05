@@ -42,7 +42,11 @@ pub fn edit_syntax_tree(
 
             edits.iter().for_each(|edit| tree.edit(edit));
 
-            db.set_syntax_tree_with_durability(file_id, Some(SyntaxTree::new(tree)), durability);
+            db.set_syntax_tree_with_durability(
+                file_id,
+                Some(SyntaxTree::new(tree.clone())),
+                durability,
+            );
         }
     }
 

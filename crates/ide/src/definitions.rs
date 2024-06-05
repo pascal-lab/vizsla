@@ -26,7 +26,7 @@ pub enum Definition {
 pub enum IdentClass {
     ModuleId(ModuleId),
     BlockId(BlockId),
-    Port { port: Idx<SubDecl>, data: Option<Idx<SubDecl>>, module: ModuleId },
+    Port { port: Idx<SubDecl>, data: Option<Idx<SubDecl>>, module_id: ModuleId },
     HierarchyInst(InModule<Idx<HierarchicalInst>>),
     SubDecl(InContainer<Idx<SubDecl>>),
     Stmt(InContainer<Idx<Stmt>>),
@@ -67,8 +67,8 @@ impl IdentClass {
         match self {
             Self::ModuleId(module) => smallvec![Definition::ModuleId(module)],
             Self::BlockId(block) => smallvec![Definition::BlockId(block)],
-            Self::Port { port, data, module } => {
-                let container_id = module.into();
+            Self::Port { port, data, module_id } => {
+                let container_id = module_id.into();
                 let mut res =
                     smallvec![Definition::SubDecl(InContainer { value: port, container_id })];
                 if let Some(data) = data {
@@ -88,8 +88,8 @@ impl From<PathResolution> for IdentClass {
         match res {
             PathResolution::ModuleId(module) => Self::ModuleId(module),
             PathResolution::BlockId(block) => Self::BlockId(block),
-            PathResolution::PortDecl { port, data, module_id: module } => {
-                Self::Port { port, data, module }
+            PathResolution::PortDecl { port, data, module_id } => {
+                Self::Port { port, data, module_id }
             }
             PathResolution::HierarchyInst(inst) => Self::HierarchyInst(inst),
             PathResolution::SubDecl(sub_decl) => Self::SubDecl(sub_decl),

@@ -1,3 +1,4 @@
+use base_db::source_db::SourceDb;
 use hir::semantics::Semantics;
 use ide_db::root_db::RootDb;
 use itertools::Itertools;
@@ -20,6 +21,8 @@ pub(crate) fn goto_definition(
 ) -> Option<RangeInfo<Vec<NavTarget>>> {
     let sema = Semantics::new(db);
     let file = sema.parse(file_id);
+    // TODO: can we remove it?
+    let tree = db.syntax_tree(file_id);
     let token = pick_best_token(token_at_offset(file.syntax(), offset), token_precedence)?;
     let navs = IdentClass::classify(&sema, token)?
         .definitions()
