@@ -20,7 +20,7 @@ pub trait FileLoader {
 #[salsa::query_group(SourceDbStorage)]
 pub trait SourceDb: FileLoader + std::fmt::Debug {
     #[salsa::input]
-    fn syntax_tree(&self, file_id: FileId) -> Option<SyntaxTree>;
+    fn syntax_tree(&self, file_id: FileId) -> Option<Arc<SyntaxTree>>;
 
     #[salsa::input]
     fn files(&self) -> FxHashSet<FileId>;
@@ -44,7 +44,7 @@ pub fn edit_syntax_tree(
 
             db.set_syntax_tree_with_durability(
                 file_id,
-                Some(SyntaxTree::new(tree.clone())),
+                Some(Arc::new(SyntaxTree::new(tree))),
                 durability,
             );
         }
@@ -65,7 +65,7 @@ pub fn parse_source(db: &mut dyn SourceDb, file_id: FileId) {
     let new_text = db.file_text(file_id);
     let new_tree = parser.parse(new_text.as_bytes(), old_tree).expect("tree-sitter parse error");
     let new_syntax_tree = SyntaxTree::new(new_tree);
-    db.set_syntax_tree(file_id, Some(new_syntax_tree));
+    db.set_syntax_tree(file_id, Some(Arc::new(new_syntax_tree)));
 }
 
 // Don't expose source roots to HIR, so extract them in a separate DB.

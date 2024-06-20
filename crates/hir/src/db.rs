@@ -31,7 +31,7 @@ impl_intern!(BlockId, BlockLoc, intern_block, lookup_intern_block);
 
 #[salsa::query_group(HirDbStorage)]
 pub trait HirDb: InternDb {
-    fn hir_syntax_tree(&self, file_id: HirFileId) -> Option<SyntaxTree>;
+    fn hir_syntax_tree(&self, file_id: HirFileId) -> Option<Arc<SyntaxTree>>;
 
     fn hir_file_text(&self, file_id: HirFileId) -> Arc<str>;
 
@@ -60,7 +60,7 @@ pub trait HirDb: InternDb {
     fn block_scope(&self, block_id: BlockId) -> Arc<BlockScope>;
 }
 
-pub fn hir_syntax_tree(db: &dyn HirDb, file_id: HirFileId) -> Option<SyntaxTree> {
+pub fn hir_syntax_tree(db: &dyn HirDb, file_id: HirFileId) -> Option<Arc<SyntaxTree>> {
     db.syntax_tree(file_id.0)
 }
 
