@@ -18,7 +18,8 @@ use crate::{
 pub enum DataType {
     Module(ModuleId),
 
-    Int(IntegerType),
+    Int { kind: IntKind, sign: bool },
+    Vector { kind: VecKind, sign: bool, dimensions: Option<SmallVec<[Dimension; 1]>> },
     Real,
 
     String,
@@ -28,16 +29,26 @@ pub enum DataType {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub enum IntegerType {
-    Byte { sign: bool },
-    ShortInt { sign: bool },
-    Int { sign: bool },
-    LongInt { sign: bool },
-    Integer { sign: bool },
-    Time { sign: bool },
-    Bit { dimensions: Option<SmallVec<[Dimension; 1]>>, sign: bool },
-    Logic { dimensions: Option<SmallVec<[Dimension; 1]>>, sign: bool },
-    Reg { dimensions: Option<SmallVec<[Dimension; 1]>>, sign: bool },
+pub enum IntKind {
+    Byte,
+    ShortInt,
+    Int,
+    LongInt,
+    Integer,
+    Time,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub enum VecKind {
+    Bit,
+    Logic,
+    Reg,
+}
+
+impl DataType {
+    pub fn implicit_ty() -> Self {
+        DataType::Vector { kind: VecKind::Logic, sign: false, dimensions: None }
+    }
 }
 
 pub(crate) fn lower_signing(signing: &ast::Signing) -> Option<bool> {
@@ -57,15 +68,18 @@ pub(crate) trait LowerDataType: LowerDimension {
                     data_type.signing(), signing => lower_signing(&signing)?,
                     _ => true,
                 };
-                DataType::Int(try_match!{
-                    int_atom.token_byte(), _ => Some(IntegerType::Byte{sign}),
-                    int_atom.token_shortint(), _ => Some(IntegerType::ShortInt{sign}),
-                    int_atom.token_int(), _ => Some(IntegerType::Int{sign}),
-                    int_atom.token_longint(), _ => Some(IntegerType::LongInt{sign}),
-                    int_atom.token_integer(), _ => Some(IntegerType::Integer{sign}),
-                    int_atom.token_time(), _ => Some(IntegerType::Time{sign}),
-                    _ => None,
-                }?)
+
+                let kind = try_match!{
+                    int_atom.token_byte(), _ => IntKind::Byte,
+                    int_atom.token_shortint(), _ => IntKind::ShortInt,
+                    int_atom.token_int(), _ => IntKind::Int,
+                    int_atom.token_longint(), _ => IntKind::LongInt,
+                    int_atom.token_integer(), _ => IntKind::Integer,
+                    int_atom.token_time(), _ => IntKind::Time,
+                    _ => { return None; }
+                };
+
+                DataType::Int { kind, sign }
             },
             // 6.11
             data_type.integer_vector_type(), int_vector => try_!{
@@ -78,12 +92,13 @@ pub(crate) trait LowerDataType: LowerDimension {
                     dimensions.push(self.lower_packed_dimension(&packed_dimension)?);
                 }
                 let dimensions = if dimensions.is_empty() { None } else { Some(dimensions) };
-                DataType::Int(try_match!{
-                    int_vector.token_bit(), _ => Some(IntegerType::Bit{dimensions, sign}),
-                    int_vector.token_logic(), _ => Some(IntegerType::Logic{dimensions, sign}),
-                    int_vector.token_reg(), _ => Some(IntegerType::Reg{dimensions, sign}),
-                    _ => None,
-                }?)
+                let kind = try_match!{
+                    int_vector.token_bit(), _ => VecKind::Bit,
+                    int_vector.token_logic(), _ => VecKind::Logic,
+                    int_vector.token_reg(), _ => VecKind::Reg,
+                    _ => { return None; }
+                };
+                DataType::Vector { sign, dimensions, kind }
             },
             _ => unimplemented!("Lower DataType")
         }
@@ -108,17 +123,17 @@ pub(crate) trait LowerDataType: LowerDimension {
                         implicit_data_type.signing(), signing => lower_signing(&signing)?,
                         _ => false,
                     };
-                    Some(DataType::Int(IntegerType::Logic { dimensions, sign }))
+                    Some(DataType::Vector { kind: VecKind::Logic, sign, dimensions })
                 },
                 _ => None
             },
-            None => Some(DataType::Int(IntegerType::Logic { dimensions: None, sign: false })),
+            None => Some(DataType::implicit_ty()),
         }
     }
 }
 
 // TODO: associative_dimension | queue_dimension | Unsized
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone, Hash)]
 pub enum Dimension {
     Range(ExprId, ExprId),
     Expr(ExprId),

@@ -7,10 +7,7 @@ use utils::try_;
 use crate::{
     container::InFile,
     hir_def::{
-        data::{
-            self, DataType, IntegerType, LowerDataType, LowerSubDecl, NetKind, SubDecl,
-            DEFAULT_NET_TYPE,
-        },
+        data::{self, DataType, LowerDataType, LowerSubDecl, NetKind, SubDecl, DEFAULT_NET_TYPE},
         expr::{LowerExpr, Select},
         try_match, Ident,
     },
@@ -170,13 +167,9 @@ pub(crate) trait LowerPortDecl: LowerDataType + LowerSubDecl + LowerExpr {
                         self.lower_var_ident_list(&input_decl.list_of_variable_identifiers()?, port_def_idx)
                     ),
                     _ => {
-                        // TODO: fix
                         let port_kind = PortKind::Net(NetKind::Default {
                             net_type: DEFAULT_NET_TYPE,
-                            data_type: DataType::Int(IntegerType::Logic {
-                                dimensions: None,
-                                sign: false,
-                            })
+                            data_type: DataType::empty_vec_ty(),
                         });
                         let data_decls = try_match! {
                             input_decl.list_of_port_identifiers(), list => {
@@ -203,13 +196,9 @@ pub(crate) trait LowerPortDecl: LowerDataType + LowerSubDecl + LowerExpr {
                         self.lower_var_port_ident_list(&output_decl.list_of_variable_port_identifiers()?, port_def_idx)
                     ),
                     _ => {
-                        // TODO: fix
                         let port_kind = PortKind::Net(NetKind::Default {
                             net_type: DEFAULT_NET_TYPE,
-                            data_type: DataType::Int(IntegerType::Logic {
-                                dimensions: None,
-                                sign: false,
-                            })
+                            data_type: DataType::empty_vec_ty(),
                         });
                         let data_decls = try_match! {
                             output_decl.list_of_port_identifiers(), list => {
@@ -263,10 +252,7 @@ pub(crate) trait LowerPortDecl: LowerDataType + LowerSubDecl + LowerExpr {
                             },
                             _ => PortKind::Net(NetKind::Default {
                                 net_type: data::DEFAULT_NET_TYPE,
-                                data_type: DataType::Int(IntegerType::Logic {
-                                    dimensions: None,
-                                    sign: false
-                                })
+                                data_type: DataType::empty_vec_ty(),
                             })
                         };
                         (direction, port_kind)
