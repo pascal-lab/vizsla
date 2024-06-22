@@ -16,13 +16,14 @@ impl<'db> SemanticsImpl<'db> {
     pub fn resolve_ident(&self, ident: &ast::Identifier) -> Option<PathResolution> {
         self.with_ctx(|ctx| {
             let file_id = self.find_file(ident.syntax());
-            let cont_id = ctx.find_container(InFile::new(file_id, *ident.syntax()))?;
-
-            let mut scopes = ContainerParent::new(ctx.db, cont_id)
-                .map(|container_id| self.scope_for_container(container_id));
+            let container_id = ctx.find_container(InFile::new(file_id, *ident.syntax()))?;
             let ident = lower_ident(ident, ctx.db.hir_file_text(file_id).as_ref())?;
 
-            let res = match scopes.find_map(|scope| Some((scope.id(), scope.get_entry(&ident)?)))? {
+            let (id, entry) = ContainerParent::new(ctx.db, container_id)
+                .map(|container_id| dbg!(self.scope_for_container(container_id)))
+                .find_map(|scope| Some((scope.id(), scope.get_entry(&ident)?)))?;
+
+            let res = match (id, entry) {
                 (ScopeId::UnitId(_), ScopeEntry::UnitScopeEntry(entry)) => entry.into(),
                 (ScopeId::ModuleId(module_id), ScopeEntry::ModuleScopeEntry(entry)) => {
                     InModule::new(module_id, entry).into()

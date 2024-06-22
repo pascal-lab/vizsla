@@ -13,7 +13,7 @@ use crate::{
     container::InFile,
     hir_def::{
         block::BlockInfo,
-        control::{DelayOrEventControl, LowerTimingControl, ProceduralTimingControlControl},
+        control::{DelayOrEventControl, LowerTimingControl, ProcTimingCtrl},
         expr::{self, AssignOp, ExprId, LowerExpr},
         try_match, Ident,
     },
@@ -28,7 +28,7 @@ pub struct Assign {
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub enum ProceduralContinuousAssign {
+pub enum ProcContAssign {
     Assign(Assign),
     Deassign(ExprId),
     Force(Assign),
@@ -67,17 +67,17 @@ pub enum ExprOrCondPat {
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub enum CaseKetword {
+pub enum CaseKeyword {
     Case,
     Casez,
     Casex,
 }
 
-pub(crate) fn lower_case_keyword(keyword: &ast::CaseKeyword) -> Option<CaseKetword> {
+pub(crate) fn lower_case_keyword(keyword: &ast::CaseKeyword) -> Option<CaseKeyword> {
     try_match! {
-        keyword.token_case(), _ => Some(CaseKetword::Case),
-        keyword.token_casez(), _ => Some(CaseKetword::Casez),
-        keyword.token_casex(), _ => Some(CaseKetword::Casex),
+        keyword.token_case(), _ => Some(CaseKeyword::Case),
+        keyword.token_casez(), _ => Some(CaseKeyword::Casez),
+        keyword.token_casex(), _ => Some(CaseKeyword::Casex),
         _ => None,
     }
 }
@@ -97,30 +97,30 @@ pub enum CaseItems {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StmtItem {
-    BlockingAssign {
+    BlkAssign {
         control: Option<DelayOrEventControl>,
         assign: Assign,
     },
-    NonblockingAssign {
+    NonBlkAssign {
         control: Option<DelayOrEventControl>,
         assign: Assign,
     },
-    ProceduralContinuousAssign(ProceduralContinuousAssign),
-    CaseStmt {
-        unique_priority: Option<UniquePriority>,
-        case_keyword: CaseKetword,
-        case_expr: ExprId,
-        case_items: CaseItems,
+    ProcContAssign(ProcContAssign),
+    Case {
+        priority: Option<UniquePriority>,
+        kw: CaseKeyword,
+        expr: ExprId,
+        items: CaseItems,
     },
-    CondStmt {
-        unique_priority: Option<UniquePriority>,
-        cond_predict: CondPredicate,
+    Cond {
+        priority: Option<UniquePriority>,
+        preds: CondPredicate,
         stmt: Option<StmtId>,
         else_stmt: Option<StmtId>,
     },
     BlockInfo(Idx<BlockInfo>),
-    ProceduralTimingControlStmt {
-        control: ProceduralTimingControlControl,
+    ProcTimingCtrl {
+        control: ProcTimingCtrl,
         stmt: Option<StmtId>,
     },
 }
@@ -180,7 +180,7 @@ pub(crate) trait LowerStmt: LowerTimingControl + LowerExpr + LowerDataDecl {
                     },
                     _ => { return None; }
                 };
-                Some(StmtItem::BlockingAssign{ control, assign })
+                Some(StmtItem::BlkAssign{ control, assign })
             },
             stmt.nonblocking_assignment(), assign => {
                 let control = assign.delay_or_event_control().and_then(|control| self.lower_delay_or_event_control(&control));
@@ -189,17 +189,17 @@ pub(crate) trait LowerStmt: LowerTimingControl + LowerExpr + LowerDataDecl {
                     rhs: self.lower_expr(&assign.expression()?),
                     op: AssignOp::Assign,
                 };
-                Some(StmtItem::NonblockingAssign{ control, assign })
+                Some(StmtItem::NonBlkAssign{ control, assign })
             },
             stmt.procedural_continuous_assignment(), assign => {
                 let assign = try_match! {
                     assign.token_assign(), _ => {
-                        ProceduralContinuousAssign::Assign(
+                        ProcContAssign::Assign(
                             self.lower_var_assign(&assign.variable_assignment()?)?
                         )
                     },
                     assign.token_deassign(), _ => {
-                        ProceduralContinuousAssign::Deassign(
+                        ProcContAssign::Deassign(
                             self.lower_var_lvalue(&assign.variable_lvalue()?)?
                         )
                     },
@@ -213,7 +213,7 @@ pub(crate) trait LowerStmt: LowerTimingControl + LowerExpr + LowerDataDecl {
                             },
                             _ => { return None; }
                         };
-                        ProceduralContinuousAssign::Force(assign)
+                        ProcContAssign::Force(assign)
                     },
                     assign.token_release(), _ => {
                         let lvalue = try_match!{
@@ -225,17 +225,17 @@ pub(crate) trait LowerStmt: LowerTimingControl + LowerExpr + LowerDataDecl {
                             },
                             _ => { return None; }
                         };
-                        ProceduralContinuousAssign::Release(lvalue)
+                        ProcContAssign::Release(lvalue)
                     },
                     _ => { return None; }
                 };
-                Some(StmtItem::ProceduralContinuousAssign(assign))
+                Some(StmtItem::ProcContAssign(assign))
             },
             stmt.case_statement(), case => {
-                let unique_priority = case.unique_priority().and_then(|priority| lower_unique_priority(&priority));
-                let case_keyword = lower_case_keyword(&case.case_keyword()?)?;
-                let case_expr = self.lower_expr(&case.case_expression()?.expression()?);
-                let case_items = try_match! {
+                let priority = case.unique_priority().and_then(|priority| lower_unique_priority(&priority));
+                let kw = lower_case_keyword(&case.case_keyword()?)?;
+                let expr = self.lower_expr(&case.case_expression()?.expression()?);
+                let items = try_match! {
                     case.token_matches(), _ => {
                         unimplemented!("case_statement with matches")
                     },
@@ -244,17 +244,17 @@ pub(crate) trait LowerStmt: LowerTimingControl + LowerExpr + LowerDataDecl {
                     },
                     _ => {
                         let mut items: SmallVec<[CaseItem; 1]> = SmallVec::new();
-                        for case_item in case.case_items() {
+                        for item in case.case_items() {
                             let item = try_match! {
-                                case_item.token_default(), _ => {
-                                    CaseItem::Default(self.lower_stmt_or_null(&case_item.statement_or_null()?))
+                                item.token_default(), _ => {
+                                    CaseItem::Default(self.lower_stmt_or_null(&item.statement_or_null()?))
                                 },
                                 _ => {
                                     let mut exprs: SmallVec<[ExprId; 1]> = SmallVec::new();
-                                    for expr in case_item.case_item_expressions() {
+                                    for expr in item.case_item_expressions() {
                                         exprs.push(self.lower_expr(&expr.expression()?));
                                     }
-                                    let stmt = self.lower_stmt_or_null(&case_item.statement_or_null()?);
+                                    let stmt = self.lower_stmt_or_null(&item.statement_or_null()?);
                                     CaseItem::Case{ exprs, stmt }
                                 }
                             };
@@ -263,31 +263,19 @@ pub(crate) trait LowerStmt: LowerTimingControl + LowerExpr + LowerDataDecl {
                         CaseItems::Case(items)
                     }
                 };
-                Some(StmtItem::CaseStmt {
-                    unique_priority,
-                    case_keyword,
-                    case_expr,
-                    case_items
-                })
+                Some(StmtItem::Case { priority, kw, expr, items })
             },
             stmt.conditional_statement(), cond => {
-                let unique_priority = cond.unique_priority().and_then(|priority| lower_unique_priority(&priority));
-                let mut cond_predict: SmallVec<[ExprOrCondPat; 1]> = SmallVec::new();
-                let cond_predicte = cond.cond_predicate()?;
-                for cond_or_cond_pat in cond_predicte.expression_or_cond_patterns() {
-                    let expr_or_cond_pat = try_match! {
-                        cond_or_cond_pat.expression(), expr => {
-                            ExprOrCondPat::Expr(self.lower_expr(&expr))
-                        },
-                        _ => { return None; }
-                    };
-                    cond_predict.push(expr_or_cond_pat);
-                }
-                let cond_predict = CondPredicate(cond_predict);
+                let priority = cond.unique_priority().and_then(|it| lower_unique_priority(&it));
+                let preds = cond.cond_predicate()?.expression_or_cond_patterns()
+                    .filter_map(|it| Some(ExprOrCondPat::Expr(self.lower_expr(&it.expression()?))))
+                    .collect();
+
                 let mut iter = cond.statement_or_nulls();
                 let stmt = self.lower_stmt_or_null(&iter.next()?);
                 let else_stmt = self.lower_stmt_or_null(&iter.next()?);
-                Some(StmtItem::CondStmt { unique_priority, cond_predict, stmt, else_stmt })
+
+                Some(StmtItem::Cond { priority, preds: CondPredicate(preds), stmt, else_stmt })
             },
             stmt.seq_block(), seq_block => {
                 Some(StmtItem::BlockInfo(self.lower_seq_block(&seq_block)?))
@@ -312,7 +300,7 @@ pub(crate) trait LowerStmt: LowerTimingControl + LowerExpr + LowerDataDecl {
                 unimplemented!("jump_statement")
             },
             stmt.procedural_timing_control_statement(), control => {
-                Some(StmtItem::ProceduralTimingControlStmt {
+                Some(StmtItem::ProcTimingCtrl {
                     control: self.lower_procedural_timing_control(&control.procedural_timing_control()?)?,
                     stmt: self.lower_stmt_or_null(&control.statement_or_null()?),
                 })

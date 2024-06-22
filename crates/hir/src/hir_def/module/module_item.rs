@@ -42,7 +42,7 @@ pub type ModuleItemSrc = InFile<ptr::NonPortModuleItemPtr>;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ModuleInst {
-    pub module_ident: Ident,
+    pub module_name: Ident,
     pub param_assigns: Option<ParamAssigns>,
     pub hierarchical_insts: IdxRange<HierarchicalInst>,
 }
@@ -55,7 +55,7 @@ pub enum ParamAssigns {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct HierarchicalInst {
-    pub ident: Ident,
+    pub name: Ident,
     pub dimensions: Option<SmallVec<[Dimension; 1]>>,
     pub port_connects: Option<PortConnects>,
     pub full_decl: Idx<ModuleInst>,
@@ -318,7 +318,7 @@ impl<'a> ModuleLowerCtx<'a> {
         let hierarchical_insts = IdxRange::new(begin_idx..end_idx);
 
         self.module_decl.data.insts.alloc(ModuleInst {
-            module_ident,
+            module_name: module_ident,
             param_assigns,
             hierarchical_insts,
         });
@@ -360,7 +360,7 @@ impl<'a> ModuleLowerCtx<'a> {
             },
             _ => None,
         };
-        Some(HierarchicalInst { ident, dimensions, port_connects, full_decl })
+        Some(HierarchicalInst { name: ident, dimensions, port_connects, full_decl })
     }
 
     fn lower_continuous_assign(&mut self, assign: &ast::ContinuousAssign) -> Option<ModuleItem> {

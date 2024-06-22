@@ -232,7 +232,7 @@ impl ModuleScope {
 
     fn collect_hierarchy_inst(&mut self, module: &Module, idx: Idx<HierarchicalInst>) {
         let inst = &module[idx];
-        let ident = inst.ident.clone();
+        let ident = inst.name.clone();
         let entry = ModuleScopeEntry::HierarchyInst(idx);
         self.insert_entry(ident, entry);
     }
@@ -264,12 +264,13 @@ impl ModuleScope {
                 },
                 ModuleItem::ProcessConstruct(pc) => {
                     if let Some(stmt) = pc.stmt {
-                        if let Some(ident) = &module[stmt].ident {
+                        let stmt = &module[stmt];
+                        if let Some(ident) = &stmt.ident {
                             self.insert_entry(
                                 ident.clone(),
                                 ModuleScopeEntry::Stmt(pc.stmt.unwrap()),
                             );
-                        } else if let StmtItem::BlockInfo(blk) = module[stmt].item {
+                        } else if let StmtItem::BlockInfo(blk) = stmt.item {
                             let block_info = &module[blk];
                             if let Some(ident) = &block_info.ident {
                                 self.insert_entry(

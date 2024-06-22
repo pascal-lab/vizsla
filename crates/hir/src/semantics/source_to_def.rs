@@ -56,7 +56,7 @@ impl Source2DefCtx<'_> {
         &mut self,
         InFile { file_id, value: node }: InFile<SyntaxNode>,
     ) -> Option<ContainerId> {
-        let cont_id = match node.kind_id() {
+        let container_id = match node.kind_id() {
             syntax_kind::MODULE_DECLARATION => {
                 let value = ast::ModuleDeclaration::cast(node).unwrap().to_ptr();
                 let module_src = ModuleSrc { file_id, value };
@@ -69,7 +69,7 @@ impl Source2DefCtx<'_> {
             }
             _ => return None,
         };
-        Some(cont_id)
+        Some(container_id)
     }
 
     pub(crate) fn find_container(&mut self, src: InFile<SyntaxNode>) -> Option<ContainerId> {
