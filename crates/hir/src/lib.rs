@@ -1,4 +1,5 @@
 #![feature(trait_upcasting)]
+#![feature(let_chains)]
 
 pub mod container;
 pub mod db;

@@ -270,12 +270,13 @@ impl ModuleScope {
                                 ident.clone(),
                                 ModuleScopeEntry::Stmt(pc.stmt.unwrap()),
                             );
-                        } else if let StmtItem::BlockInfo(blk) = stmt.item {
-                            let block_info = &module[blk];
-                            if let Some(ident) = &block_info.ident {
+                        } else if let StmtItem::ProcTimingCtrl { stmt: Some(stmt), .. } = &stmt.item
+                            && let StmtItem::BlockInfo(idx) = &module[*stmt].item
+                        {
+                            if let Some(ident) = &module[*idx].ident {
                                 self.insert_entry(
                                     ident.clone(),
-                                    ModuleScopeEntry::Block(block_info.block_id),
+                                    ModuleScopeEntry::Block(module[*idx].block_id),
                                 );
                             }
                         }
