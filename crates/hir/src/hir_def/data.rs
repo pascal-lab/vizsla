@@ -3,9 +3,10 @@ use smallvec::SmallVec;
 use syntax::ast::{self, ptr};
 use utils::try_;
 
-use super::{literal::Literal, ModuleId};
+use super::{block::BlockId, literal::Literal, ModuleId};
 use crate::{
     container::InFile,
+    db::InternDb,
     hir_def::{
         expr::{ExprId, LowerExpr, MinTypMaxExpr},
         module::port::PortDecl,
@@ -14,15 +15,16 @@ use crate::{
     source_map::SourceMap,
 };
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Ord, PartialOrd)]
+pub struct TypeId(pub salsa::InternId);
+
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum DataType {
     Module(ModuleId),
+    Block(BlockId),
 
     Int { kind: IntKind, sign: bool },
     Vector { kind: VecKind, sign: bool, dimensions: Option<SmallVec<[Dimension; 1]>> },
-    Real,
-
-    String,
     // TODO: for paramdecl syntax:
     //      parameter_declaration ::= parameter type list_of_type_assignments
     // TODO: complete all the data types
@@ -46,8 +48,11 @@ pub enum VecKind {
 }
 
 impl DataType {
-    pub fn implicit_ty() -> Self {
-        DataType::Vector { kind: VecKind::Logic, sign: false, dimensions: None }
+    pub const IMPLICIT_TY: Self =
+        DataType::Vector { kind: VecKind::Logic, sign: false, dimensions: None };
+
+    pub fn implicit_ty(db: &dyn InternDb) -> TypeId {
+        db.intern_ty(DataType::IMPLICIT_TY)
     }
 }
 
@@ -60,7 +65,7 @@ pub(crate) fn lower_signing(signing: &ast::Signing) -> Option<bool> {
 }
 
 pub(crate) trait LowerDataType: LowerDimension {
-    fn lower_data_type(&mut self, data_type: &ast::DataType) -> Option<DataType> {
+    fn lower_data_type(&mut self, data_type: &ast::DataType) -> Option<TypeId> {
         try_match! {
             // 6.11
             data_type.integer_atom_type(), int_atom => try_!{
@@ -79,7 +84,8 @@ pub(crate) trait LowerDataType: LowerDimension {
                     _ => { return None; }
                 };
 
-                DataType::Int { kind, sign }
+                let ty = DataType::Int { kind, sign };
+                self.db().intern_ty(ty)
             },
             // 6.11
             data_type.integer_vector_type(), int_vector => try_!{
@@ -98,7 +104,8 @@ pub(crate) trait LowerDataType: LowerDimension {
                     int_vector.token_reg(), _ => VecKind::Reg,
                     _ => { return None; }
                 };
-                DataType::Vector { sign, dimensions, kind }
+                let ty = DataType::Vector { sign, dimensions, kind };
+                self.db().intern_ty(ty)
             },
             _ => unimplemented!("Lower DataType")
         }
@@ -107,7 +114,7 @@ pub(crate) trait LowerDataType: LowerDimension {
     fn lower_data_type_or_implicit(
         &mut self,
         data_type_or_implicit: &Option<ast::DataTypeOrImplicit>,
-    ) -> Option<DataType> {
+    ) -> Option<TypeId> {
         match data_type_or_implicit {
             Some(data_type_or_implicit) => try_match! {
                 data_type_or_implicit.data_type(), data_type => {
@@ -123,11 +130,12 @@ pub(crate) trait LowerDataType: LowerDimension {
                         implicit_data_type.signing(), signing => lower_signing(&signing)?,
                         _ => false,
                     };
-                    Some(DataType::Vector { kind: VecKind::Logic, sign, dimensions })
+                    let ty = DataType::Vector { kind: VecKind::Logic, sign, dimensions };
+                    Some(self.db().intern_ty(ty))
                 },
                 _ => None
             },
-            None => Some(DataType::implicit_ty()),
+            None => Some(DataType::implicit_ty(self.db())),
         }
     }
 }
@@ -234,7 +242,7 @@ pub(crate) fn lower_net_type(net_type: &ast::NetType) -> Option<NetType> {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum NetKind {
-    Default { net_type: NetType, data_type: DataType },
+    Default { net_type: NetType, data_type: TypeId },
     // TODO: net_type_identifier
     // Ident{ident: Ident},
 }
@@ -472,11 +480,13 @@ pub(crate) trait LowerSubDecl: LowerDimension + LowerExpr {
         let expr = var_port_ident_decl
             .constant_expression()
             .map(|const_expr| self.lower_const_expr(&const_expr));
+
         let mut dimensions: SmallVec<[Dimension; 1]> = SmallVec::new();
         for packed_dimension in var_port_ident_decl.variable_dimensions() {
             dimensions.push(self.lower_var_dimension(&packed_dimension)?);
         }
         let dimensions = if dimensions.is_empty() { None } else { Some(dimensions) };
+
         let src = self.in_file(LocalSubDeclSrc::VarPortIdentDecl(var_port_ident_decl.to_ptr()));
         let full_decl = DataFullDecl::PortDecl(full_decl);
         let idx = self.arena_sub_decl().alloc(SubDecl { ident, dimensions, expr, full_decl });
@@ -601,7 +611,7 @@ pub struct NetDecl {
 pub struct VarDecl {
     // TODO: lifetime
     pub konst: bool,
-    pub data_type: DataType,
+    pub data_type: TypeId,
     pub sub_decls: IdxRange<SubDecl>,
 }
 
@@ -609,7 +619,7 @@ pub struct VarDecl {
 pub struct ParamDecl {
     pub local: bool,
     // 6.20.2
-    pub data_type: Option<DataType>,
+    pub data_type: Option<TypeId>,
     pub sub_decls: IdxRange<SubDecl>,
 }
 

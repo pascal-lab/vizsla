@@ -6,7 +6,7 @@ use crate::{
     db::HirDb,
     hir_def::{
         block::BlockId,
-        data::{DataType, SubDecl},
+        data::{SubDecl, TypeId},
         expr::ExprId,
         module::{module_item::ModuleInst, port::PortDecl},
     },
@@ -23,7 +23,7 @@ pub enum FieldResolution {
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct TyInferResult {
     pub field2def_cache: FxHashMap<ExprId, FieldResolution>,
-    pub expr2ty_cache: FxHashMap<ExprId, DataType>,
+    pub expr2ty_cache: FxHashMap<ExprId, TypeId>,
     pub diagnostics: Vec<TyInferDiagnostic>,
 }
 

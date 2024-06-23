@@ -7,6 +7,7 @@ use crate::{
     hir_def::{
         self,
         block::{self, Block, BlockId, BlockLoc, BlockSourceMap},
+        data::{DataType, TypeId},
         module::{self, Module, ModuleSourceMap},
         FileSourceMap, HirFile, ModuleId,
     },
@@ -25,9 +26,13 @@ macro_rules! impl_intern {
 pub trait InternDb: SourceDb {
     #[salsa::interned]
     fn intern_block(&self, loc: BlockLoc) -> BlockId;
+
+    #[salsa::interned]
+    fn intern_ty(&self, ty: DataType) -> TypeId;
 }
 
 impl_intern!(BlockId, BlockLoc, intern_block, lookup_intern_block);
+impl_intern!(TypeId, DataType, intern_ty, lookup_intern_ty);
 
 #[salsa::query_group(HirDbStorage)]
 pub trait HirDb: InternDb {

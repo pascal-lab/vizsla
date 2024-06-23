@@ -7,7 +7,9 @@ use utils::try_;
 use crate::{
     container::InFile,
     hir_def::{
-        data::{self, DataType, LowerDataType, LowerSubDecl, NetKind, SubDecl, DEFAULT_NET_TYPE},
+        data::{
+            self, DataType, LowerDataType, LowerSubDecl, NetKind, SubDecl, TypeId, DEFAULT_NET_TYPE,
+        },
         expr::{LowerExpr, Select},
         try_match, Ident,
     },
@@ -25,7 +27,7 @@ pub enum PortDirection {
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum PortKind {
     Net(NetKind),
-    Var(DataType),
+    Var(TypeId),
 }
 
 // TODO: interface port
@@ -169,7 +171,7 @@ pub(crate) trait LowerPortDecl: LowerDataType + LowerSubDecl + LowerExpr {
                     _ => {
                         let port_kind = PortKind::Net(NetKind::Default {
                             net_type: DEFAULT_NET_TYPE,
-                            data_type: DataType::implicit_ty(),
+                            data_type: DataType::implicit_ty(self.db()),
                         });
                         let data_decls = try_match! {
                             input_decl.list_of_port_identifiers(), list => {
@@ -198,7 +200,7 @@ pub(crate) trait LowerPortDecl: LowerDataType + LowerSubDecl + LowerExpr {
                     _ => {
                         let port_kind = PortKind::Net(NetKind::Default {
                             net_type: DEFAULT_NET_TYPE,
-                            data_type: DataType::implicit_ty(),
+                            data_type: DataType::implicit_ty(self.db()),
                         });
                         let data_decls = try_match! {
                             output_decl.list_of_port_identifiers(), list => {
@@ -252,7 +254,7 @@ pub(crate) trait LowerPortDecl: LowerDataType + LowerSubDecl + LowerExpr {
                             },
                             _ => PortKind::Net(NetKind::Default {
                                 net_type: data::DEFAULT_NET_TYPE,
-                                data_type: DataType::implicit_ty(),
+                                data_type: DataType::implicit_ty(self.db()),
                             })
                         };
                         (direction, port_kind)

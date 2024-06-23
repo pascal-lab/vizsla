@@ -10,7 +10,7 @@ use super::{
 };
 use crate::{
     container::InFile,
-    hir_def::{data::DataType, Ident},
+    hir_def::{data::TypeId, Ident},
     source_map::SourceMap,
     try_match,
 };
@@ -239,7 +239,7 @@ pub enum Expr {
         range: Option<Select>,
     },
     Cast {
-        data_type: DataType,
+        data_type: TypeId,
         expr: ExprId,
     },
     MinTypMax(MinTypMaxExpr),

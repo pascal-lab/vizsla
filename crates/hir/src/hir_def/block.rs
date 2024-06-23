@@ -64,6 +64,7 @@ impl_arena_idx! (BlockData for
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct BlockId(pub salsa::InternId);
+
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
 pub struct BlockLoc {
     pub container_id: ContainerId,
