@@ -158,11 +158,7 @@ impl ToNav for InModule<Idx<HierarchicalInst>> {
 impl ToNav for InContainer<Idx<SubDecl>> {
     fn to_nav(&self, db: &RootDb) -> NavTarget {
         let InContainer { value: sub_decl_id, container_id } = *self;
-        let file_id = match container_id {
-            ContainerId::HirFileId(file_id) => file_id,
-            ContainerId::ModuleId(module_id) => module_id.file_id,
-            ContainerId::BlockId(block_id) => block_id.lookup(db).block_src.file_id,
-        };
+        let file_id = container_id.file_id(db);
 
         let (node_range, name_node_range, name) = {
             use hir::hir_def::data::LocalSubDeclSrc;
@@ -228,11 +224,7 @@ impl ToNav for InContainer<Idx<SubDecl>> {
 impl ToNav for InContainer<Idx<Stmt>> {
     fn to_nav(&self, db: &RootDb) -> NavTarget {
         let InContainer { value: stmt_id, container_id } = *self;
-        let file_id = match container_id {
-            ContainerId::HirFileId(file_id) => file_id,
-            ContainerId::ModuleId(module_id) => module_id.file_id,
-            ContainerId::BlockId(block_id) => block_id.lookup(db).block_src.file_id,
-        };
+        let file_id = container_id.file_id(db);
 
         let (node_range, name_node_range, name) = {
             let tree = db.hir_syntax_tree(file_id).unwrap();

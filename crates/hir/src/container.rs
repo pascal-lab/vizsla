@@ -20,6 +20,16 @@ pub enum ContainerId {
 
 impl_from!(HirFileId, ModuleId, BlockId for ContainerId);
 
+impl ContainerId {
+    pub fn file_id(&self, db: &dyn HirDb) -> HirFileId {
+        match self {
+            ContainerId::HirFileId(file_id) => *file_id,
+            ContainerId::ModuleId(module_id) => module_id.file_id,
+            ContainerId::BlockId(block_id) => block_id.lookup(db).block_src.file_id,
+        }
+    }
+}
+
 macro_rules! impl_contained {
     ($($container:ident[$field:ident: $id:ident]),*) => {
         $(
