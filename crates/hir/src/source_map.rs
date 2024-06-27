@@ -8,8 +8,8 @@ pub struct SourceMap<Src, Hir>
 where
     Src: PartialEq + Eq + Hash + Clone + Debug,
 {
-    pub src2hir: FxHashMap<Src, Idx<Hir>>,
-    pub hir2src: ArenaMap<Idx<Hir>, Src>,
+    src2hir: FxHashMap<Src, Idx<Hir>>,
+    hir2src: ArenaMap<Idx<Hir>, Src>,
 }
 
 impl<Src, Hir> SourceMap<Src, Hir>

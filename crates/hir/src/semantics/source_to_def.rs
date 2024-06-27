@@ -41,12 +41,12 @@ impl Source2DefCtx<'_> {
             ContainerId::HirFileId(_) => unreachable!(),
             ContainerId::ModuleId(module_id) => {
                 let (module, module_src_map) = self.db.module_with_source_map(module_id);
-                let block_info_id = module_src_map.block.src2hir.get(block_src)?;
+                let block_info_id = module_src_map.block.get_idx(block_src)?;
                 Some(module[*block_info_id].block_id)
             }
             ContainerId::BlockId(block_id) => {
                 let (block, block_src_map) = self.db.block_with_source_map(block_id);
-                let block_info_id = block_src_map.block.src2hir.get(block_src)?;
+                let block_info_id = block_src_map.block.get_idx(block_src)?;
                 Some(block[*block_info_id].block_id)
             }
         }
