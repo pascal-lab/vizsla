@@ -1,7 +1,8 @@
+use std::sync::LazyLock;
+
 use anyhow::Context;
 use const_format::formatcp;
 use itertools::Itertools;
-use once_cell::sync::Lazy;
 use regex::Regex;
 use rustc_hash::FxHashSet;
 use serde::Deserialize;
@@ -12,9 +13,9 @@ use crate::macro_def::{MacroAtom, MacroDef};
 
 const DEFAULT_TOP_MODULE: &str = "main";
 const IDENTIFIER_RE: &str = r"[a-zA-Z_][a-zA-Z0-9$_]*|\\\S* ";
-static IDENT_RE: Lazy<Regex> = Lazy::new(|| Regex::new(formatcp!("^({IDENTIFIER_RE})$")).unwrap());
-static KV_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(formatcp!("^({IDENTIFIER_RE})=(.*)$")).unwrap());
+static IDENT_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(formatcp!("^({IDENTIFIER_RE})$")).unwrap());
+static KV_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(formatcp!("^({IDENTIFIER_RE})=(.*)$")).unwrap());
 
 #[derive(Debug, Deserialize)]
 struct TomlManifestSchema {

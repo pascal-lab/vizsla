@@ -11,7 +11,6 @@ anyhow.workspace = true
 base-db.workspace = true
 const_format.workspace = true
 itertools.workspace = true
-once_cell.workspace = true
 regex = "1.10.2"
 rustc-hash.workspace = true
 serde.workspace = true

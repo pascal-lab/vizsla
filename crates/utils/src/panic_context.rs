@@ -16,7 +16,7 @@ pub struct PanicContext {
 impl PanicContext {
     fn init() {
         let default_hook = panic::take_hook();
-        let hook = move |panic_info: &panic::PanicInfo<'_>| {
+        let hook = move |panic_info: &panic::PanicHookInfo<'_>| {
             with_ctx(|ctx| {
                 if !ctx.is_empty() {
                     eprintln!("Panic context:");

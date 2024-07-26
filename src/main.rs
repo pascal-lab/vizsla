@@ -100,10 +100,7 @@ fn run_server(opt: Opt) -> anyhow::Result<()> {
         .and_then(|path| AbsPathBuf::try_from(path).ok())
     {
         Some(path) => path,
-        None => {
-            let cwd = env::current_dir()?;
-            AbsPathBuf::assert_utf8(cwd)
-        }
+        None => AbsPathBuf::assert_utf8(env::current_dir()?),
     };
 
     let workspace_roots = workspace_folders
