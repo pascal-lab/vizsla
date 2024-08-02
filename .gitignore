@@ -19,3 +19,5 @@ tags
 generated.rs
 
 .DS_Store
+
+rustc-ice*
