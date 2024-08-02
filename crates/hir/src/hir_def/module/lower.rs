@@ -116,7 +116,7 @@ impl Lower for ModuleLowerCtx<'_> {
     }
 
     fn file_id(&self) -> HirFileId {
-        self.module_id.file_id
+        self.module_id.container_id
     }
 
     fn file_text(&self) -> &str {

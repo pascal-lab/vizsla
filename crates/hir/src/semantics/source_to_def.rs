@@ -24,7 +24,7 @@ impl Source2DefCtx<'_> {
         &mut self,
         module_src: &InFile<LocalModuleSrc>,
     ) -> Option<ModuleId> {
-        let file_id = module_src.file_id;
+        let file_id = module_src.container_id;
         let (_, file_source_map) = self.db.hir_file_with_source_map(file_id);
         file_source_map
             .modules
@@ -33,7 +33,7 @@ impl Source2DefCtx<'_> {
     }
 
     pub(super) fn block_to_def(&mut self, block_src: &InFile<LocalBlockSrc>) -> Option<BlockId> {
-        let tree = self.db.syntax_tree(block_src.file_id.0)?;
+        let tree = self.db.syntax_tree(block_src.container_id.0)?;
         let node = block_src.value.syntax().to_node(tree.tree())?;
         let container = self.find_container(block_src.clone().with_value(node))?;
 
@@ -54,17 +54,17 @@ impl Source2DefCtx<'_> {
 
     fn container_to_def(
         &mut self,
-        InFile { file_id, value: node }: InFile<SyntaxNode>,
+        InFile { container_id: file_id, value: node }: InFile<SyntaxNode>,
     ) -> Option<ContainerId> {
         let container_id = match node.kind_id() {
             syntax_kind::MODULE_DECLARATION => {
                 let value = ast::ModuleDeclaration::cast(node).unwrap().to_ptr();
-                let module_src = ModuleSrc { file_id, value };
+                let module_src = ModuleSrc { container_id: file_id, value };
                 self.module_to_def(&module_src)?.into()
             }
             syntax_kind::SEQ_BLOCK | syntax_kind::PAR_BLOCK => {
                 let value = LocalBlockSrc::cast(node.into()).unwrap();
-                let block_src = BlockSrc { file_id, value };
+                let block_src = BlockSrc { container_id: file_id, value };
                 self.block_to_def(&block_src)?.into()
             }
             _ => return None,
@@ -79,7 +79,7 @@ impl Source2DefCtx<'_> {
             }
         }
 
-        let (file, _) = self.db.hir_file_with_source_map(src.file_id);
+        let (file, _) = self.db.hir_file_with_source_map(src.container_id);
         let container = match file.items.first()? {
             FileItem::Module(module_id) => src.with_value(*module_id).into(),
         };

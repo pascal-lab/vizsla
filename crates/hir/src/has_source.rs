@@ -23,7 +23,7 @@ impl HasSource for ModuleId {
     type AstPtr = ptr::ModuleDeclarationPtr;
 
     fn source(&self, db: &dyn HirDb) -> Option<ModuleSrc> {
-        let InFile { file_id, value } = &self;
+        let InFile { container_id: file_id, value } = &self;
         let (_, file_source_map) = db.hir_file_with_source_map(*file_id);
         file_source_map.modules.get_src(*value).map(|it| it.clone())
     }

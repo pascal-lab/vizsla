@@ -119,7 +119,7 @@ pub(crate) fn module_with_source_map_query(
     db: &dyn HirDb,
     module_id: ModuleId,
 ) -> (Arc<Module>, Arc<ModuleSourceMap>) {
-    let (hir_file, file_source_map) = db.hir_file_with_source_map(module_id.file_id);
+    let (hir_file, file_source_map) = db.hir_file_with_source_map(module_id.container_id);
     let ident = hir_file.data[module_id.value].ident.clone();
     let mut module_decl = Module {
         ident,
@@ -132,9 +132,9 @@ pub(crate) fn module_with_source_map_query(
 
     try_! {
         let module_ptr = file_source_map.modules.get_src(module_id.value)?;
-        let tree = db.hir_syntax_tree(module_id.file_id)?;
+        let tree = db.hir_syntax_tree(module_id.container_id)?;
         let module_node = module_ptr.value.to_node(tree.tree())?;
-        let file_text = db.hir_file_text(module_id.file_id);
+        let file_text = db.hir_file_text(module_id.container_id);
         let mut ctx = lower::ModuleLowerCtx {
             db,
             module_id,

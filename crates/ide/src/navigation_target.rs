@@ -62,7 +62,7 @@ impl ToNav for Definition {
 
 impl ToNav for ModuleId {
     fn to_nav(&self, db: &RootDb) -> NavTarget {
-        let InFile { value: module_info_id, file_id } = *self;
+        let InFile { value: module_info_id, container_id: file_id } = *self;
         let module = db.module(*self);
         let (node_range, name_node_range) = {
             let (_, file_src_map) = db.hir_file_with_source_map(file_id);
@@ -95,7 +95,7 @@ impl ToNav for ModuleId {
 
 impl ToNav for BlockId {
     fn to_nav(&self, db: &RootDb) -> NavTarget {
-        let InFile { value: block_src, file_id } = self.lookup(db).block_src;
+        let InFile { value: block_src, container_id: file_id } = self.lookup(db).block_src;
         let block = db.block(*self);
 
         let (node_range, name_node_range) = {
@@ -129,8 +129,8 @@ impl ToNav for BlockId {
 
 impl ToNav for InModule<Idx<HierarchicalInst>> {
     fn to_nav(&self, db: &RootDb) -> NavTarget {
-        let InModule { value: inst_id, module_id } = *self;
-        let InFile { file_id, .. } = module_id;
+        let InModule { value: inst_id, container_id: module_id } = *self;
+        let InFile { container_id: file_id, .. } = module_id;
         let module = db.module(module_id);
 
         let (node_range, name_node_range) = {

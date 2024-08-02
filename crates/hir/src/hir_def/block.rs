@@ -120,7 +120,7 @@ pub(crate) fn block_with_source_map_query(
     block_id: BlockId,
 ) -> (Arc<Block>, Arc<BlockSourceMap>) {
     let BlockLoc { block_src, .. } = block_id.lookup(db);
-    let InFile { file_id, value: block_ptr } = block_src;
+    let InFile { container_id: file_id, value: block_ptr } = block_src;
 
     let mut block = Block {
         info: BlockInfo { ident: None, block_id },

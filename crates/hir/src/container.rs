@@ -24,61 +24,49 @@ impl ContainerId {
     pub fn file_id(&self, db: &dyn HirDb) -> HirFileId {
         match self {
             ContainerId::HirFileId(file_id) => *file_id,
-            ContainerId::ModuleId(module_id) => module_id.file_id,
-            ContainerId::BlockId(block_id) => block_id.lookup(db).block_src.file_id,
+            ContainerId::ModuleId(module_id) => module_id.container_id,
+            ContainerId::BlockId(block_id) => block_id.lookup(db).block_src.container_id,
         }
     }
 }
 
-macro_rules! impl_contained {
-    ($($container:ident[$field:ident: $id:ident]),*) => {
-        $(
-            #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
-            pub struct $container<T> {
-                pub value: T,
-                pub $field: $id,
-            }
-
-            impl<T> From<$container<T>> for InContainer<T> {
-                fn from(container: $container<T>) -> InContainer<T> {
-                    InContainer::new(ContainerId::$id(container.$field), container.value)
-                }
-            }
-
-            impl<T> $container<T> {
-                pub fn new($field: $id, value: T) -> $container<T> {
-                    $container { $field, value }
-                }
-
-                pub fn with_value<U>(self, value: U) -> $container<U> {
-                    $container::new(self.$field, value)
-                }
-            }
-        )*
-    };
-}
-
-impl_contained!(
-    InModule[module_id: ModuleId],
-    InBlock[block_id: BlockId],
-    InFile[file_id: HirFileId]
-);
-
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
-pub struct InContainer<T> {
+pub struct InContainer<T, C = ContainerId> {
     pub value: T,
-    pub container_id: ContainerId,
+    pub container_id: C,
 }
 
-impl<T> InContainer<T> {
-    fn new(container_id: ContainerId, value: T) -> InContainer<T> {
+impl<T, C> InContainer<T, C> {
+    pub fn new(container_id: C, value: T) -> InContainer<T, C> {
         InContainer { value, container_id }
     }
 
-    fn with_value<U>(self, value: U) -> InContainer<U> {
-        InContainer::new(self.container_id, value)
+    pub fn with_value<U>(self, value: U) -> InContainer<U, C> {
+        InContainer::<U, C>::new(self.container_id, value)
     }
 }
+
+impl<T> From<InFile<T>> for InContainer<T, ContainerId> {
+    fn from(file: InFile<T>) -> InContainer<T, ContainerId> {
+        InContainer::new(file.container_id.into(), file.value)
+    }
+}
+
+impl<T> From<InModule<T>> for InContainer<T, ContainerId> {
+    fn from(module: InModule<T>) -> InContainer<T, ContainerId> {
+        InContainer::new(module.container_id.into(), module.value)
+    }
+}
+
+impl<T> From<InBlock<T>> for InContainer<T, ContainerId> {
+    fn from(block: InBlock<T>) -> InContainer<T, ContainerId> {
+        InContainer::new(block.container_id.into(), block.value)
+    }
+}
+
+pub type InFile<T> = InContainer<T, HirFileId>;
+pub type InModule<T> = InContainer<T, ModuleId>;
+pub type InBlock<T> = InContainer<T, BlockId>;
 
 /// Parents of a scope.
 pub struct ContainerParent<'db> {
@@ -99,7 +87,7 @@ impl<'db> Iterator for ContainerParent<'db> {
         let next = self.container_id;
         match self.container_id {
             Some(ContainerId::ModuleId(module_id)) => {
-                self.container_id = Some(ContainerId::HirFileId(module_id.file_id));
+                self.container_id = Some(ContainerId::HirFileId(module_id.container_id));
             }
             Some(ContainerId::BlockId(block_id)) => {
                 let BlockLoc { container_id, .. } = block_id.lookup(self.db);

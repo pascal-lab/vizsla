@@ -67,10 +67,12 @@ impl From<UnitScopeEntry> for PathResolution {
 impl From<InModule<ModuleScopeEntry>> for PathResolution {
     fn from(entry: InModule<ModuleScopeEntry>) -> Self {
         use ModuleScopeEntry::*;
-        let module_id = entry.module_id;
+        let module_id = entry.container_id;
         match entry.value {
             SubDecl(sub_decl) => Self::SubDecl(entry.with_value(sub_decl).into()),
-            HierarchyInst(inst) => Self::HierarchyInst(InModule { value: inst, module_id }),
+            HierarchyInst(inst) => {
+                Self::HierarchyInst(InModule { value: inst, container_id: module_id })
+            }
             Block(block_id) => Self::BlockId(block_id),
             Stmt(stmt) => Self::Stmt(entry.with_value(stmt).into()),
             PortDecl { port, data } => Self::PortDecl { port, data, module_id },
