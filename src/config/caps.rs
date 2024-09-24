@@ -47,6 +47,18 @@ impl Config {
         ) == Some(true)
     }
 
+    pub fn hierarchical_symbols(&self) -> bool {
+        try_!(
+            self.client_caps
+                .text_document
+                .as_ref()?
+                .document_symbol
+                .as_ref()?
+                .hierarchical_document_symbol_support?
+        )
+        .unwrap_or_default()
+    }
+
     pub fn location_link(&self) -> bool {
         try_or_default!(self.client_caps.text_document.as_ref()?.definition?.link_support?)
     }

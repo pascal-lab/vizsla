@@ -4,11 +4,11 @@ use utils::{
     lines::{LineInfo, PositionEncoding},
     paths::AbsPathBuf,
 };
-use vfs::vfs_path::VfsPath;
+use vfs::{FileId, VfsPath};
 
 use crate::global_state::snapshot::GlobalStateSnapshot;
 
-pub(crate) fn vfs_path(url: &lsp_types::Url) -> anyhow::Result<vfs::vfs_path::VfsPath> {
+pub(crate) fn vfs_path(url: &lsp_types::Url) -> anyhow::Result<vfs::VfsPath> {
     let path = url.to_file_path().map_err(|()| anyhow::format_err!("url is not a file"))?;
     Ok(VfsPath::from(AbsPathBuf::try_from(path).unwrap()))
 }
@@ -58,4 +58,8 @@ pub(crate) fn file_position(
     let line_index = snap.line_info(file_id)?;
     let offset = offset(&line_index, pos_params.position)?;
     Ok(FilePosition { file_id, offset })
+}
+
+pub(crate) fn file_id(snap: &GlobalStateSnapshot, url: &lsp_types::Url) -> anyhow::Result<FileId> {
+    snap.file_id(url)
 }

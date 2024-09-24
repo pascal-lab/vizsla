@@ -52,10 +52,8 @@ hir = { path = "./crates/hir/", version = "0.0.0" }
 ide = { path = "./crates/ide/", version = "0.0.0" }
 ide-db = { path = "./crates/ide-db/", version = "0.0.0" }
 project-model = { path = "./crates/project-model/", version = "0.0.0" }
-sourcegen = { path = "./crates/sourcegen/", version = "0.0.0" }
 span = { path = "./crates/span/", version = "0.0.0" }
 syntax = { path = "./crates/syntax/", version = "0.0.0" }
-tree-sitter-verilog = { path = "./crates/tree-sitter-verilog/", version = "0.0.1" }
 utils = { path = "./crates/utils", version = "0.0.0" }
 vfs = { path = "./crates/vfs", version = "0.0.0" }
 vfs-notify = { path = "./crates/vfs-notify/", version = "0.0.0" }
@@ -69,16 +67,17 @@ itertools = "0.12.0"
 la-arena = "0.3.1"
 line-index = "0.1.0"
 nohash-hasher = "0.2.0"
+paste = "1.0.15"
 rustc-hash = "1.1.0"
 salsa = "0.17.0-pre.2"
 serde = { version = "1.0.189", features = ["derive"] }
 serde_json = "1.0.107"
+slang = { version = "0.0.1", path = "/Users/roife/slang" }
 smallvec = { version = "1.10.0", features = [
   "const_new",
   "union",
   "const_generics",
 ] }
-smol_str = { version = "0.2.0", features = ["serde"] }
+smol_str = { version = "0.3.1", features = ["serde"] }
 tracing = "0.1.37"
 triomphe = "0.1.9"
-tree-sitter = "0.20"

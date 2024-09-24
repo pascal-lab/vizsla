@@ -1,39 +1,36 @@
 use base_db::intern::Lookup;
-use syntax::ast::ptr;
+use utils::get::Get;
 
 use crate::{
     container::InFile,
     db::HirDb,
     hir_def::{
-        block::{
-            block_src::{BlockSrc, LocalBlockSrc},
-            BlockId, BlockLoc,
-        },
-        ModuleId, ModuleSrc,
+        block::{BlockId, BlockSrc},
+        module::{ModuleId, ModuleSrc},
     },
+    source_map::ToAstNode,
 };
 
 pub trait HasSource {
-    type AstPtr;
+    type AstPtr: for<'a> ToAstNode<'a>;
 
     fn source(&self, db: &dyn HirDb) -> Option<InFile<Self::AstPtr>>;
 }
 
 impl HasSource for ModuleId {
-    type AstPtr = ptr::ModuleDeclarationPtr;
+    type AstPtr = ModuleSrc;
 
-    fn source(&self, db: &dyn HirDb) -> Option<ModuleSrc> {
-        let InFile { container_id: file_id, value } = &self;
+    fn source(&self, db: &dyn HirDb) -> Option<InFile<ModuleSrc>> {
+        let InFile { cont_id: file_id, value } = &self;
         let (_, file_source_map) = db.hir_file_with_source_map(*file_id);
-        file_source_map.modules.get_src(*value).map(|it| it.clone())
+        file_source_map.modules.get_opt(value).map(|it| self.with_value(it))
     }
 }
 
 impl HasSource for BlockId {
-    type AstPtr = LocalBlockSrc;
+    type AstPtr = BlockSrc;
 
-    fn source(&self, db: &dyn HirDb) -> Option<BlockSrc> {
-        let BlockLoc { block_src, .. } = self.lookup(db);
-        Some(block_src)
+    fn source(&self, db: &dyn HirDb) -> Option<InFile<BlockSrc>> {
+        Some(self.lookup(db).src)
     }
 }

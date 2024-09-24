@@ -1,99 +1,66 @@
 use hir::{
     container::{InContainer, InModule},
     hir_def::{
-        block::BlockId, data::SubDecl, module::module_item::HierarchicalInst, stmt::Stmt, ModuleId,
+        block::BlockId,
+        expr::declarator::DeclId,
+        module::{ModuleId, instantiation::InstanceId, port::NonAnsiPortId},
+        proc::ProcId,
+        stmt::StmtId,
     },
-    semantics::{pathres::PathResolution, Semantics},
+    semantics::{Semantics, pathres::PathResolution},
 };
 use ide_db::root_db::RootDb;
-use la_arena::Idx;
-use smallvec::{smallvec, SmallVec};
-use syntax::{
-    ast::{self, AstNode},
-    syntax_kind, SyntaxNode,
-};
+use smallvec::{SmallVec, smallvec};
+use syntax::{SyntaxTokenWithParent, TokenKind, ast, match_ast};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Definition {
     ModuleId(ModuleId),
     BlockId(BlockId),
-    HierarchyInst(InModule<Idx<HierarchicalInst>>),
-    SubDecl(InContainer<Idx<SubDecl>>),
-    Stmt(InContainer<Idx<Stmt>>),
+
+    NonAnsiPort(InModule<NonAnsiPortId>),
+    Decl(InContainer<DeclId>),
+    Instance(InModule<InstanceId>),
+    Stmt(InContainer<StmtId>),
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum IdentClass {
-    ModuleId(ModuleId),
-    BlockId(BlockId),
-    Port { port: Idx<SubDecl>, data: Option<Idx<SubDecl>>, module_id: ModuleId },
-    HierarchyInst(InModule<Idx<HierarchicalInst>>),
-    SubDecl(InContainer<Idx<SubDecl>>),
-    Stmt(InContainer<Idx<Stmt>>),
-}
+impl Definition {
+    pub fn resolution(
+        sema: &Semantics<'_, RootDb>,
+        token_par @ SyntaxTokenWithParent { parent, tok }: SyntaxTokenWithParent,
+    ) -> Option<SmallVec<[Definition; 3]>> {
+        if !matches!(tok.kind(), TokenKind::IDENTIFIER | TokenKind::SYSTEM_IDENTIFIER) {
+            return None;
+        }
 
-impl IdentClass {
-    pub fn classify(sema: &Semantics<'_, RootDb>, node: SyntaxNode) -> Option<IdentClass> {
-        let res = match node.kind_id() {
-            syntax_kind::SIMPLE_IDENTIFIER => {
-                let ident = node.parent()?;
-                let parent = ident.parent();
-                match parent.map(|it| it.kind_id()) {
-                    Some(syntax_kind::NET_LVALUE) => {
-                        let parent = ast::NetLvalue::cast(parent.unwrap()).unwrap();
-                        sema.resolve_path(parent.identifiers())
-                    }
-                    Some(syntax_kind::VARIABLE_LVALUE) => {
-                        let parent = ast::VariableLvalue::cast(parent.unwrap()).unwrap();
-                        sema.resolve_path(parent.identifiers())
-                    }
-                    Some(syntax_kind::TF_CALL) => {
-                        let parent = ast::TfCall::cast(parent.unwrap()).unwrap();
-                        sema.resolve_path(parent.identifiers())
-                    }
-                    Some(syntax_kind::PRIMARY) => {
-                        let parent = ast::Primary::cast(parent.unwrap()).unwrap();
-                        sema.resolve_path(parent.identifiers())
-                    }
-                    _ => sema.resolve_ident(&ast::Identifier::cast(ident).unwrap()),
-                }
-            }
-            _ => return None,
+        let res = match_ast! { parent in
+            ast::MemberAccessExpression as _ => unimplemented!(),
+            ast::ScopedName as _ => unimplemented!(),
+            _ => sema.resolve_ident(token_par),
         }?;
-        Some(res.into())
-    }
 
-    pub fn definitions(self) -> SmallVec<[Definition; 2]> {
-        match self {
-            Self::ModuleId(module) => smallvec![Definition::ModuleId(module)],
-            Self::BlockId(block) => smallvec![Definition::BlockId(block)],
-            Self::Port { port, data, module_id } => {
-                let container_id = module_id.into();
-                let mut res =
-                    smallvec![Definition::SubDecl(InContainer { value: port, container_id })];
-                if let Some(data) = data {
-                    res.push(Definition::SubDecl(InContainer { value: data, container_id }));
+        let ans = match res {
+            PathResolution::Module(module_id) => smallvec![Self::ModuleId(module_id)],
+            PathResolution::Decl(decl_id) => smallvec![Self::Decl(decl_id)],
+            PathResolution::Port { label, port_decl, data_decl: decl, module } => {
+                let mut defs = SmallVec::new();
+                let container = module.into();
+                if let Some(label) = label {
+                    defs.push(Self::NonAnsiPort(InModule::new(module, label)));
                 }
-                res
+                if let Some(port_decl) = port_decl {
+                    defs.push(Self::Decl(InContainer::new(container, port_decl)));
+                }
+                if let Some(decl) = decl {
+                    defs.push(Self::Decl(InContainer::new(container, decl)));
+                }
+                defs
             }
-            Self::HierarchyInst(inst) => smallvec![Definition::HierarchyInst(inst)],
-            Self::SubDecl(sub_decl) => smallvec![Definition::SubDecl(sub_decl)],
-            Self::Stmt(stmt) => smallvec![Definition::Stmt(stmt)],
-        }
-    }
-}
+            PathResolution::Instance(instance_id) => smallvec![Self::Instance(instance_id)],
+            PathResolution::Stmt(stmt_id) => smallvec![Self::Stmt(stmt_id)],
+            PathResolution::Block(blk_id) => smallvec![Self::BlockId(blk_id)],
+        };
 
-impl From<PathResolution> for IdentClass {
-    fn from(res: PathResolution) -> Self {
-        match res {
-            PathResolution::ModuleId(module) => Self::ModuleId(module),
-            PathResolution::BlockId(block) => Self::BlockId(block),
-            PathResolution::PortDecl { port, data, module_id } => {
-                Self::Port { port, data, module_id }
-            }
-            PathResolution::HierarchyInst(inst) => Self::HierarchyInst(inst),
-            PathResolution::SubDecl(sub_decl) => Self::SubDecl(sub_decl),
-            PathResolution::Stmt(stmt) => Self::Stmt(stmt),
-        }
+        Some(ans)
     }
 }

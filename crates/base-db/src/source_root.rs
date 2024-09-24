@@ -1,9 +1,4 @@
-use vfs::{
-    anchored_path::AnchoredPath,
-    file_set::{FileSet, FileSetConfig},
-    vfs::{FileId, Vfs},
-    vfs_path::VfsPath,
-};
+use vfs::{FileId, FileSet, FileSetConfig, Vfs, VfsPath, anchored_path::AnchoredPath};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct SourceRootId(pub u32);

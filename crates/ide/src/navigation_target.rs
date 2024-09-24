@@ -1,21 +1,31 @@
-use base_db::intern::Lookup;
+use base_db::{intern::Lookup, source_db::SourceDb};
 use hir::{
     container::{ContainerId, InContainer, InFile, InModule},
     db::HirDb,
+    file::HirFileId,
     hir_def::{
-        block::BlockId, data::SubDecl, module::module_item::HierarchicalInst, stmt::Stmt, ModuleId,
+        block::{BlockId, BlockLoc},
+        expr::declarator::DeclId,
+        module::{
+            ModuleId,
+            instantiation::InstanceId,
+            port::{NonAnsiPortId, PortSrcs, Ports},
+        },
+        stmt::StmtId,
     },
-    try_match,
+    source_map::ToAstNode,
 };
 use ide_db::root_db::RootDb;
-use la_arena::Idx;
 use line_index::TextRange;
 use smol_str::SmolStr;
 use syntax::ast::AstNode;
-use utils::text_edit::to_text_range;
-use vfs::vfs::FileId;
+use utils::{
+    get::{Get, GetRef},
+    text_edit::SourceRangeExt,
+};
+use vfs::FileId;
 
-use crate::definitions::Definition;
+use crate::{SymbolKind, definitions::Definition};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NavTarget {
@@ -36,14 +46,6 @@ impl NavTarget {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum SymbolKind {
-    Module,
-    Block,
-    Data,
-    HierarchicalInst,
-}
-
 pub(crate) trait ToNav {
     fn to_nav(&self, db: &RootDb) -> NavTarget;
 }
@@ -53,8 +55,10 @@ impl ToNav for Definition {
         match self {
             Definition::ModuleId(module_id) => module_id.to_nav(db),
             Definition::BlockId(block_id) => block_id.to_nav(db),
-            Definition::HierarchyInst(inst_id) => inst_id.to_nav(db),
-            Definition::SubDecl(sub_decl_id) => sub_decl_id.to_nav(db),
+            Definition::NonAnsiPort(nonansi_port_id) => nonansi_port_id.to_nav(db),
+            Definition::Decl(decl_id) => decl_id.to_nav(db),
+            Definition::Instance(instance_id) => instance_id.to_nav(db),
+            Definition::BlockId(block_id) => block_id.to_nav(db),
             Definition::Stmt(stmt_id) => stmt_id.to_nav(db),
         }
     }
@@ -62,30 +66,18 @@ impl ToNav for Definition {
 
 impl ToNav for ModuleId {
     fn to_nav(&self, db: &RootDb) -> NavTarget {
-        let InFile { value: module_info_id, container_id: file_id } = *self;
-        let module = db.module(*self);
-        let (node_range, name_node_range) = {
-            let (_, file_src_map) = db.hir_file_with_source_map(file_id);
-            let tree = db.hir_syntax_tree(file_id).unwrap();
-            let module_decl = file_src_map[module_info_id].value.to_node(tree.tree()).unwrap();
+        let InFile { value: local_module_id, cont_id: file_id } = *self;
+        let tree = db.parse(file_id);
+        let (file, file_src_map) = db.hir_file_with_source_map(file_id);
 
-            let ident_range = try_match! {
-                module_decl.module_ansi_header(), header => {
-                    header.identifier().unwrap().syntax().range()
-                },
-                module_decl.module_nonansi_header(), header => {
-                    header.identifier().unwrap().syntax().range()
-                },
-                _ => unreachable!(),
-            };
-            (module_decl.syntax().range(), ident_range)
-        };
+        let decl_node = file_src_map.get(&local_module_id).to_node(&tree).unwrap();
+        let header = decl_node.header();
 
         NavTarget {
-            file_id: file_id.0,
-            full_range: to_text_range(node_range),
-            focus_range: Some(to_text_range(name_node_range)),
-            name: Some(module.ident.clone()),
+            file_id: file_id.file_id(),
+            full_range: decl_node.syntax().range().unwrap().to_text_range(),
+            focus_range: header.name().and_then(|name| name.range()).map(|r| r.to_text_range()),
+            name: Some(file.get(&local_module_id).ident.clone()),
             kind: Some(SymbolKind::Module),
             container_name: None,
             description: None,
@@ -95,165 +87,161 @@ impl ToNav for ModuleId {
 
 impl ToNav for BlockId {
     fn to_nav(&self, db: &RootDb) -> NavTarget {
-        let InFile { value: block_src, container_id: file_id } = self.lookup(db).block_src;
-        let block = db.block(*self);
+        let BlockLoc { cont_id, src: InFile { value: src, cont_id: file_id } } = self.lookup(db);
+        let tree = db.parse(file_id);
+        let block_node = src.to_node(&tree).unwrap();
 
-        let (node_range, name_node_range) = {
-            use hir::hir_def::block::block_src::LocalBlockSrc;
-            let tree = db.hir_syntax_tree(file_id).unwrap();
-            match block_src {
-                LocalBlockSrc::SeqBlock(ptr) => {
-                    let block = ptr.to_node(tree.tree()).unwrap();
-                    let ident = block.identifiers().next();
-                    (block.syntax().range(), ident.map(|it| it.syntax().range()))
-                }
-                LocalBlockSrc::ParBlock(ptr) => {
-                    let block = ptr.to_node(tree.tree()).unwrap();
-                    let ident = block.identifiers().next();
-                    (block.syntax().range(), ident.map(|it| it.syntax().range()))
-                }
+        let (name, container_name) = match cont_id {
+            ContainerId::HirFileId(file_id) => {
+                let (file, file_src_map) = db.hir_file_with_source_map(file_id);
+                let local_block_id = file_src_map.get(&src);
+                let name = file.get(&local_block_id).name.clone();
+                (name, None)
+            }
+            ContainerId::ModuleId(module_id) => {
+                let (module, module_src_map) = db.module_with_source_map(module_id);
+                let local_block_id = module_src_map.get(&src);
+                let name = module.get(&local_block_id).name.clone();
+                (name, Some(module.ident.clone()))
+            }
+            ContainerId::BlockId(block_id) => {
+                let (block, block_src_map) = db.block_with_source_map(block_id);
+                let local_block_id = block_src_map.get(&src);
+                let name = block.get(&local_block_id).name.clone();
+                (name, block.name.clone())
             }
         };
 
         NavTarget {
             file_id: file_id.0,
-            full_range: to_text_range(node_range),
-            focus_range: name_node_range.map(to_text_range),
-            name: block.info.ident.clone(),
-            kind: Some(SymbolKind::Block),
-            container_name: None,
-            description: None,
-        }
-    }
-}
-
-impl ToNav for InModule<Idx<HierarchicalInst>> {
-    fn to_nav(&self, db: &RootDb) -> NavTarget {
-        let InModule { value: inst_id, container_id: module_id } = *self;
-        let InFile { container_id: file_id, .. } = module_id;
-        let module = db.module(module_id);
-
-        let (node_range, name_node_range) = {
-            let (_, module_src_map) = db.module_with_source_map(module_id);
-            let tree = db.hir_syntax_tree(file_id).unwrap();
-            let inst = module_src_map[inst_id].value.to_node(tree.tree()).unwrap();
-            let ident_range = inst
-                .name_of_instance()
-                .and_then(|it| it.identifier().map(|it| it.syntax().range()));
-            (inst.syntax().range(), ident_range)
-        };
-
-        NavTarget {
-            file_id: file_id.0,
-            full_range: to_text_range(node_range),
-            focus_range: name_node_range.map(to_text_range),
-            name: Some(module.ident.clone()),
-            kind: Some(SymbolKind::HierarchicalInst),
-            container_name: None,
-            description: None,
-        }
-    }
-}
-
-impl ToNav for InContainer<Idx<SubDecl>> {
-    fn to_nav(&self, db: &RootDb) -> NavTarget {
-        let InContainer { value: sub_decl_id, container_id } = *self;
-        let file_id = container_id.file_id(db);
-
-        let (node_range, name_node_range, name) = {
-            use hir::hir_def::data::LocalSubDeclSrc;
-            let tree = db.hir_syntax_tree(file_id).unwrap();
-            let (name, src) = match container_id {
-                ContainerId::HirFileId(_) => unreachable!(),
-                ContainerId::ModuleId(module_id) => {
-                    let (module, module_src_map) = db.module_with_source_map(module_id);
-                    let src = module_src_map[sub_decl_id].value.clone();
-                    (module[sub_decl_id].ident.clone(), src)
-                }
-                ContainerId::BlockId(block_id) => {
-                    let (block, block_src_map) = db.block_with_source_map(block_id);
-                    let src = block_src_map[sub_decl_id].value.clone();
-                    (block[sub_decl_id].ident.clone(), src)
-                }
-            };
-            let (node_range, name_node_range) = match src {
-                LocalSubDeclSrc::NetDeclAssign(ptr) => {
-                    let node = ptr.to_node(tree.tree()).unwrap();
-                    (node.syntax().range(), node.identifier().unwrap().syntax().range())
-                }
-                LocalSubDeclSrc::VarDeclAssign(ptr) => {
-                    let node = ptr.to_node(tree.tree()).unwrap();
-                    (node.syntax().range(), node.identifier().unwrap().syntax().range())
-                }
-                LocalSubDeclSrc::ParamAssign(ptr) => {
-                    let node = ptr.to_node(tree.tree()).unwrap();
-                    (node.syntax().range(), node.identifier().unwrap().syntax().range())
-                }
-                LocalSubDeclSrc::AnsiPortDecl(ptr) => {
-                    let node = ptr.to_node(tree.tree()).unwrap();
-                    (node.syntax().range(), node.identifier().unwrap().syntax().range())
-                }
-                LocalSubDeclSrc::PortIdentDecl(ptr) => {
-                    let node = ptr.to_node(tree.tree()).unwrap();
-                    (node.syntax().range(), node.identifier().unwrap().syntax().range())
-                }
-                LocalSubDeclSrc::VarIdentDecl(ptr) => {
-                    let node = ptr.to_node(tree.tree()).unwrap();
-                    (node.syntax().range(), node.identifier().unwrap().syntax().range())
-                }
-                LocalSubDeclSrc::VarPortIdentDecl(ptr) => {
-                    let node = ptr.to_node(tree.tree()).unwrap();
-                    (node.syntax().range(), node.identifier().unwrap().syntax().range())
-                }
-            };
-            (node_range, name_node_range, name)
-        };
-
-        NavTarget {
-            file_id: file_id.0,
-            full_range: to_text_range(node_range),
-            focus_range: Some(to_text_range(name_node_range)),
-            name: Some(name),
-            kind: Some(SymbolKind::Data),
-            container_name: None,
-            description: None,
-        }
-    }
-}
-
-impl ToNav for InContainer<Idx<Stmt>> {
-    fn to_nav(&self, db: &RootDb) -> NavTarget {
-        let InContainer { value: stmt_id, container_id } = *self;
-        let file_id = container_id.file_id(db);
-
-        let (node_range, name_node_range, name) = {
-            let tree = db.hir_syntax_tree(file_id).unwrap();
-            let (name, ptr) = match container_id {
-                ContainerId::HirFileId(_) => unreachable!(),
-                ContainerId::ModuleId(module_id) => {
-                    let (module, module_src_map) = db.module_with_source_map(module_id);
-                    let ptr = module_src_map[stmt_id].value.clone();
-                    (module[stmt_id].ident.clone(), ptr)
-                }
-                ContainerId::BlockId(block_id) => {
-                    let (block, block_src_map) = db.block_with_source_map(block_id);
-                    let ptr = block_src_map[stmt_id].value.clone();
-                    (block[stmt_id].ident.clone(), ptr)
-                }
-            };
-            let node = ptr.to_node(tree.tree()).unwrap();
-            let node_range = node.syntax().range();
-            let name_node_range = node.identifier().map(|it| it.syntax().range());
-            (node_range, name_node_range, name)
-        };
-
-        NavTarget {
-            file_id: file_id.0,
-            full_range: to_text_range(node_range),
-            focus_range: name_node_range.map(to_text_range),
+            full_range: block_node.syntax().range().unwrap().to_text_range(),
+            focus_range: try { block_node.label()?.name()?.range()?.to_text_range() },
             name,
-            kind: Some(SymbolKind::Data),
-            container_name: None,
+            kind: Some(SymbolKind::Block),
+            container_name,
+            description: None,
+        }
+    }
+}
+
+impl ToNav for InModule<NonAnsiPortId> {
+    fn to_nav(&self, db: &RootDb) -> NavTarget {
+        let InModule { value: port_id, cont_id: module_id } = *self;
+
+        let (module, module_src_map) = db.module_with_source_map(module_id);
+
+        let file_id = module_id.cont_id;
+        let tree = db.parse(file_id);
+        let port_node = module_src_map.get(&port_id).to_node(&tree).unwrap();
+
+        NavTarget {
+            file_id: file_id.file_id(),
+            full_range: port_node.syntax().range().unwrap().to_text_range(),
+            focus_range: try {
+                port_node.as_explicit_non_ansi_port()?.name()?.range()?.to_text_range()
+            },
+            name: module.get(&port_id).label.clone(),
+            kind: Some(SymbolKind::PortLabel),
+            container_name: Some(module.ident.clone()),
+            description: None,
+        }
+    }
+}
+
+impl ToNav for InContainer<DeclId> {
+    fn to_nav(&self, db: &RootDb) -> NavTarget {
+        let InContainer { value: decl_id, cont_id } = *self;
+        let file_id = cont_id.file_id(db);
+        let tree = db.parse_src(cont_id.file_id(db));
+
+        let (name, decl_node, container_name) = match cont_id {
+            ContainerId::HirFileId(file_id) => {
+                let (file, file_src_map) = db.hir_file_with_source_map(file_id);
+                let name = file.get(&decl_id).name.clone();
+                let decl_node = file_src_map.get(&decl_id).to_node(&tree).unwrap();
+                (name, decl_node, None)
+            }
+            ContainerId::ModuleId(module_id) => {
+                let (module, module_src_map) = db.module_with_source_map(module_id);
+                let name = module.get(&decl_id).name.clone();
+                let decl_node = module_src_map.get(&decl_id).to_node(&tree).unwrap();
+                (name, decl_node, Some(module.ident.clone()))
+            }
+            ContainerId::BlockId(block_id) => {
+                let (block, block_src_map) = db.block_with_source_map(block_id);
+                let name = block.get(&decl_id).name.clone();
+                let decl_node = block_src_map.get(&decl_id).to_node(&tree).unwrap();
+                (name, decl_node, block.name.clone())
+            }
+        };
+
+        NavTarget {
+            file_id,
+            full_range: decl_node.syntax().range().unwrap().to_text_range(),
+            focus_range: try { decl_node.name()?.range()?.to_text_range() },
+            name,
+            kind: Some(SymbolKind::Decl),
+            container_name,
+            description: None,
+        }
+    }
+}
+
+impl ToNav for InModule<InstanceId> {
+    fn to_nav(&self, db: &RootDb) -> NavTarget {
+        let InModule { value: instance_id, cont_id: module_id } = *self;
+        let file_id = module_id.file_id();
+        let tree = db.parse_src(file_id);
+
+        let (module, module_src_map) = db.module_with_source_map(module_id);
+        let instance_node = module_src_map.get(&instance_id).to_node(&tree).unwrap();
+
+        NavTarget {
+            file_id,
+            full_range: instance_node.syntax().range().unwrap().to_text_range(),
+            focus_range: try { instance_node.decl()?.name()?.range()?.to_text_range() },
+            name: module.get(&instance_id).name.clone(),
+            kind: Some(SymbolKind::Instance),
+            container_name: Some(module.ident.clone()),
+            description: None,
+        }
+    }
+}
+
+impl ToNav for InContainer<StmtId> {
+    fn to_nav(&self, db: &RootDb) -> NavTarget {
+        let InContainer { value: stmt_id, cont_id } = *self;
+        let file_id = cont_id.file_id(db);
+        let tree = db.parse_src(file_id);
+
+        let (name, stmt_node, container_name) = match cont_id {
+            ContainerId::HirFileId(file_id) => {
+                let (file, file_src_map) = db.hir_file_with_source_map(file_id);
+                let name = file.get(&stmt_id).label.clone();
+                let stmt_node = file_src_map.get(&stmt_id).to_node(&tree).unwrap();
+                (name, stmt_node, None)
+            }
+            ContainerId::ModuleId(module_id) => {
+                let (module, module_src_map) = db.module_with_source_map(module_id);
+                let name = module.get(&stmt_id).label.clone();
+                let stmt_node = module_src_map.get(&stmt_id).to_node(&tree).unwrap();
+                (name, stmt_node, Some(module.ident.clone()))
+            }
+            ContainerId::BlockId(block_id) => {
+                let (block, block_src_map) = db.block_with_source_map(block_id);
+                let name = block.get(&stmt_id).label.clone();
+                let stmt_node = block_src_map.get(&stmt_id).to_node(&tree).unwrap();
+                (name, stmt_node, block.name.clone())
+            }
+        };
+
+        NavTarget {
+            file_id,
+            full_range: stmt_node.syntax().range().unwrap().to_text_range(),
+            focus_range: try { stmt_node.label()?.name()?.range()?.to_text_range() },
+            name,
+            kind: Some(SymbolKind::Stmt),
+            container_name,
             description: None,
         }
     }

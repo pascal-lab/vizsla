@@ -28,18 +28,17 @@ pub struct Config {
 
 pub enum Message {
     Progress { n_total: usize, n_done: usize, config_version: u32 },
-    Loaded { files: Vec<(AbsPathBuf, VfsLoadResult)> },
+    Loaded { files: Vec<(AbsPathBuf, LoadResult)> },
 }
 
-pub type Sender = Box<dyn Fn(Message) + Send>;
+pub type Sender = crossbeam_channel::Sender<Message>;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub enum VfsLoadError {
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum LoadResult {
+    Loaded(String, LineEnding),
     LoadError,
     DecodeError,
 }
-
-pub type VfsLoadResult = Result<(String, LineEnding), VfsLoadError>;
 
 pub trait Handle: fmt::Debug {
     fn spawn(sender: Sender) -> Self
@@ -50,7 +49,7 @@ pub trait Handle: fmt::Debug {
 
     fn invalidate(&mut self, path: AbsPathBuf);
 
-    fn load_sync(&mut self, path: &AbsPath) -> VfsLoadResult;
+    fn load_sync(&mut self, path: &AbsPath) -> LoadResult;
 }
 
 impl Entry {

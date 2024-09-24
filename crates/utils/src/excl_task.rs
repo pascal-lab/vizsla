@@ -4,7 +4,7 @@
 pub struct ExclTask<Output, Cause = String> {
     requested: Option<Cause>,
     in_process: bool,
-    last_result: Output,
+    last_result: Option<Output>,
 }
 
 impl<Output, Cause> ExclTask<Output, Cause> {
@@ -20,13 +20,13 @@ impl<Output, Cause> ExclTask<Output, Cause> {
         self.requested.take()
     }
 
-    pub fn complete(&mut self, result: Output) {
+    pub fn complete(&mut self, result: Option<Output>) {
         assert!(self.in_process);
         self.in_process = false;
         self.last_result = result;
     }
 
-    pub fn last_op_result(&self) -> &Output {
+    pub fn last_op_result(&self) -> &Option<Output> {
         &self.last_result
     }
 

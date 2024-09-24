@@ -1,7 +1,7 @@
 use base_db::{salsa, source_db::SourceDb};
 use line_index::LineIndex;
 use triomphe::Arc;
-use vfs::vfs::FileId;
+use vfs::FileId;
 
 #[salsa::query_group(LineIndexDbStorage)]
 pub trait LineIndexDb: SourceDb {

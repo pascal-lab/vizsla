@@ -5,10 +5,10 @@ use itertools::Itertools;
 use nohash_hasher::IntMap;
 use parking_lot::{RwLockUpgradableReadGuard, RwLockWriteGuard};
 use rustc_hash::FxHashMap;
-use utils::{lines::LineEnding, text_edit::SourceEditKind};
-use vfs::vfs::{ChangedFile, FileId, Vfs};
+use utils::lines::LineEnding;
+use vfs::{ChangedFile, FileId, Vfs};
 
-use super::{reload::should_refresh_for_change, GlobalState};
+use super::{GlobalState, reload::should_refresh_for_change};
 
 // Apply changes
 impl GlobalState {
@@ -65,7 +65,7 @@ impl GlobalState {
         let mut change = Change::new();
         for changed_file in bytes {
             let file_id = changed_file.file_id;
-            if let Some(line_ending) = changed_file.get_line_endings() {
+            if let Some(line_ending) = changed_file.ending() {
                 line_ending_map.insert(file_id, line_ending);
             }
             change.add_changed_file(changed_file)
@@ -83,8 +83,7 @@ impl GlobalState {
         }
 
         // collapse modifications
-        use vfs::vfs::ChangeKind::*;
-        use SourceEditKind::*;
+        use vfs::ChangeKind::*;
 
         let mut file_changes = FxHashMap::default();
         for changed_file in vfs_changes {
@@ -94,24 +93,29 @@ impl GlobalState {
 
                     match (change, *just_created, changed_file.change_kind) {
                         (change, _, Delete) => *change = Delete,
-                        (Create(prev), _, Create(new) | Modify(new, _)) => *prev = new,
-                        (Modify(prev, Edits(a)), _, Modify(new, Edits(b))) => {
+                        (
+                            Create(prev, prev_ending),
+                            _,
+                            Create(new, new_ending) | Modify(new, new_ending),
+                        ) => {
                             *prev = new;
-                            a.extend(b);
+                            *prev_ending = new_ending;
                         }
-                        (Modify(prev, a), _, Modify(new, _)) => {
+                        (Modify(prev, prev_ending), _, Modify(new, new_ending)) => {
                             *prev = new;
-                            *a = Full;
+                            *prev_ending = new_ending;
                         }
-                        (change @ Delete, _, Create(new)) => {
-                            *change = Modify(new, Full);
+                        (change @ Delete, _, Create(new, new_ending)) => {
+                            *change = Modify(new, new_ending);
                             *just_created = true;
                         }
-                        (Delete, _, Modify(_, _)) | (Modify(_, _), _, Create(_)) => unreachable!(),
+                        (Delete, _, Modify(_, _)) | (Modify(_, _), _, Create(_, _)) => {
+                            unreachable!()
+                        }
                     }
                 }
                 Vacant(v) => {
-                    let just_created = matches!(&changed_file.change_kind, Create(_));
+                    let just_created = matches!(&changed_file.change_kind, Create(_, _));
                     v.insert((changed_file.change_kind, just_created));
                 }
             }

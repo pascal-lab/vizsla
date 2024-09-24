@@ -2,13 +2,7 @@ use std::cmp::max;
 
 use itertools::Itertools;
 pub use line_index::{TextRange, TextSize};
-pub use tree_sitter::{InputEdit as SourceEdit, Point as SourcePoint, Range as SourceRange};
-
-#[derive(Eq, PartialEq, Clone, Debug)]
-pub enum SourceEditKind {
-    Full,
-    Edits(Vec<SourceEdit>),
-}
+use slang::SourceRange;
 
 // A single atomic change to text: a insertion, a deletion or a replacement.
 // Must not overlap with other `InDel`s
@@ -225,8 +219,15 @@ fn coalsece_changes(changes: Vec<TextEditItem>) -> Vec<TextEditItem> {
         .collect_vec()
 }
 
-pub fn to_text_range(range: SourceRange) -> TextRange {
-    let start = range.start_byte as u32;
-    let end = range.end_byte as u32;
-    TextRange::new(start.into(), end.into())
+pub trait SourceRangeExt {
+    fn to_text_range(self) -> TextRange;
+}
+
+impl SourceRangeExt for SourceRange {
+    #[inline]
+    fn to_text_range(self) -> TextRange {
+        let start = self.start() as u32;
+        let end = self.end() as u32;
+        TextRange::new(start.into(), end.into())
+    }
 }

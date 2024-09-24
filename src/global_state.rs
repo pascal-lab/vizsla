@@ -10,7 +10,7 @@ pub(crate) mod snapshot;
 use std::time::Instant;
 
 use base_db::source_root::SourceRootConfig;
-use crossbeam_channel::{unbounded, Receiver, Sender};
+use crossbeam_channel::{Receiver, Sender, unbounded};
 use ide::analysis_host::AnalysisHost;
 use lsp_server::{Message, ReqQueue, Request};
 use nohash_hasher::IntMap;
@@ -22,10 +22,7 @@ use utils::{
     lines::LineEnding,
     thread::{Pool, ThreadIntent},
 };
-use vfs::{
-    self,
-    vfs::{FileId, Vfs},
-};
+use vfs::{self, FileId, Vfs};
 
 use self::{main_loop::Task, mem_docs::MemDocs, snapshot::GlobalStateSnapshot};
 use crate::config::{Config, ConfigError};
@@ -106,15 +103,14 @@ pub(crate) struct GlobalState {
 
     // workspaces
     pub(crate) workspaces: Arc<Vec<Workspace>>,
-    pub(crate) fetch_workspaces_task: ExclTask<Option<(Arc<Vec<Workspace>>, Vec<anyhow::Error>)>>,
+    pub(crate) fetch_workspaces_task: ExclTask<(Arc<Vec<Workspace>>, Vec<anyhow::Error>)>,
 }
 
 impl GlobalState {
     pub(crate) fn new(sender: Sender<lsp_server::Message>, config: Config) -> GlobalState {
         let vfs_loader = {
             let (sender, receiver) = unbounded::<vfs::loader::Message>();
-            let handle: vfs_notify::NotifyHandle =
-                vfs::loader::Handle::spawn(Box::new(move |msg| sender.send(msg).unwrap()));
+            let handle: vfs_notify::NotifyHandle = vfs::loader::Handle::spawn(sender);
             let handle = Box::new(handle) as Box<dyn vfs::loader::Handle>;
             Handle { handle, receiver }
         };

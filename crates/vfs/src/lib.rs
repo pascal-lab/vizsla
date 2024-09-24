@@ -1,7 +1,11 @@
 #![feature(let_chains)]
 
 pub mod anchored_path;
-pub mod file_set;
+mod file_set;
 pub mod loader;
-pub mod vfs;
-pub mod vfs_path;
+mod vfs;
+mod vfs_path;
+
+pub use file_set::{FileSet, FileSetConfig};
+pub use vfs::{ChangeKind, ChangedFile, FileId, FileState, Vfs};
+pub use vfs_path::VfsPath;

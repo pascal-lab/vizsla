@@ -1,18 +1,19 @@
 use syntax::{
-    ast::{self, ptr::AstNodePtr, AstNode},
-    syntax_kind, SyntaxAncestors, SyntaxNode,
+    SyntaxAncestors, SyntaxNode,
+    ast::{self, AstNode},
+    match_ast,
 };
+use utils::get::{Get, GetRef};
 
 use crate::{
-    container::{ContainerId, InFile},
+    container::{ContainerId, InContainer, InFile},
     db::HirDb,
+    file::HirFileId,
     hir_def::{
-        block::{
-            block_src::{BlockSrc, LocalBlockSrc},
-            BlockId,
-        },
-        FileItem, LocalModuleSrc, ModuleId, ModuleSrc,
+        block::{BlockId, BlockSrc},
+        module::{ModuleId, ModuleSrc},
     },
+    source_map::ToAstNode,
 };
 
 pub(super) struct Source2DefCtx<'a> {
@@ -22,67 +23,75 @@ pub(super) struct Source2DefCtx<'a> {
 impl Source2DefCtx<'_> {
     pub(super) fn module_to_def(
         &mut self,
-        module_src: &InFile<LocalModuleSrc>,
+        InFile { cont_id: file_id, value: src }: InFile<ModuleSrc>,
     ) -> Option<ModuleId> {
-        let file_id = module_src.container_id;
         let (_, file_source_map) = self.db.hir_file_with_source_map(file_id);
-        file_source_map
-            .modules
-            .get_idx(module_src)
-            .map(|module_id| ModuleId::new(file_id, *module_id))
+        Some(ModuleId::new(file_id, file_source_map.modules.get(&src)))
     }
 
-    pub(super) fn block_to_def(&mut self, block_src: &InFile<LocalBlockSrc>) -> Option<BlockId> {
-        let tree = self.db.syntax_tree(block_src.container_id.0)?;
-        let node = block_src.value.syntax().to_node(tree.tree())?;
-        let container = self.find_container(block_src.clone().with_value(node))?;
+    pub(super) fn block_to_def(
+        &mut self,
+        InFile { cont_id: file_id, value: block_src }: InFile<BlockSrc>,
+    ) -> Option<BlockId> {
+        let tree = self.db.parse(file_id);
+        let node = block_src.to_node(&tree)?;
+        self.block_to_def_inner(file_id, node, block_src)
+    }
 
-        match container {
-            ContainerId::HirFileId(_) => unreachable!(),
+    // This is a faster version of block_to_def that doesn't require a [`to_node`]
+    fn block_to_def_inner(
+        &mut self,
+        file_id: HirFileId,
+        block: ast::BlockStatement,
+        block_src: BlockSrc,
+    ) -> Option<BlockId> {
+        let node = block.syntax();
+        let container = self.find_container(InFile::new(file_id, node))?;
+
+        let block_id = match container {
+            ContainerId::HirFileId(file_id) => {
+                let (file, file_src_map) = self.db.hir_file_with_source_map(file_id);
+                let local_block_id = file_src_map.get(&block_src);
+                file.get(&local_block_id).block_id
+            }
             ContainerId::ModuleId(module_id) => {
                 let (module, module_src_map) = self.db.module_with_source_map(module_id);
-                let block_info_id = module_src_map.block.get_idx(block_src)?;
-                Some(module[*block_info_id].block_id)
+                let local_block_id = module_src_map.get(&block_src);
+                module.get(&local_block_id).block_id
             }
             ContainerId::BlockId(block_id) => {
                 let (block, block_src_map) = self.db.block_with_source_map(block_id);
-                let block_info_id = block_src_map.block.get_idx(block_src)?;
-                Some(block[*block_info_id].block_id)
+                let local_block_id = block_src_map.get(&block_src);
+                block.get(&local_block_id).block_id
             }
-        }
+        };
+
+        Some(block_id)
     }
 
-    fn container_to_def(
-        &mut self,
-        InFile { container_id: file_id, value: node }: InFile<SyntaxNode>,
-    ) -> Option<ContainerId> {
-        let container_id = match node.kind_id() {
-            syntax_kind::MODULE_DECLARATION => {
-                let value = ast::ModuleDeclaration::cast(node).unwrap().to_ptr();
-                let module_src = ModuleSrc { container_id: file_id, value };
-                self.module_to_def(&module_src)?.into()
-            }
-            syntax_kind::SEQ_BLOCK | syntax_kind::PAR_BLOCK => {
-                let value = LocalBlockSrc::cast(node.into()).unwrap();
-                let block_src = BlockSrc { container_id: file_id, value };
-                self.block_to_def(&block_src)?.into()
-            }
+    fn container_to_def(&mut self, file_id: HirFileId, node: SyntaxNode) -> Option<ContainerId> {
+        let cont_id = match_ast! { node in
+            ast::ModuleDeclaration as module => {
+                let src = module.into();
+                self.module_to_def(InFile::new(file_id, src))?.into()
+            },
+            ast::BlockStatement as block => {
+                let block_src = BlockSrc::from(block);
+                self.block_to_def_inner(file_id, block, block_src)?.into()
+            },
+            ast::CompilationUnit => file_id.into(),
             _ => return None,
         };
-        Some(container_id)
+
+        Some(cont_id)
     }
 
-    pub(crate) fn find_container(&mut self, src: InFile<SyntaxNode>) -> Option<ContainerId> {
-        for container in SyntaxAncestors::new(&src.value) {
-            if let Some(def) = self.container_to_def(src.with_value(container)) {
-                return Some(def);
-            }
-        }
-
-        let (file, _) = self.db.hir_file_with_source_map(src.container_id);
-        let container = match file.items.first()? {
-            FileItem::Module(module_id) => src.with_value(*module_id).into(),
-        };
-        Some(container)
+    pub(crate) fn find_container(
+        &mut self,
+        InContainer { value: src, cont_id: file_id }: InFile<SyntaxNode>,
+    ) -> Option<ContainerId> {
+        SyntaxAncestors::start_from(src)
+            .skip(1) // skip the node itself
+            .find_map(|node| self.container_to_def(file_id, node))
     }
 }

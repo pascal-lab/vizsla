@@ -1,9 +1,9 @@
 use salsa::Durability;
 use triomphe::Arc;
-use vfs::vfs::ChangedFile;
+use vfs::ChangedFile;
 
 use crate::{
-    source_db::{edit_syntax_tree, parse_source, SourceRootDb},
+    source_db::SourceRootDb,
     source_root::{SourceRoot, SourceRootId},
 };
 
@@ -38,33 +38,30 @@ impl Change {
             }
         }
 
-        if self.changed_files.iter().any(|it| it.is_created_or_deleted()) {
-            let mut files = db.files();
-            self.changed_files.iter().for_each(|it| {
-                use vfs::vfs::ChangeKind;
-                match it.change_kind {
-                    ChangeKind::Create(_) => {
-                        files.insert(it.file_id);
-                    }
-                    ChangeKind::Delete => {
-                        files.remove(&it.file_id);
-                    }
-                    ChangeKind::Modify(_, _) => {}
-                }
-            });
-            db.set_files(files);
-        }
-
+        let mut files = db.files();
+        let mut files_changed = false;
         for changed_file in self.changed_files {
             let file_id = changed_file.file_id;
             let source_root = db.source_root(db.source_root_id(file_id));
             let durability = durability(&source_root);
 
-            let file_exists = changed_file.exists();
-            edit_syntax_tree(db, changed_file, durability);
-            if file_exists {
-                parse_source(db, file_id);
+            match changed_file.change_kind {
+                vfs::ChangeKind::Create(_, _) => {
+                    files_changed |= files.insert(file_id);
+                }
+                vfs::ChangeKind::Delete => {
+                    files.remove(&file_id);
+                    files_changed = true;
+                }
+                vfs::ChangeKind::Modify(_, _) => {}
             }
+
+            let text = changed_file.text().unwrap_or_else(|| Arc::from(""));
+            db.set_file_text_with_durability(file_id, text, durability);
+        }
+
+        if files_changed {
+            db.set_files_with_durability(files, Durability::HIGH);
         }
     }
 }

@@ -15,8 +15,8 @@ line-index.workspace = true
 memchr = "2.7.1"
 serde.workspace = true
 serde_json.workspace = true
+slang.workspace = true
 tracing.workspace = true
-tree-sitter.workspace = true
 triomphe.workspace = true
 
 [features]

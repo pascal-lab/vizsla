@@ -1,38 +1,23 @@
+use data_ty::DataTy;
 use itertools::Itertools;
 use la_arena::{Arena, Idx};
-use smallvec::SmallVec;
-use syntax::ast::{self, ptr, support::AstChildren, AstNode};
-use utils::{try_, try_or_default};
-
-use super::{
-    literal::{Literal, LowerLiteral},
-    lower::Lower,
+use syntax::{
+    SyntaxKind, TokenKind,
+    ast::{self, AstNode},
 };
+
+use super::literal::{Literal, lower_literal};
 use crate::{
-    container::InFile,
-    hir_def::{data::TypeId, Ident},
+    alloc_idx_and_src,
+    db::InternDb,
+    define_src,
+    hir_def::{Ident, literal::lower_integer_vector, lower_ident_opt},
     source_map::SourceMap,
-    try_match,
 };
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub enum LocalExprSrc {
-    Expr(ptr::ExpressionPtr),
-    Primary(ptr::PrimaryPtr),
-    NetLValue(ptr::NetLvaluePtr),
-    VarLValue(ptr::VariableLvaluePtr),
-    ConstExpr(ptr::ConstantExpressionPtr),
-    ConstPrimary(ptr::ConstantPrimaryPtr),
-    ParamExpr(ptr::ParamExpressionPtr),
-    ConstParamExpr(ptr::ConstantParamExpressionPtr),
-    Ident(ptr::IdentifierPtr),
-    SystfIdent(ptr::SystemTfIdentifierPtr),
-    // NetLValue(ptr::NetLvaluePtr),
-    // VarLValue(ptr::VariableLvaluePtr),
-    // TODO: NoneRangeVarLValue(ptr::NonerangeVariableLvaluePtr),
-}
-
-pub type ExprSrc = InFile<LocalExprSrc>;
+pub mod data_ty;
+pub mod declarator;
+pub mod timing_control;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone, Hash)]
 pub enum UnaryOp {
@@ -118,7 +103,8 @@ pub enum BinaryOp {
     BitXor,
     // `~^`, same as `^~`
     BitXnor,
-    // TODO: implication and equivalence
+    // Assignments
+    Assign(AssignOp),
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone, Hash)]
@@ -133,821 +119,504 @@ pub enum IncDecOp {
 pub enum AssignOp {
     // `=`
     Assign,
+    // `<=`
+    NonBlockAssign,
     // `+=`
-    BinaryOpAssign(BinaryOp),
+    AddAssign,
+    // `-=`
+    SubAssign,
+    // `*=`
+    MulAssign,
+    // `/=`
+    DivAssign,
+    // `%=`
+    ModAssign,
+    // `&=`
+    BitAndAssign,
+    // `|=`
+    BitOrAssign,
+    // `^=`
+    BitXorAssign,
+    // `<<=`
+    ShiftLeftAssign,
+    // `>>=`
+    ShiftRightAssign,
+    // `<<<=`
+    ArithShiftLeftAssign,
+    // `>>>=`
+    ArithShiftRightAssign,
 }
 
-pub(crate) fn lower_assign_op(op: &ast::AssignmentOperator) -> Option<AssignOp> {
-    try_match! {
-        op.token_eq(), _ => Some(AssignOp::Assign),
-        op.token_plus_eq(), _ => Some(AssignOp::BinaryOpAssign(BinaryOp::Add)),
-        op.token_minus_eq(), _ => Some(AssignOp::BinaryOpAssign(BinaryOp::Sub)),
-        op.token_star_eq(), _ => Some(AssignOp::BinaryOpAssign(BinaryOp::Mul)),
-        op.token_slash_eq(), _ => Some(AssignOp::BinaryOpAssign(BinaryOp::Div)),
-        op.token_percent_eq(), _ => Some(AssignOp::BinaryOpAssign(BinaryOp::Mod)),
-        op.token_and_eq(), _ => Some(AssignOp::BinaryOpAssign(BinaryOp::BitAnd)),
-        op.token_or_eq(), _ => Some(AssignOp::BinaryOpAssign(BinaryOp::BitOr)),
-        op.token_xor_eq(), _ => Some(AssignOp::BinaryOpAssign(BinaryOp::BitXor)),
-        op.token_lshift_eq(), _ => Some(AssignOp::BinaryOpAssign(BinaryOp::ShiftLeft)),
-        op.token_rshift_eq(), _ => Some(AssignOp::BinaryOpAssign(BinaryOp::ShiftRight)),
-        op.token_arith_lshift_eq(), _ => Some(AssignOp::BinaryOpAssign(BinaryOp::ArithShiftLeft)),
-        op.token_arith_rshift_eq(), _ => Some(AssignOp::BinaryOpAssign(BinaryOp::ArithShiftRight)),
-        _ => None,
-    }
-}
-
-pub(crate) fn lower_unary_op(unary_op: ast::UnaryOperator) -> UnaryOp {
-    try_match! {
-        unary_op.token_plus(), _ => UnaryOp::Pos,
-        unary_op.token_minus(), _ => UnaryOp::Neg,
-        unary_op.token_not(), _ => UnaryOp::LogNeg,
-        unary_op.token_tilde(), _ => UnaryOp::BitNeg,
-        unary_op.token_and(), _ => UnaryOp::ReducAnd,
-        unary_op.token_tilde_and(), _ => UnaryOp::ReducNand,
-        unary_op.token_or(), _ => UnaryOp::ReducOr,
-        unary_op.token_tilde_or(), _ => UnaryOp::ReducNor,
-        unary_op.token_xor(), _ => UnaryOp::ReducXor,
-        unary_op.token_tilde_xor(), _ => UnaryOp::ReducXnor,
-        _ => unreachable!(),
-    }
+#[derive(Debug, PartialEq, Eq, Copy, Clone, Hash)]
+pub enum StreamOp {
+    None,
+    // >>
+    Right,
+    // <<
+    Left,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub enum MinTypMaxExpr {
-    MinTypMax { min: ExprId, typ: ExprId, max: ExprId },
-    Expr(ExprId),
-}
-
-impl MinTypMaxExpr {
-    pub fn get_min(&self) -> ExprId {
-        match self {
-            MinTypMaxExpr::MinTypMax { min, .. } => *min,
-            MinTypMaxExpr::Expr(expr) => *expr,
-        }
-    }
-
-    pub fn get_typ(&self) -> ExprId {
-        match self {
-            MinTypMaxExpr::MinTypMax { typ, .. } => *typ,
-            MinTypMaxExpr::Expr(expr) => *expr,
-        }
-    }
-
-    pub fn get_max(&self) -> ExprId {
-        match self {
-            MinTypMaxExpr::MinTypMax { max, .. } => *max,
-            MinTypMaxExpr::Expr(expr) => *expr,
-        }
-    }
+pub struct Assign {
+    pub lhs: ExprId,
+    pub rhs: ExprId,
+    pub op: AssignOp,
 }
 
 #[derive(Default, Debug, PartialEq, Eq, Clone, Hash)]
 pub enum Expr {
-    // TODO: Add more expressions
-    // TODO: only used in params
     #[default]
     Missing,
-    Unary {
-        op: UnaryOp,
-        expr: ExprId,
-    },
+
     Binary {
         op: BinaryOp,
         lhs: ExprId,
         rhs: ExprId,
     },
-    Cond {
-        cond: ExprId,
-        true_expr: ExprId,
-        false_expr: ExprId,
-    },
-    IncDec {
-        op: IncDecOp,
-        lv: ExprId,
-        is_post: bool,
-    },
-
-    // Primary
-    Literal(Literal),
-    Concat {
-        concat: Box<[ExprId]>,
-        range: Option<Select>,
-    },
-    MultiConcat {
-        rep: ExprId,
-        concat: Box<[ExprId]>,
-        range: Option<Select>,
-    },
-    Cast {
-        data_type: TypeId,
-        expr: ExprId,
-    },
-    MinTypMax(MinTypMaxExpr),
     Call {
         callee: ExprId,
         args: Box<[Arg]>,
     },
-    LValue {
-        path: ExprId,
-        select: Option<Select>,
+    Concat(Box<[ExprId]>),
+    Cond {
+        pred: ExprId,
+        true_expr: ExprId,
+        false_expr: ExprId,
     },
-    Path(Ident),
     Field {
         receiver: ExprId,
-        field: Ident,
+        field: Option<Ident>,
     },
-    // TODO: add more primary expressions
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub enum Arg {
-    Positional(ExprId),
-    Named { name: Ident, expr: ExprId },
-    Default { name: Option<Ident> },
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct Select {
-    pub bit_selects: Box<[ExprId]>,
-    pub part_select: Option<PartSelectExpr>,
-}
-
-impl Select {
-    pub fn traverse(self) -> Option<Select> {
-        if self.bit_selects.is_empty() && self.part_select.is_none() {
-            return None;
-        }
-
-        Some(self)
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub enum PartSelectExpr {
-    Indexed { is_add: bool, index: ExprId, offset: ExprId },
-    Range { lsb: ExprId, msb: ExprId },
+    Ident(Ident),
+    Literal(Literal),
+    Cast {
+        ty: DataTy,
+        expr: ExprId,
+    },
+    SignedCast {
+        signed: bool,
+        expr: ExprId,
+    },
+    MinTypMax {
+        min: ExprId,
+        typ: ExprId,
+        max: ExprId,
+    },
+    MultiConcat {
+        concat: Box<[ExprId]>,
+        rep: ExprId,
+    },
+    PostfixIncDec {
+        op: IncDecOp,
+        val: ExprId,
+    },
+    PrefixIncDec {
+        op: IncDecOp,
+        val: ExprId,
+    },
+    ElementSelect {
+        receiver: ExprId,
+        select: Option<Selector>,
+    },
+    Stream {
+        op: StreamOp,
+        slice: Option<ExprId>,
+        concats: Box<[ExprId]>,
+    },
+    Unary {
+        op: UnaryOp,
+        expr: ExprId,
+    },
 }
 
 pub type ExprId = Idx<Expr>;
 
-macro_rules! map_or_missing {
-    ($self:ident, $item:expr, $f:ident) => {
-        match $item {
-            Some(x) => $self.$f(&x),
-            None => $self.alloc_missing(),
+define_src!(ExprSrc(ast::Expression));
+
+impl Expr {
+    pub fn to_assign(&self) -> Option<Assign> {
+        match self {
+            Expr::Binary { op, lhs, rhs } => {
+                let op = match op {
+                    BinaryOp::Assign(op) => *op,
+                    _ => return None,
+                };
+                Some(Assign { lhs: *lhs, rhs: *rhs, op })
+            }
+            _ => None,
         }
-    };
+    }
 }
 
-pub(crate) trait LowerExpr: LowerLiteral + Lower {
-    fn arena_expr(&mut self) -> &mut Arena<Expr>;
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub enum Arg {
+    Named { name: Option<Ident>, expr: ExprId },
+    Ordered(ExprId),
+    Empty,
+}
 
-    fn src_map_expr(&mut self) -> &mut SourceMap<ExprSrc, Expr>;
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub enum Selector {
+    Bit(ExprId),
+    Range(ExprId, ExprId),
+    Ascending(ExprId, ExprId),
+    Descending(ExprId, ExprId),
+}
+
+pub(crate) trait LowerExpr {
+    fn expr_ctx(&mut self) -> LowerExprCtx;
+}
+
+pub(crate) struct LowerExprCtx<'a> {
+    pub(crate) db: &'a dyn InternDb,
+    pub(crate) exprs: &'a mut Arena<Expr>,
+    pub(crate) expr_source_map: &'a mut SourceMap<ExprSrc, Expr>,
+}
+
+impl LowerExprCtx<'_> {
+    pub(crate) fn lower_expr_opt(&mut self, expr: Option<ast::Expression>) -> ExprId {
+        if let Some(expr) = expr { self.lower_expr(expr) } else { self.alloc_missing() }
+    }
+
+    pub(crate) fn lower_expr(&mut self, expr: ast::Expression) -> ExprId {
+        if let Some(hir_expr) = self.lower_expr_inner(expr) {
+            alloc_idx_and_src! {
+                hir_expr => self.exprs,
+                expr => self.expr_source_map,
+            }
+        } else {
+            self.alloc_missing()
+        }
+    }
+
+    fn lower_expr_inner(&mut self, expr: ast::Expression) -> Option<Expr> {
+        use ast::Expression::*;
+        match expr {
+            PrimaryExpression(primary) => self.lower_primary_expr(primary),
+            BinaryExpression(binary_expr) => self.lower_binary_expr(binary_expr),
+            Name(name) => self.lower_name(name),
+            InvocationExpression(expr) => self.lower_invocation_expr(expr),
+            PrefixUnaryExpression(expr) => self.lower_prefix_unary_expr(expr),
+            ElementSelectExpression(expr) => self.lower_select_expr(expr),
+            MinTypMaxExpression(expr) => self.lower_min_typ_max_expr(expr),
+            MemberAccessExpression(expr) => self.lower_member_access_expr(expr),
+            ConditionalExpression(expr) => self.lower_cond_expr(expr),
+            CastExpression(expr) => self.lower_cast_expr(expr),
+            SignedCastExpression(expr) => self.lower_cast_signed_expr(expr),
+            PostfixUnaryExpression(expr) => self.lower_postfix_unary_expr(expr),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn lower_assign(&mut self, expr: ast::Expression) -> Option<Assign> {
+        self.lower_expr_inner(expr)?.to_assign()
+    }
+
+    fn lower_primary_expr(&mut self, expr: ast::PrimaryExpression) -> Option<Expr> {
+        use ast::PrimaryExpression::*;
+        match expr {
+            LiteralExpression(lit) => lower_literal(lit).map(Expr::Literal),
+            IntegerVectorExpression(int_vec) => lower_integer_vector(int_vec).map(Expr::Literal),
+            MultipleConcatenationExpression(expr) => self.lower_multiple_concat_expr(expr),
+            StreamingConcatenationExpression(expr) => self.lower_stream_concat_expr(expr),
+            ConcatenationExpression(expr) => self.lower_concat_expr(expr),
+            ParenthesizedExpression(expr) => self.lower_expr_inner(expr.expression()),
+            _ => None,
+        }
+    }
+
+    fn lower_member_access_expr(&mut self, expr: ast::MemberAccessExpression) -> Option<Expr> {
+        let receiver = self.lower_expr(expr.left());
+        let field = lower_ident_opt(expr.name());
+        Some(Expr::Field { receiver, field })
+    }
+
+    fn lower_stream_concat_expr(
+        &mut self,
+        expr: ast::StreamingConcatenationExpression,
+    ) -> Option<Expr> {
+        let op = match expr.operator_token().map(|tok| tok.kind()) {
+            None => StreamOp::None,
+            Some(TokenKind::LEFT_SHIFT) => StreamOp::Left,
+            Some(TokenKind::RIGHT_SHIFT) => StreamOp::Right,
+            Some(_) => {
+                unreachable!(
+                    "lower_stream_concat_expr: {:?}",
+                    expr.operator_token().unwrap().kind()
+                )
+            }
+        };
+        let slice = expr.slice_size().map(|size| self.lower_expr(size));
+
+        // TODO: handle with-range
+        let concats =
+            expr.expressions().children().map(|expr| self.lower_expr(expr.expression())).collect();
+        Some(Expr::Stream { op, slice, concats })
+    }
+
+    fn lower_name(&mut self, name: ast::Name) -> Option<Expr> {
+        fn lower_ident_select(
+            ctx: &mut LowerExprCtx,
+            ident_select: ast::IdentifierSelectName,
+        ) -> Option<Expr> {
+            let mut expr =
+                lower_ident_opt(ident_select.identifier()).map_or(Expr::Missing, Expr::Ident);
+
+            let mut selectors = ident_select
+                .selectors()
+                .children()
+                .filter_map(|sel| Some(ctx.lower_selector(sel.selector()?)))
+                .collect_vec()
+                .into_iter()
+                .peekable();
+
+            let src = ast::Expression::cast(ident_select.syntax()).unwrap().into();
+            loop {
+                match selectors.next() {
+                    select @ Some(_) => {
+                        let receiver = ctx.exprs.alloc(expr);
+                        ctx.expr_source_map.insert(src, receiver);
+                        expr = Expr::ElementSelect { receiver, select };
+                    }
+                    None => return Some(expr),
+                }
+            }
+        }
+
+        use ast::Name::*;
+        match name {
+            ast::Name::SystemName(ident) => {
+                Some(lower_ident_opt(ident.system_identifier()).map_or(Expr::Missing, Expr::Ident))
+            }
+            ast::Name::IdentifierSelectName(ident_select) => lower_ident_select(self, ident_select),
+            ast::Name::IdentifierName(ident) => {
+                Some(lower_ident_opt(ident.identifier()).map_or(Expr::Missing, Expr::Ident))
+            }
+            ast::Name::ScopedName(scoped) => {
+                let left = ast::Expression::cast(scoped.left().syntax()).unwrap();
+                let receiver = self.lower_expr(left);
+
+                match scoped.right() {
+                    IdentifierName(ident) => {
+                        let field = lower_ident_opt(ident.identifier());
+                        Some(Expr::Field { receiver, field })
+                    }
+                    IdentifierSelectName(ident_select) => lower_ident_select(self, ident_select),
+                    _ => unreachable!("lower_name: {:?}", scoped.right().syntax().kind()),
+                }
+            }
+            _ => unimplemented!("lower_name: {:?}", name.syntax().kind()),
+        }
+    }
+
+    fn lower_binary_expr(&mut self, expr: ast::BinaryExpression) -> Option<Expr> {
+        let left = self.lower_expr(expr.left());
+        let op = match expr.operator_token().unwrap().kind() {
+            TokenKind::PLUS => BinaryOp::Add,
+            TokenKind::MINUS => BinaryOp::Sub,
+            TokenKind::STAR => BinaryOp::Mul,
+            TokenKind::SLASH => BinaryOp::Div,
+            TokenKind::PERCENT => BinaryOp::Mod,
+            TokenKind::DOUBLE_STAR => BinaryOp::Pow,
+            TokenKind::DOUBLE_EQUALS => BinaryOp::Eq,
+            TokenKind::EXCLAMATION_EQUALS => BinaryOp::Neq,
+            TokenKind::TRIPLE_EQUALS => BinaryOp::CaseEq,
+            TokenKind::EXCLAMATION_DOUBLE_EQUALS => BinaryOp::CaseNeq,
+            TokenKind::DOUBLE_EQUALS_QUESTION => BinaryOp::WildEq,
+            TokenKind::EXCLAMATION_EQUALS_QUESTION => BinaryOp::WildNeq,
+            TokenKind::GREATER_THAN => BinaryOp::Gt,
+            TokenKind::GREATER_THAN_EQUALS => BinaryOp::Ge,
+            TokenKind::LESS_THAN => BinaryOp::Lt,
+            TokenKind::DOUBLE_AND => BinaryOp::LogAnd,
+            TokenKind::DOUBLE_OR => BinaryOp::LogOr,
+            TokenKind::RIGHT_SHIFT => BinaryOp::ShiftRight,
+            TokenKind::LEFT_SHIFT => BinaryOp::ShiftLeft,
+            TokenKind::TRIPLE_RIGHT_SHIFT => BinaryOp::ArithShiftRight,
+            TokenKind::TRIPLE_LEFT_SHIFT => BinaryOp::ArithShiftLeft,
+            TokenKind::AND => BinaryOp::BitAnd,
+            TokenKind::OR => BinaryOp::BitOr,
+            TokenKind::XOR => BinaryOp::BitXor,
+            TokenKind::LESS_THAN_EQUALS => {
+                if expr.syntax().kind() == SyntaxKind::NONBLOCKING_ASSIGNMENT_EXPRESSION {
+                    BinaryOp::Assign(AssignOp::NonBlockAssign)
+                } else {
+                    BinaryOp::Le
+                }
+            }
+            TokenKind::TILDE_XOR | TokenKind::XOR_TILDE => BinaryOp::BitXnor,
+            TokenKind::EQUALS => BinaryOp::Assign(AssignOp::Assign),
+            TokenKind::PLUS_EQUAL => BinaryOp::Assign(AssignOp::AddAssign),
+            TokenKind::MINUS_EQUAL => BinaryOp::Assign(AssignOp::SubAssign),
+            TokenKind::STAR_EQUAL => BinaryOp::Assign(AssignOp::MulAssign),
+            TokenKind::SLASH_EQUAL => BinaryOp::Assign(AssignOp::DivAssign),
+            TokenKind::PERCENT_EQUAL => BinaryOp::Assign(AssignOp::ModAssign),
+            TokenKind::AND_EQUAL => BinaryOp::Assign(AssignOp::BitAndAssign),
+            TokenKind::OR_EQUAL => BinaryOp::Assign(AssignOp::BitOrAssign),
+            TokenKind::XOR_EQUAL => BinaryOp::Assign(AssignOp::BitXorAssign),
+            TokenKind::LEFT_SHIFT_EQUAL => BinaryOp::Assign(AssignOp::ShiftLeftAssign),
+            TokenKind::RIGHT_SHIFT_EQUAL => BinaryOp::Assign(AssignOp::ShiftRightAssign),
+            TokenKind::TRIPLE_LEFT_SHIFT_EQUAL => BinaryOp::Assign(AssignOp::ArithShiftLeftAssign),
+            TokenKind::TRIPLE_RIGHT_SHIFT_EQUAL => {
+                BinaryOp::Assign(AssignOp::ArithShiftRightAssign)
+            }
+            _ => return None,
+        };
+        let right = self.lower_expr(expr.right());
+        Some(Expr::Binary { op, lhs: left, rhs: right })
+    }
+
+    fn lower_prefix_unary_expr(&mut self, expr: ast::PrefixUnaryExpression) -> Option<Expr> {
+        let val = self.lower_expr(expr.operand());
+        let op = match expr.operator_token()?.kind() {
+            TokenKind::PLUS => UnaryOp::Pos,
+            TokenKind::MINUS => UnaryOp::Neg,
+            TokenKind::EXCLAMATION => UnaryOp::LogNeg,
+            TokenKind::TILDE => UnaryOp::BitNeg,
+            TokenKind::AND => UnaryOp::ReducAnd,
+            TokenKind::TILDE_AND => UnaryOp::ReducNand,
+            TokenKind::OR => UnaryOp::ReducOr,
+            TokenKind::TILDE_OR => UnaryOp::ReducNor,
+            TokenKind::XOR => UnaryOp::ReducXor,
+            TokenKind::TILDE_XOR | TokenKind::XOR_TILDE => UnaryOp::ReducXnor,
+            TokenKind::DOUBLE_PLUS => {
+                return Some(Expr::PrefixIncDec { op: IncDecOp::Inc, val });
+            }
+            TokenKind::DOUBLE_MINUS => {
+                return Some(Expr::PrefixIncDec { op: IncDecOp::Dec, val });
+            }
+            _ => return None,
+        };
+        Some(Expr::Unary { op, expr: val })
+    }
+
+    fn lower_postfix_unary_expr(&mut self, expr: ast::PostfixUnaryExpression) -> Option<Expr> {
+        let val = self.lower_expr(expr.operand());
+        let op = match expr.operator_token()?.kind() {
+            TokenKind::DOUBLE_PLUS => IncDecOp::Inc,
+            TokenKind::DOUBLE_MINUS => IncDecOp::Dec,
+            _ => return None,
+        };
+        Some(Expr::PostfixIncDec { op, val })
+    }
+
+    fn lower_cond_expr(&mut self, expr: ast::ConditionalExpression) -> Option<Expr> {
+        // NOTE: We do not support patterns currently
+        let cond_pred = expr.predicate().conditions().children().next().map(|pred| pred.expr());
+        let pred = self.lower_expr_opt(cond_pred);
+        let true_expr = self.lower_expr(expr.left());
+        let false_expr = self.lower_expr(expr.right());
+        Some(Expr::Cond { pred, true_expr, false_expr })
+    }
+
+    fn lower_concat_expr(&mut self, expr: ast::ConcatenationExpression) -> Option<Expr> {
+        let concat = expr.expressions().children().map(|expr| self.lower_expr(expr)).collect();
+        Some(Expr::Concat(concat))
+    }
+
+    fn lower_multiple_concat_expr(
+        &mut self,
+        expr: ast::MultipleConcatenationExpression,
+    ) -> Option<Expr> {
+        let rep = self.lower_expr(expr.expression());
+        let concat = expr
+            .concatenation()
+            .expressions()
+            .children()
+            .map(|expr| self.lower_expr(expr))
+            .collect();
+        Some(Expr::MultiConcat { rep, concat })
+    }
+
+    fn lower_cast_expr(&mut self, expr: ast::CastExpression) -> Option<Expr> {
+        let ty = self.lower_data_ty(expr.left().as_data_type()?);
+
+        let right = ast::Expression::cast(expr.right().syntax()).unwrap();
+        let expr = self.lower_expr(right);
+        Some(Expr::Cast { ty, expr })
+    }
+
+    fn lower_cast_signed_expr(&mut self, expr: ast::SignedCastExpression) -> Option<Expr> {
+        let signed = match expr.signing().unwrap().kind() {
+            TokenKind::SIGNED_KEYWORD => true,
+            TokenKind::UNSIGNED_KEYWORD => false,
+            _ => unreachable!(),
+        };
+
+        let inner = ast::Expression::cast(expr.inner().syntax()).unwrap();
+        let expr = self.lower_expr(inner);
+        Some(Expr::SignedCast { signed, expr })
+    }
+
+    fn lower_min_typ_max_expr(&mut self, expr: ast::MinTypMaxExpression) -> Option<Expr> {
+        let min = self.lower_expr(expr.min());
+        let typ = self.lower_expr(expr.typ());
+        let max = self.lower_expr(expr.max());
+        Some(Expr::MinTypMax { min, typ, max })
+    }
+
+    fn lower_invocation_expr(&mut self, expr: ast::InvocationExpression) -> Option<Expr> {
+        let callee = self.lower_expr(expr.left());
+        let args =
+            expr.arguments()?.parameters().children().map(|arg| self.lower_argument(arg)).collect();
+        Some(Expr::Call { callee, args })
+    }
+
+    fn lower_argument(&mut self, arg: ast::Argument) -> Arg {
+        use ast::Argument::*;
+        match arg {
+            NamedArgument(arg) => {
+                let name = lower_ident_opt(arg.name());
+                let expr = match arg.expr() {
+                    Some(expr) => self.lower_property_expr(expr),
+                    None => self.alloc_missing(),
+                };
+                Arg::Named { name, expr }
+            }
+            OrderedArgument(arg) => {
+                let expr = self.lower_property_expr(arg.expr());
+                Arg::Ordered(expr)
+            }
+            EmptyArgument(_) => Arg::Empty,
+        }
+    }
+
+    fn lower_select_expr(&mut self, expr: ast::ElementSelectExpression) -> Option<Expr> {
+        let receiver = self.lower_expr(expr.left());
+        let select = expr.select().selector().map(|sel| self.lower_selector(sel));
+        Some(Expr::ElementSelect { receiver, select })
+    }
+
+    pub(crate) fn lower_selector(&mut self, selector: ast::Selector) -> Selector {
+        use ast::{RangeSelect::*, Selector::*};
+        match selector {
+            RangeSelect(range_sel) => {
+                let left = self.lower_expr(range_sel.left());
+                let right = self.lower_expr(range_sel.right());
+                match range_sel {
+                    AscendingRangeSelect(_) => Selector::Ascending(left, right),
+                    DescendingRangeSelect(_) => Selector::Descending(left, right),
+                    SimpleRangeSelect(_) => Selector::Range(left, right),
+                }
+            }
+            BitSelect(bit_sel) => Selector::Bit(self.lower_expr(bit_sel.expr())),
+        }
+    }
 
     fn alloc_missing(&mut self) -> ExprId {
-        let expr = Expr::Missing;
-        self.arena_expr().alloc(expr)
+        self.exprs.alloc(Expr::Missing)
+    }
+}
+
+impl LowerExprCtx<'_> {
+    pub(crate) fn lower_property_expr(&mut self, expr: ast::PropertyExpr) -> ExprId {
+        self.lower_property_expr_inner(expr).unwrap_or_else(|| self.alloc_missing())
     }
 
-    fn lower_path(&mut self, idents: AstChildren<ast::Identifier>) -> Option<ExprId> {
-        let mut idents = idents.collect_vec().into_iter().rev();
-        let last_ident = idents.next()?;
-        let path_expr = Expr::Path(self.lower_ident(&last_ident)?);
-        let path_expr_id = self.arena_expr().alloc(path_expr);
-        let src = self.in_file(LocalExprSrc::Ident(last_ident.to_ptr()));
-        self.src_map_expr().insert(src, path_expr_id);
-
-        idents.try_fold(path_expr_id, |receiver, field| {
-            let field_expr = Expr::Field { receiver, field: self.lower_ident(&field)? };
-            let field_expr_id = self.arena_expr().alloc(field_expr);
-            let src = self.in_file(LocalExprSrc::Ident(field.to_ptr()));
-            self.src_map_expr().insert(src, field_expr_id);
-            Some(field_expr_id)
-        })
+    pub(crate) fn lower_property_expr_inner(&mut self, expr: ast::PropertyExpr) -> Option<ExprId> {
+        expr.as_simple_property_expr().and_then(|expr| self.lower_sequence_expr(expr.expr()))
     }
 
-    fn lower_systf_path(&mut self, ident: &ast::SystemTfIdentifier) -> Option<ExprId> {
-        let path = self.lower_systf_identifier(ident)?;
-        let path_expr = Expr::Path(path);
-        let path_expr_id = self.arena_expr().alloc(path_expr);
-        let src = self.in_file(LocalExprSrc::SystfIdent(ident.to_ptr()));
-        self.src_map_expr().insert(src, path_expr_id);
-        Some(path_expr_id)
-    }
-
-    fn lower_net_lvalue(&mut self, netlv: &ast::NetLvalue) -> Option<ExprId> {
-        let path = self.lower_path(netlv.identifiers())?;
-
-        let select = if let Some(select) = netlv.constant_select() {
-            Some(self.lower_const_select(&select)?)
-        } else {
-            None
-        };
-
-        let expr = Expr::LValue { path, select };
-        let expr_id = self.arena_expr().alloc(expr);
-        let src = self.in_file(LocalExprSrc::NetLValue(netlv.to_ptr()));
-        self.src_map_expr().insert(src, expr_id);
-
-        Some(expr_id)
-    }
-
-    fn lower_var_lvalue(&mut self, varlv: &ast::VariableLvalue) -> Option<ExprId> {
-        let path = self.lower_path(varlv.identifiers())?;
-
-        let select = if let Some(select) = varlv.select() {
-            Some(self.lower_select(&select)?)
-        } else {
-            None
-        };
-
-        let expr = Expr::LValue { path, select };
-        let expr_id = self.arena_expr().alloc(expr);
-        let src = self.in_file(LocalExprSrc::VarLValue(varlv.to_ptr()));
-        self.src_map_expr().insert(src, expr_id);
-
-        Some(expr_id)
-    }
-
-    fn lower_const_select(&mut self, select: &ast::ConstantSelect) -> Option<Select> {
-        let bit_selects = select
-            .constant_expressions()
-            .map(|expr| self.lower_const_expr(&expr))
-            .collect::<Box<[_]>>();
-
-        let part_select = try_match!(
-            select.constant_part_select_range(), part_select => {
-                try_match!(
-                    part_select.constant_range(), const_range => {
-                        let mut exprs = const_range.constant_expressions();
-                        let msb = map_or_missing!(self, exprs.next(), lower_const_expr);
-                        let lsb = map_or_missing!(self, exprs.next(), lower_const_expr);
-                        Some(PartSelectExpr::Range { lsb, msb })
-                    },
-                    part_select.constant_indexed_range(), indexed_range => {
-                        let mut exprs = indexed_range.constant_expressions();
-                        let index = map_or_missing!(self, exprs.next(), lower_const_expr);
-                        let offset = map_or_missing!(self, exprs.next(), lower_const_expr);
-                        let is_add = try_match!(
-                            indexed_range.token_plus_colon(), _ => true,
-                            indexed_range.token_minus_colon(), _ => false,
-                            _ => return None,
-                        );
-                        Some(PartSelectExpr::Indexed { is_add, index, offset })
-                    },
-                    _ => None,
-                )
-            },
-            _ => None,
-        );
-
-        let range = Select { bit_selects, part_select };
-        Some(range)
-    }
-
-    fn lower_const_part_select_range(
-        &mut self,
-        part_select: &ast::ConstantPartSelectRange,
-    ) -> Option<PartSelectExpr> {
-        try_match! {
-            part_select.constant_range(), const_range => {
-                let mut exprs = const_range.constant_expressions();
-                let msb = map_or_missing!(self, exprs.next(), lower_const_expr);
-                let lsb = map_or_missing!(self, exprs.next(), lower_const_expr);
-                Some(PartSelectExpr::Range { lsb, msb })
-            },
-            part_select.constant_indexed_range(), indexed_range => {
-                let mut exprs = indexed_range.constant_expressions();
-                let index = map_or_missing!(self, exprs.next(), lower_const_expr);
-                let offset = map_or_missing!(self, exprs.next(), lower_const_expr);
-                let is_add = try_match!(
-                    indexed_range.token_plus_colon(), _ => true,
-                    indexed_range.token_minus_colon(), _ => false,
-                    _ => return None,
-                );
-                Some(PartSelectExpr::Indexed { is_add, index, offset })
-            },
-            _ => None,
-        }
-    }
-
-    fn lower_part_select_range(
-        &mut self,
-        part_select: &ast::PartSelectRange,
-    ) -> Option<PartSelectExpr> {
-        try_match! {
-            part_select.constant_range(), const_range => {
-                let mut exprs = const_range.constant_expressions();
-                let msb = map_or_missing!(self, exprs.next(), lower_const_expr);
-                let lsb = map_or_missing!(self, exprs.next(), lower_const_expr);
-                Some(PartSelectExpr::Range { lsb, msb })
-            },
-            part_select.indexed_range(), indexed_range => {
-                let index = map_or_missing!(self, indexed_range.expression(), lower_expr);
-                let offset = map_or_missing!(self, indexed_range.constant_expression(), lower_const_expr);
-                let is_add = try_match!(
-                    indexed_range.token_plus_colon(), _ => true,
-                    indexed_range.token_minus_colon(), _ => false,
-                    _ => return None,
-                );
-                Some(PartSelectExpr::Indexed { is_add, index, offset })
-            },
-            _ => None,
-        }
-    }
-
-    fn lower_select(&mut self, select: &ast::Select) -> Option<Select> {
-        // TODO: optimize this
-        let bit_selects = select
-            .bit_selects()
-            .flat_map(|sel| {
-                sel.expressions().map(|expr| self.lower_expr(&expr)).collect::<Vec<_>>().into_iter()
-            })
-            .collect::<Box<[_]>>();
-
-        let part_select = try_match! {
-            select.part_select_range(), part_select => self.lower_part_select_range(&part_select),
-            _ => None,
-        };
-
-        let range = Select { bit_selects, part_select };
-        Some(range)
-    }
-
-    fn lower_param_expr(&mut self, param_expr: &ast::ParamExpression) -> Option<ExprId> {
-        let expr = try_match! {
-            param_expr.mintypmax_expression(), min_typ_max => {
-                let min_typ_max = self.lower_min_typ_max_expr(&min_typ_max);
-                Expr::MinTypMax(min_typ_max)
-            },
-            _ => {
-                Expr::Missing
-                // TODO: ("Unsupported");
-            }
-        };
-
-        let expr_id = self.arena_expr().alloc(expr);
-        let src = self.in_file(LocalExprSrc::ParamExpr(param_expr.to_ptr()));
-        self.src_map_expr().insert(src, expr_id);
-        Some(expr_id)
-    }
-
-    fn lower_const_param_expr(
-        &mut self,
-        param_expr: &ast::ConstantParamExpression,
-    ) -> Option<ExprId> {
-        let expr = try_match! {
-            param_expr.constant_mintypmax_expression(), min_typ_max => {
-                let min_typ_max = self.lower_const_min_typ_max_expr(&min_typ_max);
-                Expr::MinTypMax(min_typ_max)
-            },
-            _ => {
-                Expr::Missing
-                // TODO: ("Unsupported");
-            }
-        };
-
-        let expr_id = self.arena_expr().alloc(expr);
-        let src = self.in_file(LocalExprSrc::ConstParamExpr(param_expr.to_ptr()));
-        self.src_map_expr().insert(src, expr_id);
-        Some(expr_id)
-    }
-
-    fn lower_const_range_expr(&mut self, range: &ast::ConstantRangeExpression) -> Option<Select> {
-        try_match! {
-            range.constant_expression(), expr => {
-                let expr_id = self.lower_const_expr(&expr);
-                Select {
-                    bit_selects: Box::new([expr_id]),
-                    part_select: None,
-                }.traverse()
-            },
-            range.constant_part_select_range(), part_select => {
-                let part_select = self.lower_const_part_select_range(&part_select)?;
-                Select {
-                    bit_selects: Box::new([]),
-                    part_select: Some(part_select),
-                }.traverse()
-            },
-            _ => None,
-        }
-    }
-
-    fn lower_range_expr(&mut self, range: &ast::RangeExpression) -> Option<Select> {
-        try_match! {
-            range.expression(), expr => {
-                let expr_id = self.lower_expr(&expr);
-                Select {
-                    bit_selects: Box::new([expr_id]),
-                    part_select: None,
-                }.traverse()
-            },
-            range.part_select_range(), part_select => {
-                let part_select = self.lower_part_select_range(&part_select)?;
-                Select {
-                    bit_selects: Box::new([]),
-                    part_select: Some(part_select),
-                }.traverse()
-            },
-            _ => None,
-        }
-    }
-
-    fn lower_list_of_args(&mut self, arg_list: &ast::ListOfArgumentsParent) -> Box<[Arg]> {
-        let mut cursor = arg_list.syntax().walk();
-        if !cursor.goto_first_child() {
-            return Box::new([]);
-        }
-        let mut args = Vec::new();
-        loop {
-            if cursor.node().kind_id() == syntax::syntax_kind::IDENTIFIER {
-                let ident = ast::Identifier::cast(cursor.node()).unwrap();
-                let name = self.lower_ident(&ident).unwrap();
-                cursor.goto_next_sibling();
-                if cursor.node().kind_id() == syntax::syntax_kind::EXPRESSION {
-                    let expr =
-                        map_or_missing!(self, ast::Expression::cast(cursor.node()), lower_expr);
-                    args.push(Arg::Named { name, expr });
-                } else {
-                    args.push(Arg::Default { name: Some(name) });
-                }
-                cursor.goto_next_sibling();
-                if cursor.node().kind_id() == syntax::syntax_kind::TOKEN_COMMA {
-                    cursor.goto_next_sibling();
-                } else {
-                    break;
-                }
-            } else if cursor.node().kind_id() == syntax::syntax_kind::EXPRESSION {
-                let expr = map_or_missing!(self, ast::Expression::cast(cursor.node()), lower_expr);
-                args.push(Arg::Positional(expr));
-                cursor.goto_next_sibling();
-                if cursor.node().kind_id() == syntax::syntax_kind::TOKEN_COMMA {
-                    cursor.goto_next_sibling();
-                } else {
-                    break;
-                }
-            } else if cursor.node().kind_id() == syntax::syntax_kind::TOKEN_COMMA {
-                args.push(Arg::Default { name: None });
-                cursor.goto_next_sibling();
-            } else {
-                break;
-            }
-        }
-        args.into_boxed_slice()
-    }
-
-    fn lower_const_primary_expr(&mut self, primary: &ast::ConstantPrimary) -> ExprId {
-        let expr = try_match! {
-            primary.primary_literal(), literal => {
-                self.lower_literal(&literal).map(Expr::Literal).unwrap_or_default()
-            },
-            primary.constant_concatenation(), concat => {
-                let concat = concat
-                    .constant_expressions()
-                    .map(|expr| self.lower_const_expr(&expr))
-                    .collect();
-                let range = primary
-                    .constant_range_expression()
-                    .and_then(|range| self.lower_const_range_expr(&range));
-                Expr::Concat { concat, range }
-            },
-            primary.constant_multiple_concatenation(), mc => {
-                let rep = map_or_missing!(self, mc.constant_expression(), lower_const_expr);
-                let concat = try_or_default! {
-                    mc.constant_concatenation()?
-                        .constant_expressions()
-                        .map(|expr| self.lower_const_expr(&expr))
-                        .collect()
-                };
-                let range = primary.constant_range_expression().and_then(|range| self.lower_const_range_expr(&range));
-                Expr::MultiConcat { rep, concat, range }
-            },
-            primary.constant_mintypmax_expression(), mintypmax => {
-                Expr::MinTypMax(self.lower_const_min_typ_max_expr(&mintypmax))
-            },
-            _ => {
-                Expr::Missing
-            }
-        };
-
-        let expr_id = self.arena_expr().alloc(expr);
-        let src = self.in_file(LocalExprSrc::ConstPrimary(primary.to_ptr()));
-        self.src_map_expr().insert(src, expr_id);
-        expr_id
-    }
-
-    fn lower_primary_expr(&mut self, primary: &ast::Primary) -> ExprId {
-        let expr = try_match! {
-            primary.primary_literal(), literal => {
-                self.lower_literal(&literal)
-                    .map(Expr::Literal)
-                    .unwrap_or_default()
-            },
-            primary.concatenation(), concat => {
-                let concat = concat
-                    .expressions()
-                    .map(|expr| self.lower_expr(&expr))
-                    .collect();
-                let range = primary.range_expression()
-                    .and_then(|range| self.lower_range_expr(&range));
-                Expr::Concat { concat, range }
-            },
-            primary.multiple_concatenation(), mc => {
-                let rep = map_or_missing!(self, mc.expression(), lower_expr);
-                let concat = try_or_default! {
-                    mc.concatenation()?
-                        .expressions()
-                        .map(|expr| self.lower_expr(&expr))
-                        .collect()
-                };
-                let range = primary.range_expression()
-                    .and_then(|range| self.lower_range_expr(&range));
-                Expr::MultiConcat { rep, concat, range }
-            },
-            primary.function_subroutine_call(), call => {
-                // TODO: lower const bit select
-                try_or_default! {
-                    let call = call.subroutine_call()?;
-                    try_match! {
-                        call.tf_call(), tf_call => {
-                            let path = self.lower_path(tf_call.identifiers())?;
-                            let args = tf_call
-                                .list_of_arguments_parent()
-                                .map_or_else(
-                                    || Box::new([]) as Box<[_]>,
-                                    |arg_list| self.lower_list_of_args(&arg_list)
-                                );
-                            Expr::Call { callee: path, args }
-                        },
-                        call.system_tf_call(), sys_tf_call => {
-                            let path = self.lower_systf_path(&sys_tf_call.system_tf_identifier()?)?;
-                            let args = sys_tf_call
-                                .list_of_arguments_parent()
-                                .map_or_else::<Box<[Arg]>, _, _>(
-                                    || Box::new([]),
-                                    |arg_list| self.lower_list_of_args(&arg_list)
-                                );
-                            Expr::Call { callee: path, args }
-                        },
-                        _ => Expr::Missing,
-                    }
-                }
-            },
-            primary.mintypmax_expression(), mintypmax => {
-                Expr::MinTypMax(self.lower_min_typ_max_expr(&mintypmax))
-            },
-            primary.cast_(), cast => {
-                // todo!("casting type");
-                Expr::Missing
-            },
-            _ => {
-                if primary.identifiers().count() != 0 {
-                    try_or_default! {
-                        let path = self.lower_path(primary.identifiers())?;
-                        let select = if let Some(select) = primary.select() {
-                            Some(self.lower_select(&select)?)
-                        } else {
-                            None
-                        };
-
-                        Expr::LValue { path, select }
-                    }
-                } else {
-                    Expr::Missing
-                }
-            }
-        };
-
-        let expr_id = self.arena_expr().alloc(expr);
-        let src = self.in_file(LocalExprSrc::Primary(primary.to_ptr()));
-        self.src_map_expr().insert(src, expr_id);
-        expr_id
-    }
-
-    // TODO: Should we stored it in src map?
-    fn lower_const_min_typ_max_expr(
-        &mut self,
-        min_typ_max_expr: &ast::ConstantMintypmaxExpression,
-    ) -> MinTypMaxExpr {
-        let mut exprs = min_typ_max_expr
-            .constant_expressions()
-            .map(|expr| self.lower_const_expr(&expr))
-            .collect::<SmallVec<[_; 3]>>();
-
-        if exprs.len() == 1 {
-            MinTypMaxExpr::Expr(exprs.pop().unwrap())
-        } else if exprs.len() == 3 {
-            let min = exprs.pop().unwrap();
-            let typ = exprs.pop().unwrap();
-            let max = exprs.pop().unwrap();
-            MinTypMaxExpr::MinTypMax { min, typ, max }
-        } else {
-            unreachable!("Invalid number of expressions in min-typ-max expression")
-        }
-    }
-
-    fn lower_min_typ_max_expr(
-        &mut self,
-        min_typ_max_expr: &ast::MintypmaxExpression,
-    ) -> MinTypMaxExpr {
-        let mut exprs = min_typ_max_expr
-            .expressions()
-            .map(|expr| self.lower_expr(&expr))
-            .collect::<SmallVec<[_; 3]>>();
-
-        if exprs.len() == 1 {
-            MinTypMaxExpr::Expr(exprs.pop().unwrap())
-        } else if exprs.len() == 3 {
-            let min = exprs.pop().unwrap();
-            let typ = exprs.pop().unwrap();
-            let max = exprs.pop().unwrap();
-            MinTypMaxExpr::MinTypMax { min, typ, max }
-        } else {
-            unreachable!("Invalid number of expressions in min-typ-max expression")
-        }
-    }
-
-    fn lower_cond_predicate(&mut self, pred: &ast::CondPredicate) -> ExprId {
-        // TODO: We do not support patterns
-        try_! {
-            self.lower_expr(&pred.expression_or_cond_patterns().next()?.expression()?)
-        }
-        .unwrap_or_else(|| self.alloc_missing())
-    }
-
-    fn lower_const_binary(
-        &mut self,
-        bin_expr: &ast::ConstantExpression,
-        bin_op: BinaryOp,
-    ) -> ExprId {
-        let mut exprs = bin_expr.constant_expressions();
-        let lhs = map_or_missing!(self, exprs.next(), lower_const_expr);
-        let rhs = map_or_missing!(self, exprs.next(), lower_const_expr);
-        let expr = Expr::Binary { op: bin_op, lhs, rhs };
-
-        let expr_id = self.arena_expr().alloc(expr);
-        let src = self.in_file(LocalExprSrc::ConstExpr(bin_expr.to_ptr()));
-        self.src_map_expr().insert(src, expr_id);
-        expr_id
-    }
-
-    fn lower_binary(&mut self, bin_expr: &ast::Expression, bin_op: BinaryOp) -> ExprId {
-        let mut exprs = bin_expr.expressions();
-        let lhs = map_or_missing!(self, exprs.next(), lower_expr);
-        let rhs = map_or_missing!(self, exprs.next(), lower_expr);
-        let expr = Expr::Binary { op: bin_op, lhs, rhs };
-
-        let expr_id = self.arena_expr().alloc(expr);
-        let src = self.in_file(LocalExprSrc::Expr(bin_expr.to_ptr()));
-        self.src_map_expr().insert(src, expr_id);
-        expr_id
-    }
-
-    fn lower_const_expr(&mut self, expr: &ast::ConstantExpression) -> ExprId {
-        try_match! {
-            expr.unary_operator(), unary_op => {
-                let op = lower_unary_op(unary_op);
-                let primary = map_or_missing!(self, expr.constant_primary(), lower_const_primary_expr);
-                let expr_id = self.arena_expr().alloc(Expr::Unary { op, expr: primary });
-                let src = self.in_file(LocalExprSrc::ConstExpr(expr.to_ptr()));
-                self.src_map_expr().insert(src, expr_id);
-                expr_id
-            },
-            expr.token_plus(), _ => self.lower_const_binary(expr, BinaryOp::Add),
-            expr.token_minus(), _ => self.lower_const_binary(expr, BinaryOp::Sub),
-            expr.token_star(), _ => self.lower_const_binary(expr, BinaryOp::Mul),
-            expr.token_slash(), _ => self.lower_const_binary(expr, BinaryOp::Div),
-            expr.token_percent(), _ => self.lower_const_binary(expr, BinaryOp::Mod),
-            expr.token_star_star(), _ => self.lower_const_binary(expr, BinaryOp::Pow),
-            expr.token_eq_eq(), _ => self.lower_const_binary(expr, BinaryOp::Eq),
-            expr.token_not_eq(), _ => self.lower_const_binary(expr, BinaryOp::Neq),
-            expr.token_eq_eq_eq(), _ => self.lower_const_binary(expr, BinaryOp::CaseEq),
-            expr.token_not_eq_eq(), _ => self.lower_const_binary(expr, BinaryOp::CaseNeq),
-            expr.token_eq_eq_question(), _ => self.lower_const_binary(expr, BinaryOp::WildEq),
-            expr.token_not_eq_question(), _ => self.lower_const_binary(expr, BinaryOp::WildNeq),
-            expr.token_greater(), _ => self.lower_const_binary(expr, BinaryOp::Gt),
-            expr.token_greater_eq(), _ => self.lower_const_binary(expr, BinaryOp::Ge),
-            expr.token_less(), _ => self.lower_const_binary(expr, BinaryOp::Lt),
-            expr.token_less_eq(), _ => self.lower_const_binary(expr, BinaryOp::Le),
-            expr.token_and_and(), _ => self.lower_const_binary(expr, BinaryOp::LogAnd),
-            expr.token_or_or(), _ => self.lower_const_binary(expr, BinaryOp::LogOr),
-            expr.token_rshift(), _ => self.lower_const_binary(expr, BinaryOp::ShiftRight),
-            expr.token_lshift(), _ => self.lower_const_binary(expr, BinaryOp::ShiftLeft),
-            expr.token_arith_rshift(), _ => self.lower_const_binary(expr, BinaryOp::ArithShiftRight),
-            expr.token_arith_lshift(), _ => self.lower_const_binary(expr, BinaryOp::ArithShiftLeft),
-            expr.token_and(), _ => self.lower_const_binary(expr, BinaryOp::BitAnd),
-            expr.token_or(), _ => self.lower_const_binary(expr, BinaryOp::BitOr),
-            expr.token_xor(), _ => self.lower_const_binary(expr, BinaryOp::BitXor),
-            expr.token_tilde_xor(), _ => self.lower_const_binary(expr, BinaryOp::BitXnor),
-            expr.token_xor_tilde(), _ => self.lower_const_binary(expr, BinaryOp::BitXnor),
-            expr.constant_primary(), primary => self.lower_const_primary_expr(&primary),
-            _ => self.alloc_missing(),
-        }
-    }
-
-    fn lower_expr(&mut self, expr: &ast::Expression) -> ExprId {
-        try_match!(
-            expr.unary_operator(), unary_op => {
-                let op = lower_unary_op(unary_op);
-                let primary = map_or_missing!(self, expr.primary(), lower_primary_expr);
-                let expr_id = self.arena_expr().alloc(Expr::Unary { op, expr: primary });
-                let src = self.in_file(LocalExprSrc::Expr(expr.to_ptr()));
-                self.src_map_expr().insert(src, expr_id);
-                expr_id
-            },
-            expr.inc_or_dec_expression(), inc_or_dec => {
-                let is_inc = try_match!(
-                    inc_or_dec.inc_or_dec_operator(), inc_op => {
-                        try_match! {
-                            inc_op.token_plus_plus(), _ => true,
-                            inc_op.token_minus_minus(), _ => false,
-                            _ => return self.alloc_missing(),
-                        }
-                    },
-                    _ => return self.alloc_missing(),
-                );
-                let is_post = {
-                    let mut cursor = inc_or_dec.syntax().walk();
-                    if !cursor.goto_first_child() {
-                        return self.alloc_missing();
-                    }
-                    loop {
-                        if ast::VariableLvalue::can_cast(cursor.node().kind_id()) {
-                            break true;
-                        } else if ast::IncOrDecOperator::can_cast(cursor.node().kind_id()) {
-                            break false;
-                        } else if !cursor.goto_next_sibling() {
-                            return self.alloc_missing();
-                        }
-                    }
-                };
-
-                let lv = try_! {
-                    self.lower_var_lvalue(&inc_or_dec.variable_lvalue()?)?
-                }.unwrap_or_else(|| self.alloc_missing());
-
-                let expr_id = self.arena_expr().alloc(Expr::IncDec {
-                    op: if is_inc { IncDecOp::Inc } else { IncDecOp::Dec },
-                    lv,
-                    is_post
-                });
-                let src = self.in_file(LocalExprSrc::Expr(expr.to_ptr()));
-                self.src_map_expr().insert(src, expr_id);
-                expr_id
-            },
-            expr.operator_assignment(), _ => {
-                return self.alloc_missing();
-                todo!("Unsupported")
-            },
-            expr.token_lparen(), _ => {
-                if expr.token_rparen().is_none() {
-                    return self.alloc_missing();
-                }
-                map_or_missing!(self, expr.expressions().next(), lower_expr)
-            },
-            expr.token_plus(), _ => self.lower_binary(expr, BinaryOp::Add),
-            expr.token_minus(), _ => self.lower_binary(expr, BinaryOp::Sub),
-            expr.token_star(), _ => self.lower_binary(expr, BinaryOp::Mul),
-            expr.token_slash(), _ => self.lower_binary(expr, BinaryOp::Div),
-            expr.token_percent(), _ => self.lower_binary(expr, BinaryOp::Mod),
-            expr.token_star_star(), _ => self.lower_binary(expr, BinaryOp::Pow),
-            expr.token_eq_eq(), _ => self.lower_binary(expr, BinaryOp::Eq),
-            expr.token_not_eq(), _ => self.lower_binary(expr, BinaryOp::Neq),
-            expr.token_eq_eq_eq(), _ => self.lower_binary(expr, BinaryOp::CaseEq),
-            expr.token_not_eq_eq(), _ => self.lower_binary(expr, BinaryOp::CaseNeq),
-            expr.token_eq_eq_question(), _ => self.lower_binary(expr, BinaryOp::WildEq),
-            expr.token_not_eq_question(), _ => self.lower_binary(expr, BinaryOp::WildNeq),
-            expr.token_greater(), _ => self.lower_binary(expr, BinaryOp::Gt),
-            expr.token_greater_eq(), _ => self.lower_binary(expr, BinaryOp::Ge),
-            expr.token_less(), _ => self.lower_binary(expr, BinaryOp::Lt),
-            expr.token_less_eq(), _ => self.lower_binary(expr, BinaryOp::Le),
-            expr.token_and_and(), _ => self.lower_binary(expr, BinaryOp::LogAnd),
-            expr.token_or_or(), _ => self.lower_binary(expr, BinaryOp::LogOr),
-            expr.token_rshift(), _ => self.lower_binary(expr, BinaryOp::ShiftRight),
-            expr.token_lshift(), _ => self.lower_binary(expr, BinaryOp::ShiftLeft),
-            expr.token_arith_rshift(), _ => self.lower_binary(expr, BinaryOp::ArithShiftRight),
-            expr.token_arith_lshift(), _ => self.lower_binary(expr, BinaryOp::ArithShiftLeft),
-            expr.token_and(), _ => self.lower_binary(expr, BinaryOp::BitAnd),
-            expr.token_or(), _ => self.lower_binary(expr, BinaryOp::BitOr),
-            expr.token_xor(), _ => self.lower_binary(expr, BinaryOp::BitXor),
-            expr.token_tilde_xor(), _ => self.lower_binary(expr, BinaryOp::BitXnor),
-            expr.token_xor_tilde(), _ => self.lower_binary(expr, BinaryOp::BitXnor),
-            expr.conditional_expression(), cond_expr => {
-                let cond = map_or_missing!(self, cond_expr.cond_predicate(), lower_cond_predicate);
-
-                let mut exprs = cond_expr.expressions();
-                let true_expr = map_or_missing!(self, exprs.next(), lower_expr);
-                let false_expr = map_or_missing!(self, exprs.next(), lower_expr);
-
-                let cond_expr = Expr::Cond { cond, true_expr, false_expr };
-                let expr_id = self.arena_expr().alloc(cond_expr);
-
-                let src = self.in_file(LocalExprSrc::Expr(expr.to_ptr()));
-                self.src_map_expr().insert(src, expr_id);
-                expr_id
-            },
-            expr.primary(), primary => self.lower_primary_expr(&primary),
-            _ => self.alloc_missing(),
-        )
+    pub(crate) fn lower_sequence_expr(&mut self, expr: ast::SequenceExpr) -> Option<ExprId> {
+        expr.as_simple_sequence_expr().map(|expr| self.lower_expr(expr.expr()))
     }
 }

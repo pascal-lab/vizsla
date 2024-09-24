@@ -23,7 +23,7 @@ impl VfsPath {
         }
     }
 
-    /// Creates a new `VfsPath` with `path` adjoined to `self`.
+    /// Creates a new [`VfsPath`] with `path` adjoined to `self`.
     pub fn join(&self, path: &str) -> Option<VfsPath> {
         match &self.0 {
             VfsPathKinds::RealPath(it) => {

@@ -7,13 +7,14 @@ use regex::Regex;
 use rustc_hash::FxHashSet;
 use serde::Deserialize;
 use smol_str::SmolStr;
-use utils::paths::{sort_and_remove_subfolders, AbsPathBuf, Utf8PathBuf};
+use utils::paths::{AbsPathBuf, Utf8PathBuf, sort_and_remove_subfolders};
 
 use crate::macro_def::{MacroAtom, MacroDef};
 
 const DEFAULT_TOP_MODULE: &str = "main";
 const IDENTIFIER_RE: &str = r"[a-zA-Z_][a-zA-Z0-9$_]*|\\\S* ";
-static IDENT_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(formatcp!("^({IDENTIFIER_RE})$")).unwrap());
+static IDENT_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(formatcp!("^({IDENTIFIER_RE})$")).unwrap());
 static KV_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(formatcp!("^({IDENTIFIER_RE})=(.*)$")).unwrap());
 

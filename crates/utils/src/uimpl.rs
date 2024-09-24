@@ -1,21 +1,5 @@
 #[macro_export]
 macro_rules! impl_from {
-    ($($variant:ident $(($($sub_variant:ident),*))?),* for $enum:ident) => {
-        $(
-            impl From<$variant> for $enum {
-                fn from(it: $variant) -> $enum {
-                    $enum::$variant(it)
-                }
-            }
-            $($(
-                impl From<$sub_variant> for $enum {
-                    fn from(it: $sub_variant) -> $enum {
-                        $enum::$variant($variant::$sub_variant(it))
-                    }
-                }
-            )*)?
-        )*
-    };
     ($($variant:ident$(<$V:ident>)?),* for $enum:ident) => {
         $(
             impl$(<$V>)? From<$variant$(<$V>)?> for $enum$(<$V>)? {
@@ -36,4 +20,19 @@ macro_rules! impl_from {
             }
         )*
     };
+}
+
+#[macro_export]
+macro_rules! define_enum_deriving_from {
+    ($vis:vis enum $name:ident { $($variant:ident),* $(,)? }) => {
+        $vis enum $name { $($variant($variant)),* }
+
+        $crate::impl_from!($($variant),* for $name);
+    };
+
+    (#[$attr:meta] $vis:vis enum $name:ident { $($variant:ident),* $(,)? }) => {
+        #[$attr]
+        $vis enum $name { $($variant($variant)),* }
+        $crate::impl_from!($($variant),* for $name);
+    }
 }

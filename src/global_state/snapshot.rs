@@ -1,11 +1,11 @@
-use ide::{analysis::Analysis, Cancellable};
+use ide::{Cancellable, analysis::Analysis};
 use lsp_types::Url;
 use nohash_hasher::IntMap;
 use parking_lot::{MappedRwLockReadGuard, RwLock, RwLockReadGuard};
 use project_model::workspace::Workspace;
 use triomphe::Arc;
 use utils::lines::{LineEnding, LineInfo};
-use vfs::vfs::{FileId, Vfs};
+use vfs::{FileId, Vfs};
 
 use super::mem_docs::MemDocs;
 use crate::{

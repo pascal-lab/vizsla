@@ -6,8 +6,10 @@ description = "Isolating high level crates from the file-system, preventing them
 edition.workspace = true
 
 [dependencies]
+crossbeam-channel.workspace = true
 fst = "0.4.7"
 indexmap = "2.0.0"
 nohash-hasher.workspace = true
 rustc-hash.workspace = true
+triomphe.workspace = true
 utils.workspace = true

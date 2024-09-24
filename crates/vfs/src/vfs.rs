@@ -2,12 +2,10 @@ use std::{fmt, hash::BuildHasherDefault, mem};
 
 use indexmap::IndexSet;
 use rustc_hash::FxHasher;
-use utils::{lines::LineEnding, text_edit::SourceEditKind};
+use triomphe::Arc;
+use utils::lines::LineEnding;
 
-use crate::{
-    loader::{VfsLoadError, VfsLoadResult},
-    vfs_path::VfsPath,
-};
+use crate::{loader::LoadResult, vfs_path::VfsPath};
 
 #[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct FileId(pub u32);
@@ -21,9 +19,9 @@ pub struct Vfs {
     changes: Vec<ChangedFile>,
 }
 
-#[derive(Copy, PartialEq, PartialOrd, Clone)]
+#[derive(PartialEq, PartialOrd, Clone)]
 pub enum FileState {
-    Exists,
+    Exists(String, LineEnding),
     Deleted,
 }
 
@@ -34,47 +32,29 @@ pub struct ChangedFile {
 }
 
 impl ChangedFile {
-    pub fn file_state(&self) -> FileState {
-        match &self.change_kind {
-            ChangeKind::Create(_) | ChangeKind::Modify(_, _) => FileState::Exists,
-            ChangeKind::Delete => FileState::Deleted,
-        }
-    }
-
     pub fn is_created_or_deleted(&self) -> bool {
-        matches!(self.change_kind, ChangeKind::Create(_) | ChangeKind::Delete)
+        matches!(self.change_kind, ChangeKind::Create(_, _) | ChangeKind::Delete)
     }
 
-    pub fn exists(&self) -> bool {
-        self.file_state() == FileState::Exists
-    }
-
-    pub fn source_edits(&self) -> Option<&SourceEditKind> {
+    pub fn text(&self) -> Option<Arc<str>> {
         match &self.change_kind {
-            ChangeKind::Create(_) | ChangeKind::Delete => None,
-            ChangeKind::Modify(_, edits) => Some(edits),
+            ChangeKind::Create(text, _) | ChangeKind::Modify(text, _) => Some(text.clone()),
+            ChangeKind::Delete => None,
         }
     }
 
-    pub fn get_line_endings(&self) -> Option<LineEnding> {
-        match self.change_kind {
-            ChangeKind::Create(Ok((_, e))) | ChangeKind::Modify(Ok((_, e)), _) => Some(e),
-            _ => None,
-        }
-    }
-
-    pub fn get_text(self) -> Option<String> {
-        match self.change_kind {
-            ChangeKind::Create(Ok((text, _))) | ChangeKind::Modify(Ok((text, _)), _) => Some(text),
-            _ => None,
+    pub fn ending(&self) -> Option<LineEnding> {
+        match &self.change_kind {
+            ChangeKind::Create(_, ending) | ChangeKind::Modify(_, ending) => Some(*ending),
+            ChangeKind::Delete => None,
         }
     }
 }
 
 #[derive(Clone, Debug)]
 pub enum ChangeKind {
-    Create(VfsLoadResult),
-    Modify(VfsLoadResult, SourceEditKind),
+    Create(Arc<str>, LineEnding),
+    Modify(Arc<str>, LineEnding),
     Delete,
 }
 
@@ -94,29 +74,31 @@ impl Vfs {
             .map(move |file_id| (file_id, self.file_path(file_id)))
     }
 
-    pub fn set_file_contents(
-        &mut self,
-        path: &VfsPath,
-        contents: VfsLoadResult,
-        source_edits: SourceEditKind,
-    ) {
+    pub fn set_file_contents(&mut self, path: &VfsPath, contents: LoadResult) {
         let file_id = self.file_id_or_alloc(path);
+        use FileState::*;
+        use LoadResult::*;
         let change_kind = match (self.file_state(file_id), contents) {
-            (FileState::Exists, Err(VfsLoadError::LoadError)) => ChangeKind::Delete,
-            (FileState::Exists, v) => ChangeKind::Modify(v, source_edits),
-            (FileState::Deleted, Err(VfsLoadError::LoadError)) => return,
-            (FileState::Deleted, v) => ChangeKind::Create(v),
+            (Exists(old, _), Loaded(new, new_ending)) => {
+                if *old == new {
+                    return;
+                }
+
+                let change_kind = ChangeKind::Modify(Arc::from(new.as_str()), new_ending);
+                self.file_states[file_id.0 as usize] = Exists(new, new_ending);
+                change_kind
+            }
+            (Deleted, Loaded(new, new_ending)) => {
+                let change_kind = ChangeKind::Create(Arc::from(new.as_str()), new_ending);
+                self.file_states[file_id.0 as usize] = Exists(new, new_ending);
+                change_kind
+            }
+            (Exists(_, _), LoadError) => ChangeKind::Delete,
+            (Exists(_, _), DecodeError) | (Deleted, LoadError | DecodeError) => return,
         };
 
-        if let ChangeKind::Modify(_, SourceEditKind::Edits(edits)) = &change_kind
-            && edits.is_empty()
-        {
-            return;
-        }
-
-        let change_file = ChangedFile { file_id, change_kind };
-        self.file_states[file_id.0 as usize] = change_file.file_state();
-        self.changes.push(change_file);
+        let changed_file = ChangedFile { file_id, change_kind };
+        self.changes.push(changed_file);
     }
 
     pub fn has_changes(&self) -> bool {
@@ -128,7 +110,7 @@ impl Vfs {
     }
 
     pub fn exists(&self, file_id: FileId) -> bool {
-        self.file_state(file_id) == FileState::Exists
+        matches!(self.file_state(file_id), FileState::Exists(_, _))
     }
 
     fn file_id_or_alloc(&mut self, path: &VfsPath) -> FileId {
@@ -146,8 +128,8 @@ impl Vfs {
         FileId(id as u32)
     }
 
-    fn file_state(&self, file_id: FileId) -> FileState {
-        self.file_states[file_id.0 as usize]
+    fn file_state(&self, file_id: FileId) -> &FileState {
+        &self.file_states[file_id.0 as usize]
     }
 }
 

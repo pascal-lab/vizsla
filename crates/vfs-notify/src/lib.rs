@@ -1,14 +1,16 @@
-use std::{collections::HashSet, fs, ops::Not};
+use std::{fs, sync::atomic::AtomicUsize};
 
-use crossbeam_channel::{never, select, unbounded, Receiver, Sender};
+use crossbeam_channel::{Receiver, Sender, select, unbounded};
 use itertools::Itertools;
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
+use rustc_hash::FxHashSet;
 use utils::{
     lines::LineEnding,
     paths::{AbsPath, AbsPathBuf},
     thread,
 };
-use vfs::loader::{self, VfsLoadError, VfsLoadResult};
+use vfs::loader::{self, LoadResult};
 use walkdir::WalkDir;
 
 #[derive(Debug)]
@@ -43,36 +45,45 @@ impl loader::Handle for NotifyHandle {
         self.sender.send(ServerMsg::Invalidate(path)).unwrap();
     }
 
-    fn load_sync(&mut self, path: &AbsPath) -> VfsLoadResult {
+    fn load_sync(&mut self, path: &AbsPath) -> LoadResult {
         read(path)
     }
 }
 
-type FsEvent = notify::Result<notify::Event>;
+type NotifyEvent = notify::Result<notify::Event>;
 
 struct NotifyActor {
     sender: loader::Sender,
-    watched_entries: Vec<loader::Entry>,
+    watched_files: FxHashSet<AbsPathBuf>,
+    watched_dirs: Vec<loader::Directories>,
     // Drop order is significant.
-    watcher: Option<(RecommendedWatcher, Receiver<FsEvent>)>,
+    watcher: Option<(RecommendedWatcher, Receiver<NotifyEvent>)>,
 }
 
 #[derive(Debug)]
 enum Event {
     ServerMsg(ServerMsg),
-    FsEvent(FsEvent),
+    NotifyEvent(NotifyEvent),
 }
 
 impl NotifyActor {
     fn new(sender: loader::Sender) -> NotifyActor {
-        NotifyActor { sender, watched_entries: Vec::new(), watcher: None }
+        NotifyActor {
+            sender,
+            watched_files: FxHashSet::default(),
+            watched_dirs: Vec::new(),
+            watcher: None,
+        }
     }
 
     fn next_event(&self, receiver: &Receiver<ServerMsg>) -> Option<Event> {
-        let watcher_receiver = self.watcher.as_ref().map(|(_, receiver)| receiver);
+        let Some((_, watcher_receiver)) = &self.watcher else {
+            return receiver.recv().ok().map(Event::ServerMsg);
+        };
+
         select! {
             recv(receiver) -> it => it.ok().map(Event::ServerMsg),
-            recv(watcher_receiver.unwrap_or(&never())) -> it => Some(Event::FsEvent(it.unwrap())),
+            recv(watcher_receiver) -> it => Some(Event::NotifyEvent(it.unwrap())),
         }
     }
 
@@ -87,7 +98,7 @@ impl NotifyActor {
                             let (watcher_sender, watcher_receiver) = unbounded();
                             let watcher = log_notify_error(RecommendedWatcher::new(
                                 move |event| {
-                                    watcher_sender.send(event).unwrap();
+                                    _ = watcher_sender.send(event);
                                 },
                                 Config::default(),
                             ));
@@ -95,25 +106,42 @@ impl NotifyActor {
                         }
 
                         let config_version = config.version;
-
                         let n_total = config.to_load.len();
                         self.send(loader::Message::Progress { n_total, n_done: 0, config_version });
 
-                        self.watched_entries.clear();
+                        self.watched_files.clear();
+                        self.watched_dirs.clear();
 
-                        let watch_set: HashSet<usize> = config.to_watch.into_iter().collect();
-                        for (i, entry) in config.to_load.into_iter().enumerate() {
-                            let watch = watch_set.contains(&i);
-                            if watch {
-                                self.watched_entries.push(entry.clone());
+                        let (entry_tx, entry_rx) = unbounded();
+                        let (watch_tx, watch_rx) = unbounded();
+                        let processed = AtomicUsize::new(0);
+
+                        config.to_load.into_par_iter().enumerate().for_each(|(i, entry)| {
+                            let do_watch = config.to_watch.contains(&i);
+                            if do_watch {
+                                _ = entry_tx.send(entry.clone());
                             }
-                            let files = self.load_entry(entry, watch);
+                            let files = Self::load_entry(&watch_tx, entry, do_watch);
                             self.send(loader::Message::Loaded { files });
                             self.send(loader::Message::Progress {
                                 n_total,
-                                n_done: i + 1,
+                                n_done: 1 + processed
+                                    .fetch_add(1, std::sync::atomic::Ordering::AcqRel),
                                 config_version,
                             });
+                        });
+
+                        drop(watch_tx);
+                        for path in watch_rx {
+                            self.watch(&path);
+                        }
+
+                        drop(entry_tx);
+                        for entry in entry_rx {
+                            match entry {
+                                loader::Entry::Files(files) => self.watched_files.extend(files),
+                                loader::Entry::Directories(dir) => self.watched_dirs.push(dir),
+                            }
                         }
                     }
                     ServerMsg::Invalidate(path) => {
@@ -122,65 +150,64 @@ impl NotifyActor {
                         self.send(loader::Message::Loaded { files });
                     }
                 },
-                Event::FsEvent(event) => {
-                    if let Some(event) = log_notify_error(event) {
-                        let abs_paths =
-                            event.paths.into_iter().map(|path| AbsPathBuf::try_from(path).unwrap());
-                        let files = abs_paths
-                            .filter_map(|path| {
-                                let meta = fs::metadata(&path).ok()?;
-                                let is_file = meta.file_type().is_dir();
-                                let is_dir = meta.file_type().is_file();
+                Event::NotifyEvent(event) => {
+                    let Some(event) = log_notify_error(event) else {
+                        continue;
+                    };
 
-                                if is_dir {
-                                    if self
-                                        .watched_entries
-                                        .iter()
-                                        .any(|entry| entry.contains_dir(&path))
-                                    {
-                                        self.watch(&path);
-                                    }
-
-                                    return None;
-                                }
-
-                                if !is_file {
-                                    return None;
-                                }
-
-                                if self
-                                    .watched_entries
-                                    .iter()
-                                    .any(|entry| entry.contains_file(&path))
-                                    .not()
-                                {
-                                    return None;
-                                }
-
-                                let contents = read(&path);
-
-                                Some((path, contents))
-                            })
-                            .collect();
-
-                        self.send(loader::Message::Loaded { files });
+                    if !(event.kind.is_create() || event.kind.is_modify() || event.kind.is_remove())
+                    {
+                        continue;
                     }
+
+                    let files = event
+                        .paths
+                        .into_iter()
+                        .filter_map(|path| AbsPathBuf::try_from(path).ok())
+                        .filter_map(|path| {
+                            let meta = fs::metadata(&path).ok()?;
+                            let is_file = meta.file_type().is_dir();
+                            let is_dir = meta.file_type().is_file();
+
+                            if is_dir && self.watched_dirs.iter().any(|dir| dir.contains_dir(&path))
+                            {
+                                self.watch(&path);
+                                return None;
+                            }
+
+                            if !is_file {
+                                return None;
+                            }
+
+                            if !(self.watched_files.contains(&path)
+                                || self.watched_dirs.iter().any(|dir| dir.contains_file(&path)))
+                            {
+                                return None;
+                            }
+
+                            let contents = read(&path);
+
+                            Some((path, contents))
+                        })
+                        .collect();
+
+                    self.send(loader::Message::Loaded { files });
                 }
             }
         }
     }
 
     fn load_entry(
-        &mut self,
+        watch_tx: &Sender<AbsPathBuf>,
         entry: loader::Entry,
         watch: bool,
-    ) -> Vec<(AbsPathBuf, VfsLoadResult)> {
+    ) -> Vec<(AbsPathBuf, LoadResult)> {
         match entry {
             loader::Entry::Files(files) => files
                 .into_iter()
                 .map(|file| {
                     if watch {
-                        self.watch(&file);
+                        _ = watch_tx.send(file.to_owned());
                     }
                     let contents = read(file.as_path());
                     (file, contents)
@@ -188,6 +215,8 @@ impl NotifyActor {
                 .collect_vec(),
             loader::Entry::Directories(dirs) => {
                 let mut res = Vec::new();
+                let dir_set =
+                    dirs.include.iter().chain(dirs.exclude.iter()).collect::<FxHashSet<_>>();
 
                 for root in &dirs.include {
                     let walkdir =
@@ -196,17 +225,16 @@ impl NotifyActor {
                                 return true;
                             }
                             let path = &AbsPathBuf::assert_utf8(entry.path().to_path_buf());
-                            root == path
-                                || dirs.exclude.iter().chain(&dirs.include).all(|it| it != path)
+                            root == path || !dir_set.contains(path)
                         });
 
                     let files = walkdir.filter_map(|it| it.ok()).filter_map(|entry| {
                         let is_dir = entry.file_type().is_dir();
                         let is_file = entry.file_type().is_file();
-                        let abs_path = AbsPathBuf::assert_utf8(entry.into_path());
+                        let abs_path = AbsPathBuf::try_from(entry.into_path()).ok()?;
 
                         if is_dir && watch {
-                            self.watch(&abs_path);
+                            _ = watch_tx.send(abs_path.to_owned());
                         }
 
                         if !is_file {
@@ -237,16 +265,21 @@ impl NotifyActor {
         }
     }
 
-    fn send(&mut self, msg: loader::Message) {
+    fn send(&self, msg: loader::Message) {
         // Call self.sender with msg
-        (self.sender)(msg);
+        self.sender.send(msg).unwrap();
     }
 }
 
-fn read(path: &AbsPath) -> VfsLoadResult {
-    let bytes = std::fs::read(path).map_err(|_| VfsLoadError::LoadError)?;
-    let text = String::from_utf8(bytes).map_err(|_| VfsLoadError::DecodeError)?;
-    Ok(LineEnding::normalize(text))
+fn read(path: &AbsPath) -> LoadResult {
+    let Ok(bytes) = std::fs::read(path) else {
+        return LoadResult::LoadError;
+    };
+    let Ok(text) = String::from_utf8(bytes) else {
+        return LoadResult::DecodeError;
+    };
+    let (text, ending) = LineEnding::normalize(text);
+    LoadResult::Loaded(text, ending)
 }
 
 fn log_notify_error<T>(res: notify::Result<T>) -> Option<T> {

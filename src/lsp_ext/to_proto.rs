@@ -1,15 +1,15 @@
-use ide::{navigation_target::NavTarget, Cancellable};
+use ide::{Cancellable, SymbolKind, navigation_target::NavTarget};
 use itertools::Itertools;
 use line_index::{TextRange, TextSize};
 use span::FileRange;
 use utils::{
     lines::{LineInfo, PositionEncoding},
     paths::{
-        camino::{Utf8Component, Utf8Prefix},
         AbsPath,
+        camino::{Utf8Component, Utf8Prefix},
     },
 };
-use vfs::vfs::FileId;
+use vfs::FileId;
 
 use crate::global_state::snapshot::GlobalStateSnapshot;
 
@@ -35,6 +35,56 @@ pub(crate) fn goto_definition_response(
         locations.into()
     };
     Ok(res)
+}
+
+pub(crate) fn document_symbol(
+    line_info: &LineInfo,
+    symbol: ide::document_symbols::DocumentSymbol,
+) -> lsp_types::DocumentSymbol {
+    lsp_types::DocumentSymbol {
+        name: symbol.label,
+        detail: symbol.detail,
+        kind: symbol_kind(symbol.kind),
+        tags: None,
+        deprecated: None,
+        range: lsp_range(line_info, symbol.full_range),
+        selection_range: lsp_range(line_info, symbol.focus_range),
+        children: None,
+    }
+}
+
+pub(crate) fn document_symbol_information(
+    symbol: ide::document_symbols::DocumentSymbol,
+    url: lsp_types::Url,
+    line_info: &LineInfo,
+    res: &mut Vec<lsp_types::SymbolInformation>,
+) {
+    res.push(lsp_types::SymbolInformation {
+        name: symbol.label,
+        kind: symbol_kind(symbol.kind),
+        tags: None,
+        deprecated: None,
+        location: lsp_types::Location::new(url.clone(), lsp_range(line_info, symbol.focus_range)),
+        container_name: symbol.container_name,
+    });
+
+    if let Some(children) = symbol.children {
+        for child in children {
+            document_symbol_information(child, url.clone(), line_info, res);
+        }
+    }
+}
+
+pub(crate) fn symbol_kind(symbol_kind: SymbolKind) -> lsp_types::SymbolKind {
+    use lsp_types::SymbolKind as LspSymbolKind;
+    match symbol_kind {
+        SymbolKind::Module => LspSymbolKind::MODULE,
+        SymbolKind::PortLabel => LspSymbolKind::FIELD,
+        SymbolKind::Decl => LspSymbolKind::FIELD,
+        SymbolKind::Instance => LspSymbolKind::OBJECT,
+        SymbolKind::Block => LspSymbolKind::VARIABLE,
+        SymbolKind::Stmt => LspSymbolKind::VARIABLE,
+    }
 }
 
 fn location(

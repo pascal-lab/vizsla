@@ -1,4 +1,4 @@
-use vfs::vfs::FileId;
+use vfs::FileId;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub struct HirFileId(pub FileId);

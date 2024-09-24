@@ -6,7 +6,7 @@ use std::{
 
 use ide::Cancelled;
 use lsp_server::{ExtractError, Request, Response};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use utils::{json::from_json, thread::ThreadIntent};
 
 use super::{main_loop::Task, snapshot::GlobalStateSnapshot};

@@ -1,102 +1,108 @@
 use base_db::intern::Lookup;
-use utils::impl_from;
+use utils::define_enum_deriving_from;
+use vfs::FileId;
 
 use crate::{
-    db::HirDb,
+    db::InternDb,
     file::HirFileId,
-    hir_def::{
-        block::{BlockId, BlockLoc},
-        ModuleId,
-    },
+    hir_def::{block::BlockId, module::ModuleId},
 };
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
-pub enum ContainerId {
-    // [`HirFileId`] is a special container.
-    HirFileId(HirFileId),
-    ModuleId(ModuleId),
-    BlockId(BlockId),
-}
-
-impl_from!(HirFileId, ModuleId, BlockId for ContainerId);
-
-impl ContainerId {
-    pub fn file_id(&self, db: &dyn HirDb) -> HirFileId {
-        match self {
-            ContainerId::HirFileId(file_id) => *file_id,
-            ContainerId::ModuleId(module_id) => module_id.container_id,
-            ContainerId::BlockId(block_id) => block_id.lookup(db).block_src.container_id,
-        }
+define_enum_deriving_from! {
+    #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+    pub enum ContainerId {
+        HirFileId,
+        ModuleId,
+        BlockId,
     }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub struct InContainer<T, C = ContainerId> {
     pub value: T,
-    pub container_id: C,
+    pub cont_id: C,
 }
 
 impl<T, C> InContainer<T, C> {
-    pub fn new(container_id: C, value: T) -> InContainer<T, C> {
-        InContainer { value, container_id }
+    pub fn new(cont_id: C, value: T) -> InContainer<T, C> {
+        InContainer { value, cont_id }
     }
 
     pub fn with_value<U>(self, value: U) -> InContainer<U, C> {
-        InContainer::<U, C>::new(self.container_id, value)
+        InContainer::<U, C>::new(self.cont_id, value)
     }
 }
 
-impl<T> From<InFile<T>> for InContainer<T, ContainerId> {
-    fn from(file: InFile<T>) -> InContainer<T, ContainerId> {
-        InContainer::new(file.container_id.into(), file.value)
+macro_rules! impl_container_id {
+    ($($name:ident<$id:ty>),*) => {
+        $(
+            pub type $name<T> = InContainer<T, $id>;
+
+            impl<T> From<$name<T>> for InContainer<T, ContainerId> {
+                fn from(item: $name<T>) -> InContainer<T, ContainerId> {
+                    InContainer::new(item.cont_id.into(), item.value)
+                }
+            }
+        )*
+
+        impl ContainerId {
+            pub fn file_id(self, db: &dyn InternDb) -> FileId {
+                match self {
+                    ContainerId::HirFileId(file_id) => file_id.file_id(),
+                    ContainerId::ModuleId(module_id) => module_id.file_id(),
+                    ContainerId::BlockId(block_id) => block_id.file_id(db),
+                }
+            }
+        }
+    };
+}
+
+impl_container_id! {
+    InFile<HirFileId>,
+    InModule<ModuleId>,
+    InBlock<BlockId>
+}
+
+impl HirFileId {
+    pub fn file_id(self) -> FileId {
+        self.0
     }
 }
 
-impl<T> From<InModule<T>> for InContainer<T, ContainerId> {
-    fn from(module: InModule<T>) -> InContainer<T, ContainerId> {
-        InContainer::new(module.container_id.into(), module.value)
+impl ModuleId {
+    pub fn file_id(self) -> FileId {
+        self.cont_id.0
     }
 }
 
-impl<T> From<InBlock<T>> for InContainer<T, ContainerId> {
-    fn from(block: InBlock<T>) -> InContainer<T, ContainerId> {
-        InContainer::new(block.container_id.into(), block.value)
+impl BlockId {
+    pub fn file_id(self, db: &dyn InternDb) -> FileId {
+        self.lookup(db).src.cont_id.0
     }
 }
-
-pub type InFile<T> = InContainer<T, HirFileId>;
-pub type InModule<T> = InContainer<T, ModuleId>;
-pub type InBlock<T> = InContainer<T, BlockId>;
 
 /// Parents of a scope.
 pub struct ContainerParent<'db> {
-    db: &'db dyn HirDb,
-    container_id: Option<ContainerId>,
+    db: &'db dyn InternDb,
+    cont_id: Option<ContainerId>,
 }
 
-impl<'db> ContainerParent<'db> {
-    pub fn new(db: &'db dyn HirDb, container_id: ContainerId) -> ContainerParent {
-        ContainerParent { db, container_id: Some(container_id) }
+impl ContainerParent<'_> {
+    pub fn start_from(db: &dyn InternDb, cont_id: ContainerId) -> ContainerParent {
+        ContainerParent { db, cont_id: Some(cont_id) }
     }
 }
 
-impl<'db> Iterator for ContainerParent<'db> {
+impl Iterator for ContainerParent<'_> {
     type Item = ContainerId;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let next = self.container_id;
-        match self.container_id {
-            Some(ContainerId::ModuleId(module_id)) => {
-                self.container_id = Some(ContainerId::HirFileId(module_id.container_id));
-            }
-            Some(ContainerId::BlockId(block_id)) => {
-                let BlockLoc { container_id, .. } = block_id.lookup(self.db);
-                self.container_id = Some(container_id);
-            }
-            _ => {
-                self.container_id = None;
-            }
-        }
+        let next = self.cont_id;
+        self.cont_id = match self.cont_id? {
+            ContainerId::ModuleId(module_id) => Some(module_id.cont_id.into()),
+            ContainerId::HirFileId(file_id) => None,
+            ContainerId::BlockId(block_id) => Some(block_id.lookup(self.db).cont_id),
+        };
         next
     }
 }

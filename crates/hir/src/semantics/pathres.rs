@@ -1,92 +1,98 @@
-use itertools::Itertools;
-use la_arena::Idx;
-use syntax::ast::{self, support::AstChildren, AstNode};
+use syntax::SyntaxTokenWithParent;
 
 use super::SemanticsImpl;
 use crate::{
-    container::{ContainerParent, InBlock, InContainer, InFile, InModule},
+    container::{ContainerId, ContainerParent, InBlock, InContainer, InFile, InModule},
     hir_def::{
-        block::BlockId, data::SubDecl, lower::lower_ident, module::module_item::HierarchicalInst,
-        stmt::Stmt, ModuleId,
+        block::BlockId,
+        expr::declarator::DeclId,
+        lower_ident_opt,
+        module::{ModuleId, instantiation::InstanceId, port::NonAnsiPortId},
+        proc::ProcId,
+        stmt::StmtId,
     },
-    scope::{BlockScopeEntry, ModuleScopeEntry, ScopeEntry, ScopeId, UnitScopeEntry},
+    scope::{self, BlockEntry, ModuleEntry, UnitEntry},
 };
 
-impl<'db> SemanticsImpl<'db> {
-    pub fn resolve_ident(&self, ident: &ast::Identifier) -> Option<PathResolution> {
+impl SemanticsImpl<'_> {
+    pub fn resolve_ident(
+        &self,
+        SyntaxTokenWithParent { parent, tok: ident }: SyntaxTokenWithParent,
+    ) -> Option<PathResolution> {
         self.with_ctx(|ctx| {
-            let file_id = self.find_file(ident.syntax());
-            let container_id = ctx.find_container(InFile::new(file_id, *ident.syntax()))?;
-            let ident = lower_ident(ident, ctx.db.hir_file_text(file_id).as_ref())?;
+            let db = self.db;
+            let file_id = self.find_file(&parent);
+            let container = ctx.find_container(InFile::new(file_id, parent))?;
+            let ident = lower_ident_opt(Some(ident))?;
 
-            let (id, entry) = ContainerParent::new(ctx.db, container_id)
-                .map(|container_id| dbg!(self.scope_for_container(container_id)))
-                .find_map(|scope| Some((scope.id(), scope.get_entry(&ident)?)))?;
-
-            let res = match (id, entry) {
-                (ScopeId::UnitId(_), ScopeEntry::UnitScopeEntry(entry)) => entry.into(),
-                (ScopeId::ModuleId(module_id), ScopeEntry::ModuleScopeEntry(entry)) => {
-                    InModule::new(module_id, entry).into()
+            ContainerParent::start_from(db, container).find_map(|id| match id {
+                ContainerId::HirFileId(file_id) => {
+                    let scope = db.unit_scope();
+                    let entry = scope.get(&ident)?;
+                    Some(entry.into())
                 }
-                (ScopeId::BlockId(block_id), ScopeEntry::BlockScopeEntry(entry)) => {
-                    InBlock::new(block_id, entry).into()
+                ContainerId::ModuleId(module_id) => {
+                    let scope = db.module_scope(module_id);
+                    let entry = scope.get(&ident)?;
+                    Some(InModule::new(module_id, entry).into())
                 }
-                _ => unreachable!(),
-            };
-            Some(res)
+                ContainerId::BlockId(block_id) => {
+                    let scope = db.block_scope(block_id);
+                    let entry = scope.get(&ident)?;
+                    Some(InBlock::new(block_id, entry).into())
+                }
+            })
         })
-    }
-
-    pub fn resolve_path(&self, path: AstChildren<ast::Identifier>) -> Option<PathResolution> {
-        let path = path.collect_vec();
-        let last_ident = path.last()?;
-
-        if path.len() == 1 { self.resolve_ident(last_ident) } else { unimplemented!() }
     }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum PathResolution {
-    ModuleId(ModuleId),
-    BlockId(BlockId),
-    PortDecl { port: Idx<SubDecl>, data: Option<Idx<SubDecl>>, module_id: ModuleId },
-    HierarchyInst(InModule<Idx<HierarchicalInst>>),
-    SubDecl(InContainer<Idx<SubDecl>>),
-    Stmt(InContainer<Idx<Stmt>>),
+    Module(ModuleId),
+    Decl(InContainer<DeclId>),
+    Port {
+        label: Option<NonAnsiPortId>,
+        port_decl: Option<DeclId>,
+        data_decl: Option<DeclId>,
+        module: ModuleId,
+    },
+    Instance(InModule<InstanceId>),
+    Stmt(InContainer<StmtId>),
+    Block(BlockId),
 }
 
-impl From<UnitScopeEntry> for PathResolution {
-    fn from(entry: UnitScopeEntry) -> Self {
-        use UnitScopeEntry::*;
+impl From<UnitEntry> for PathResolution {
+    fn from(entry: UnitEntry) -> Self {
+        use UnitEntry::*;
         match entry {
-            Module(module) => Self::ModuleId(module),
+            ModuleId(idx) => Self::Module(idx),
+            FiledDeclId(idx) => Self::Decl(idx.into()),
         }
     }
 }
 
-impl From<InModule<ModuleScopeEntry>> for PathResolution {
-    fn from(entry: InModule<ModuleScopeEntry>) -> Self {
-        use ModuleScopeEntry::*;
-        let module_id = entry.container_id;
+impl From<InModule<ModuleEntry>> for PathResolution {
+    fn from(entry: InModule<ModuleEntry>) -> Self {
+        use ModuleEntry::*;
         match entry.value {
-            SubDecl(sub_decl) => Self::SubDecl(entry.with_value(sub_decl).into()),
-            HierarchyInst(inst) => {
-                Self::HierarchyInst(InModule { value: inst, container_id: module_id })
+            DeclId(decl_id) => Self::Decl(entry.with_value(decl_id).into()),
+            InstanceId(idx) => Self::Instance(entry.with_value(idx)),
+            StmtId(idx) => Self::Stmt(entry.with_value(idx).into()),
+            NonAnsiPortEntry(scope::NonAnsiPortEntry { label, port_decl, data_decl }) => {
+                Self::Port { label, port_decl, data_decl, module: entry.cont_id }
             }
-            Block(block_id) => Self::BlockId(block_id),
-            Stmt(stmt) => Self::Stmt(entry.with_value(stmt).into()),
-            PortDecl { port, data } => Self::PortDecl { port, data, module_id },
+            BlockId(block_id) => Self::Block(block_id),
         }
     }
 }
 
-impl From<InBlock<BlockScopeEntry>> for PathResolution {
-    fn from(entry: InBlock<BlockScopeEntry>) -> Self {
-        use BlockScopeEntry::*;
+impl From<InBlock<BlockEntry>> for PathResolution {
+    fn from(entry: InBlock<BlockEntry>) -> Self {
+        use BlockEntry::*;
         match entry.value {
-            SubDecl(sub_decl) => Self::SubDecl(entry.with_value(sub_decl).into()),
-            Block(block_id) => Self::BlockId(block_id),
-            Stmt(stmt) => Self::Stmt(entry.with_value(stmt).into()),
+            DeclId(idx) => Self::Decl(entry.with_value(idx).into()),
+            StmtId(idx) => Self::Stmt(entry.with_value(idx).into()),
+            BlockId(block_id) => Self::Block(block_id),
         }
     }
 }

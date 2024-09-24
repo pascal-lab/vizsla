@@ -1,4 +1,5 @@
 #![feature(let_chains)]
+#![feature(try_blocks)]
 use std::{env, fs, io, path::PathBuf};
 
 use anyhow::Context;
@@ -9,13 +10,13 @@ use itertools::Itertools;
 use lsp_server::Connection;
 use lsp_types::{MessageType, ShowMessageParams};
 use tracing_subscriber::{
-    filter::Targets, fmt::writer::BoxMakeWriter, layer::SubscriberExt, util::SubscriberInitExt,
-    Registry,
+    Registry, filter::Targets, fmt::writer::BoxMakeWriter, layer::SubscriberExt,
+    util::SubscriberInitExt,
 };
 use triomphe::Arc;
 use utils::{
     json::from_json,
-    paths::{patch_path_prefix, AbsPathBuf},
+    paths::{AbsPathBuf, patch_path_prefix},
 };
 
 use crate::global_state::main_loop;
@@ -120,10 +121,11 @@ fn run_server(opt: Opt) -> anyhow::Result<()> {
             Config::parse_initialization_options(initialization_options.unwrap());
         if !errors.is_empty() {
             use lsp_types::notification::{Notification, ShowMessage};
-            let noti = lsp_server::Notification::new(
-                ShowMessage::METHOD.to_string(),
-                ShowMessageParams { typ: MessageType::WARNING, message: errors.to_string() },
-            );
+            let noti =
+                lsp_server::Notification::new(ShowMessage::METHOD.to_string(), ShowMessageParams {
+                    typ: MessageType::WARNING,
+                    message: errors.to_string(),
+                });
             connection.sender.send(lsp_server::Message::Notification(noti)).unwrap();
         }
         (user_config, Arc::new(detached_files), snippets)

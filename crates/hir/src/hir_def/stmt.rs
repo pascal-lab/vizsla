@@ -1,389 +1,432 @@
 use la_arena::{Arena, Idx};
 use smallvec::SmallVec;
-use syntax::ast::{self, ptr};
+use syntax::{
+    SyntaxKind, SyntaxToken, TokenKind,
+    ast::{self, AstNode},
+    ptr::SyntaxNodePtr,
+};
 
 use super::{
-    block::{
-        block_src::{BlockSrc, LocalBlockSrc},
-        BlockItemDecl, BlockLoc,
+    Ident, arena_nxt_idx,
+    block::{BlockInfo, BlockLoc},
+    expr::{
+        Expr, ExprId, ExprSrc, LowerExpr, LowerExprCtx,
+        data_ty::DataTy,
+        declarator::{DeclId, Declarator, DeclaratorSrc, LowerDecl, LowerDeclCtx},
+        timing_control::{
+            EventExpr, EventExprSrc, LowerEventExpr, LowerEventExprCtx, TimingControl,
+        },
     },
-    data::LowerDataDecl,
+    lower_ident_opt,
 };
 use crate::{
-    container::InFile,
-    hir_def::{
-        block::BlockInfo,
-        control::{DelayOrEventControl, LowerTimingControl, ProcTimingCtrl},
-        expr::{self, AssignOp, ExprId, LowerExpr},
-        try_match, Ident,
-    },
+    alloc_idx_and_src,
+    container::{ContainerId, InFile},
+    db::InternDb,
+    define_src,
+    file::HirFileId,
+    hir_def::lower_named_label_opt,
     source_map::SourceMap,
 };
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub struct Assign {
-    pub lhs: ExprId,
-    pub rhs: ExprId,
-    pub op: AssignOp,
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Stmt {
+    pub label: Option<Ident>,
+    pub kind: StmtKind,
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub enum ProcContAssign {
-    Assign(Assign),
+pub type StmtId = Idx<Stmt>;
+
+#[derive(Default, Debug, PartialEq, Eq, Clone)]
+pub enum StmtKind {
+    #[default]
+    Empty,
+
+    Expr(ExprId),
+    TimingCtrl(TimingControl, StmtId),
+    ProcAssign(ProcAssignKind),
+    Block(BlockInfo),
+
+    Cond {
+        unique_priority: Option<UniquePriority>,
+        pred: SmallVec<[ExprId; 1]>,
+        then_stmt: StmtId,
+        else_stmt: Option<StmtId>,
+    },
+    Case {
+        unique_priority: Option<UniquePriority>,
+        case: Option<CaseKeyword>,
+        expr: ExprId,
+        items: SmallVec<[CaseItem; 5]>,
+    },
+
+    Forever(StmtId),
+    DoWhile(StmtId, ExprId),
+    While(ExprId, StmtId),
+    For {
+        inits: ForInit,
+        stop: ExprId,
+        steps: SmallVec<[ExprId; 1]>,
+        stmt: StmtId,
+    },
+    Jump(JumpKind),
+
+    Wait(WaitKind, StmtId),
+    Disable(DisableKind),
+}
+
+define_src!(StmtSrc(ast::Statement));
+
+impl StmtSrc {
+    pub(super) fn new(src: SyntaxNodePtr) -> Self {
+        Self(src)
+    }
+
+    pub(super) fn ptr(&self) -> SyntaxNodePtr {
+        self.0
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub enum ProcAssignKind {
+    Assign(ExprId),
+    Force(ExprId),
     Deassign(ExprId),
-    Force(Assign),
     Release(ExprId),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Stmt {
-    pub ident: Option<Ident>,
-    pub item: StmtItem,
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub enum JumpKind {
+    Return(Option<ExprId>),
+    Break,
+    Continue,
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum ForInit {
+    Init(SmallVec<[(DataTy, DeclId); 1]>),
+    Assign(SmallVec<[ExprId; 1]>),
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+pub enum WaitKind {
+    Wait(ExprId),
+    // TODO: more wait statements
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+pub enum DisableKind {
+    Disable(ExprId),
+    // TODO: more disable statements
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub enum UniquePriority {
     Unique,
     Unique0,
     Priority,
 }
 
-pub(crate) fn lower_unique_priority(priority: &ast::UniquePriority) -> Option<UniquePriority> {
-    try_match! {
-        priority.token_unique(), _ => Some(UniquePriority::Unique),
-        priority.token_unique0(), _ => Some(UniquePriority::Unique0),
-        priority.token_priority(), _ => Some(UniquePriority::Priority),
-        _ => None,
-    }
-}
-
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub struct CondPredicate(SmallVec<[ExprOrCondPat; 1]>);
-
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub enum ExprOrCondPat {
-    Expr(ExprId),
-    // TODO: CondPat(CondPredicate),
-}
-
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub enum CaseKeyword {
     Case,
     Casez,
     Casex,
 }
 
-pub(crate) fn lower_case_keyword(keyword: &ast::CaseKeyword) -> Option<CaseKeyword> {
-    try_match! {
-        keyword.token_case(), _ => Some(CaseKeyword::Case),
-        keyword.token_casez(), _ => Some(CaseKeyword::Casez),
-        keyword.token_casex(), _ => Some(CaseKeyword::Casex),
-        _ => None,
-    }
-}
-
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum CaseItem {
-    Case { exprs: SmallVec<[ExprId; 1]>, stmt: Option<StmtId> },
-    Default(Option<StmtId>),
+    Case { exprs: SmallVec<[ExprId; 1]>, clause: StmtId },
+    Default(StmtId),
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub enum CaseItems {
-    Case(SmallVec<[CaseItem; 1]>),
-    // TODO: Pattern()
-    // TODO: Inside()
+pub(crate) trait LowerStmt: LowerExpr + LowerEventExpr + LowerDecl {
+    fn stmt_ctx(&mut self) -> LowerStmtCtx;
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum StmtItem {
-    BlkAssign {
-        control: Option<DelayOrEventControl>,
-        assign: Assign,
-    },
-    NonBlkAssign {
-        control: Option<DelayOrEventControl>,
-        assign: Assign,
-    },
-    ProcContAssign(ProcContAssign),
-    Case {
-        priority: Option<UniquePriority>,
-        kw: CaseKeyword,
-        expr: ExprId,
-        items: CaseItems,
-    },
-    Cond {
-        priority: Option<UniquePriority>,
-        preds: CondPredicate,
-        stmt: Option<StmtId>,
-        else_stmt: Option<StmtId>,
-    },
-    BlockInfo(Idx<BlockInfo>),
-    ProcTimingCtrl {
-        control: ProcTimingCtrl,
-        stmt: Option<StmtId>,
-    },
+pub(crate) struct LowerStmtCtx<'a> {
+    pub(crate) db: &'a dyn InternDb,
+    pub(crate) file_id: HirFileId,
+    pub(crate) cont_id: ContainerId,
+    pub(crate) stmts: &'a mut Arena<Stmt>,
+    pub(crate) stmt_srcs: &'a mut SourceMap<StmtSrc, Stmt>,
+
+    pub(crate) event_exprs: &'a mut Arena<EventExpr>,
+    pub(crate) event_expr_srcs: &'a mut SourceMap<EventExprSrc, EventExpr>,
+
+    pub(crate) exprs: &'a mut Arena<Expr>,
+    pub(crate) expr_source_map: &'a mut SourceMap<ExprSrc, Expr>,
+
+    pub(crate) decls: &'a mut Arena<Declarator>,
+    pub(crate) decl_srcs: &'a mut SourceMap<DeclaratorSrc, Declarator>,
 }
 
-pub type StmtId = Idx<Stmt>;
-pub type StmtSrc = InFile<ptr::StatementPtr>;
+impl LowerExpr for LowerStmtCtx<'_> {
+    fn expr_ctx(&mut self) -> LowerExprCtx {
+        LowerExprCtx { db: self.db, exprs: self.exprs, expr_source_map: self.expr_source_map }
+    }
+}
 
-pub(crate) trait LowerStmt: LowerTimingControl + LowerExpr + LowerDataDecl {
-    fn arena_stmts(&mut self) -> &mut Arena<Stmt>;
+impl LowerEventExpr for LowerStmtCtx<'_> {
+    fn event_expr_ctx(&mut self) -> LowerEventExprCtx {
+        LowerEventExprCtx {
+            db: self.db,
+            event_exprs: self.event_exprs,
+            event_expr_srcs: self.event_expr_srcs,
+            exprs: self.exprs,
+            expr_source_map: self.expr_source_map,
+        }
+    }
+}
 
-    fn arena_blocks(&mut self) -> &mut Arena<BlockInfo>;
+impl LowerDecl for LowerStmtCtx<'_> {
+    fn decl_ctx(&mut self) -> LowerDeclCtx {
+        LowerDeclCtx {
+            db: self.db,
+            decls: self.decls,
+            decl_srcs: self.decl_srcs,
+            exprs: self.exprs,
+            expr_source_map: self.expr_source_map,
+        }
+    }
+}
 
-    fn src_map_stmt(&mut self) -> &mut SourceMap<StmtSrc, Stmt>;
-
-    fn src_map_blocks(&mut self) -> &mut SourceMap<BlockSrc, BlockInfo>;
-
-    fn lower_stmt(&mut self, stmt: &ast::Statement) -> Option<StmtId> {
-        let ident = stmt.identifier().and_then(|ident| self.lower_ident(&ident));
-        let item = self.lower_stmt_item(&stmt.statement_item()?)?;
-        let src = self.in_file(stmt.to_ptr());
-        let idx = self.arena_stmts().alloc(Stmt { ident, item });
-        self.src_map_stmt().insert(src, idx);
-        Some(idx)
+impl LowerStmtCtx<'_> {
+    pub(crate) fn lower_stmt_opt(&mut self, stmt: Option<ast::Statement>) -> StmtId {
+        if let Some(stmt) = stmt { self.lower_stmt(stmt) } else { self.alloc_missing() }
     }
 
-    fn lower_stmt_or_null(&mut self, stmt_or_null: &ast::StatementOrNull) -> Option<StmtId> {
-        try_match! {
-            stmt_or_null.statement(), stmt => {
-                self.lower_stmt(&stmt)
-            },
-            _ => None,
+    pub(crate) fn lower_stmt(&mut self, stmt: ast::Statement) -> StmtId {
+        let hir_stmt = self.lower_stmt_inner(stmt);
+        alloc_idx_and_src! {
+            hir_stmt => self.stmts,
+            stmt => self.stmt_srcs,
         }
     }
 
-    fn lower_stmt_item(&mut self, stmt: &ast::StatementItem) -> Option<StmtItem> {
-        try_match! {
-            stmt.blocking_assignment(), assign => {
-                let control = try_match!{
-                    assign.delay_or_event_control(), control => {
-                        self.lower_delay_or_event_control(&control)
-                    },
-                    _ => None
-                };
-                let assign = try_match!{
-                    assign.variable_lvalue(), var_lvalue => {
-                        let lhs = self.lower_var_lvalue(&var_lvalue)?;
-                        let rhs = self.lower_expr(&assign.expression()?);
-                        let op = AssignOp::Assign;
-                        Assign { lhs, rhs, op }
-                    },
-                    assign.nonrange_variable_lvalue(), _ => {
-                        unimplemented!("nonrange_variable_lvalue = dynamic_array_new")
-                    },
-                    // TODO: add syntax: hierarchical_variable_identifier select = class_new
-                    assign.operator_assignment(), op_assign => {
-                        self.lower_op_assign(&op_assign)?
-                    },
-                    _ => { return None; }
-                };
-                Some(StmtItem::BlkAssign{ control, assign })
-            },
-            stmt.nonblocking_assignment(), assign => {
-                let control = assign.delay_or_event_control().and_then(|control| self.lower_delay_or_event_control(&control));
-                let assign = Assign {
-                    lhs: self.lower_var_lvalue(&assign.variable_lvalue()?)?,
-                    rhs: self.lower_expr(&assign.expression()?),
-                    op: AssignOp::Assign,
-                };
-                Some(StmtItem::NonBlkAssign{ control, assign })
-            },
-            stmt.procedural_continuous_assignment(), assign => {
-                let assign = try_match! {
-                    assign.token_assign(), _ => {
-                        ProcContAssign::Assign(
-                            self.lower_var_assign(&assign.variable_assignment()?)?
-                        )
-                    },
-                    assign.token_deassign(), _ => {
-                        ProcContAssign::Deassign(
-                            self.lower_var_lvalue(&assign.variable_lvalue()?)?
-                        )
-                    },
-                    assign.token_force(), _ => {
-                        let assign = try_match!{
-                            assign.variable_assignment(), var_assign => {
-                                self.lower_var_assign(&var_assign)?
-                            },
-                            assign.net_assignment(), net_assign => {
-                                self.lower_net_assign(&net_assign)?
-                            },
-                            _ => { return None; }
-                        };
-                        ProcContAssign::Force(assign)
-                    },
-                    assign.token_release(), _ => {
-                        let lvalue = try_match!{
-                            assign.variable_lvalue(), var_lvalue => {
-                                self.lower_var_lvalue(&var_lvalue)?
-                            },
-                            assign.net_lvalue(), net_lvalue => {
-                                self.lower_net_lvalue(&net_lvalue)?
-                            },
-                            _ => { return None; }
-                        };
-                        ProcContAssign::Release(lvalue)
-                    },
-                    _ => { return None; }
-                };
-                Some(StmtItem::ProcContAssign(assign))
-            },
-            stmt.case_statement(), case => {
-                let priority = case.unique_priority().and_then(|priority| lower_unique_priority(&priority));
-                let kw = lower_case_keyword(&case.case_keyword()?)?;
-                let expr = self.lower_expr(&case.case_expression()?.expression()?);
-                let items = try_match! {
-                    case.token_matches(), _ => {
-                        unimplemented!("case_statement with matches")
-                    },
-                    case.token_inside(), _ => {
-                        unimplemented!("case_statement with inside")
-                    },
-                    _ => {
-                        let mut items: SmallVec<[CaseItem; 1]> = SmallVec::new();
-                        for item in case.case_items() {
-                            let item = try_match! {
-                                item.token_default(), _ => {
-                                    CaseItem::Default(self.lower_stmt_or_null(&item.statement_or_null()?))
-                                },
-                                _ => {
-                                    let mut exprs: SmallVec<[ExprId; 1]> = SmallVec::new();
-                                    for expr in item.case_item_expressions() {
-                                        exprs.push(self.lower_expr(&expr.expression()?));
-                                    }
-                                    let stmt = self.lower_stmt_or_null(&item.statement_or_null()?);
-                                    CaseItem::Case{ exprs, stmt }
-                                }
-                            };
-                            items.push(item);
-                        }
-                        CaseItems::Case(items)
-                    }
-                };
-                Some(StmtItem::Case { priority, kw, expr, items })
-            },
-            stmt.conditional_statement(), cond => {
-                let priority = cond.unique_priority().and_then(|it| lower_unique_priority(&it));
-                let preds = cond.cond_predicate()?.expression_or_cond_patterns()
-                    .filter_map(|it| Some(ExprOrCondPat::Expr(self.lower_expr(&it.expression()?))))
-                    .collect();
+    fn lower_stmt_inner(&mut self, stmt: ast::Statement) -> Stmt {
+        let label = lower_named_label_opt(stmt.label());
 
-                let mut iter = cond.statement_or_nulls();
-                let stmt = self.lower_stmt_or_null(&iter.next()?);
-                let else_stmt = self.lower_stmt_or_null(&iter.next()?);
+        use ast::Statement::*;
+        let kind = match stmt {
+            ExpressionStatement(stmt) => self.lower_expr_stmt(stmt),
+            TimingControlStatement(stmt) => self.lower_timing_ctrl_stmt(stmt),
+            ProceduralAssignStatement(stmt) => self.lower_assign_stmt(stmt),
+            ProceduralDeassignStatement(stmt) => self.lower_deassign_stmt(stmt),
 
-                Some(StmtItem::Cond { priority, preds: CondPredicate(preds), stmt, else_stmt })
-            },
-            stmt.seq_block(), seq_block => {
-                Some(StmtItem::BlockInfo(self.lower_seq_block(&seq_block)?))
-            },
-            stmt.par_block(), par_block => {
-                Some(StmtItem::BlockInfo(self.lower_par_block(&par_block)?))
-            },
-            stmt.inc_or_dec_expression(), _inc_or_dec => {
-                unimplemented!("inc_or_dec_expression")
-            },
-            // TODO: add syntax: subroutine_call_statement
-            stmt.disable_statement(), _disable => {
-                unimplemented!("disable_statement")
-            },
-            stmt.event_trigger(), _event_trigger => {
-                unimplemented!("event_trigger")
-            },
-            stmt.loop_statement(), _loop => {
-                unimplemented!("loop_statement")
-            },
-            stmt.jump_statement(), _jump => {
-                unimplemented!("jump_statement")
-            },
-            stmt.procedural_timing_control_statement(), control => {
-                Some(StmtItem::ProcTimingCtrl {
-                    control: self.lower_procedural_timing_control(&control.procedural_timing_control()?)?,
-                    stmt: self.lower_stmt_or_null(&control.statement_or_null()?),
-                })
-            },
-            stmt.wait_statement(), _wait => {
-                unimplemented!("wait_statement")
-            },
-            stmt.procedural_assertion_statement(), _assertion => {
-                unimplemented!("procedural_assertion_statement")
-            },
-            stmt.clocking_drive(), _clocking => {
-                unimplemented!("clocking_drive")
-            },
-            // TODO: Add syntax randsequence_statement
-            stmt.randcase_statement(), _randcase => {
-                unimplemented!("randcase_statement")
-            },
-            stmt.expect_property_statement(), _expect_property => {
-                unimplemented!("expect_property_statement")
-            },
-            _ => None,
-        }
-    }
+            WaitStatement(stmt) => self.lower_wait_stmt(stmt),
+            DisableStatement(stmt) => self.lower_disable_stmt(stmt),
 
-    fn lower_net_assign(&mut self, net_assign: &ast::NetAssignment) -> Option<Assign> {
-        let lhs = self.lower_net_lvalue(&net_assign.net_lvalue()?)?;
-        let rhs = self.lower_expr(&net_assign.expression()?);
-        let op = AssignOp::Assign;
-        Some(Assign { lhs, rhs, op })
-    }
+            ConditionalStatement(stmt) => self.lower_cond_stmt(stmt),
+            CaseStatement(stmt) => self.lower_case_stmt(stmt),
 
-    fn lower_var_assign(&mut self, var_assign: &ast::VariableAssignment) -> Option<Assign> {
-        let lhs = self.lower_var_lvalue(&var_assign.variable_lvalue()?)?;
-        let rhs = self.lower_expr(&var_assign.expression()?);
-        let op = AssignOp::Assign;
-        Some(Assign { lhs, rhs, op })
-    }
+            ReturnStatement(stmt) => self.lower_return_stmt(stmt),
+            DoWhileStatement(stmt) => self.lower_do_while_stmt(stmt),
+            ForeverStatement(stmt) => self.lower_forever_stmt(stmt),
+            LoopStatement(stmt) => self.lower_loop_stmt(stmt),
+            JumpStatement(stmt) => self.lower_jump_stmt(stmt),
+            ForLoopStatement(stmt) => self.lower_for_loop_stmt(stmt),
 
-    fn lower_op_assign(&mut self, op_assign: &ast::OperatorAssignment) -> Option<Assign> {
-        let lhs = self.lower_var_lvalue(&op_assign.variable_lvalue()?)?;
-        let rhs = self.lower_expr(&op_assign.expression()?);
-        let op = try_match! {
-            op_assign.assignment_operator(), op => {
-                expr::lower_assign_op(&op)?
-            },
-            _ => { return None; }
+            BlockStatement(stmt) => self.lower_block_stmt(stmt),
+
+            EmptyStatement(stmt) => StmtKind::Empty,
+            _ => unimplemented!("lower_stmt: {:?}", stmt.syntax().kind()),
         };
-        Some(Assign { lhs, rhs, op })
+
+        Stmt { label, kind }
     }
 
-    fn lower_block_item_decl(&mut self, item: &ast::BlockItemDeclaration) -> Option<BlockItemDecl> {
-        try_match! {
-            item.data_declaration(), data_decl => {
-                Some(BlockItemDecl::DataDecl(self.lower_data_decl(&data_decl)?))
-            },
-            item.any_parameter_declaration(), any_param_decl => {
-                Some(BlockItemDecl::DataDecl(self.lower_any_param_decl(&any_param_decl)?))
-            },
-            _ => None,
-        }
+    fn lower_expr_stmt(&mut self, stmt: ast::ExpressionStatement) -> StmtKind {
+        let expr = self.expr_ctx().lower_expr(stmt.expr());
+        StmtKind::Expr(expr)
     }
 
-    fn lower_seq_block(&mut self, block: &ast::SeqBlock) -> Option<Idx<BlockInfo>> {
-        let ident = block.identifiers().next().and_then(|ident| self.lower_ident(&ident));
-        let block_id = self.db().intern_block(BlockLoc {
-            container_id: self.container_id().into(),
-            block_src: self.in_file(LocalBlockSrc::SeqBlock(block.to_ptr())),
+    fn lower_assign_stmt(&mut self, stmt: ast::ProceduralAssignStatement) -> StmtKind {
+        let expr = self.expr_ctx().lower_expr(stmt.expr());
+
+        use ast::ProceduralAssignStatement::*;
+        let kind = match stmt {
+            ProceduralForceStatement(_) => ProcAssignKind::Force(expr),
+            ProceduralAssignStatement(_) => ProcAssignKind::Assign(expr),
+        };
+
+        StmtKind::ProcAssign(kind)
+    }
+
+    fn lower_deassign_stmt(&mut self, stmt: ast::ProceduralDeassignStatement) -> StmtKind {
+        let expr = self.expr_ctx().lower_expr(stmt.variable());
+
+        use ast::ProceduralDeassignStatement::*;
+        let kind = match stmt {
+            ProceduralDeassignStatement(_) => ProcAssignKind::Deassign(expr),
+            ProceduralReleaseStatement(_) => ProcAssignKind::Release(expr),
+        };
+
+        StmtKind::ProcAssign(kind)
+    }
+
+    fn lower_forever_stmt(&mut self, stmt: ast::ForeverStatement) -> StmtKind {
+        let stmt = self.lower_stmt(stmt.statement());
+        StmtKind::Forever(stmt)
+    }
+
+    fn lower_do_while_stmt(&mut self, stmt: ast::DoWhileStatement) -> StmtKind {
+        let expr = self.expr_ctx().lower_expr(stmt.expr());
+        let stmt = self.lower_stmt(stmt.statement());
+        StmtKind::DoWhile(stmt, expr)
+    }
+
+    fn lower_for_loop_stmt(&mut self, stmt: ast::ForLoopStatement) -> StmtKind {
+        let mut initializers = stmt.initializers().children().peekable();
+
+        let inits = match initializers.peek().map(|init| init.syntax().kind()) {
+            Some(SyntaxKind::FOR_VARIABLE_DECLARATION) => {
+                let mut ty = None;
+                let mut inits = SmallVec::new();
+                let next_stmt_id = arena_nxt_idx(self.stmts).into();
+                for init in initializers {
+                    let init = ast::ForVariableDeclaration::cast(init.syntax()).unwrap();
+                    if let Some(ast_ty) = init.type_() {
+                        ty = Some(self.expr_ctx().lower_data_ty(ast_ty));
+                    }
+                    let decl = self.decl_ctx().lower_declarator(init.declarator(), next_stmt_id);
+                    inits.push((ty.unwrap(), decl));
+                }
+                ForInit::Init(inits)
+            }
+            Some(SyntaxKind::ASSIGNMENT_EXPRESSION) => {
+                let inits = initializers
+                    .map(|init| {
+                        let expr = ast::Expression::cast(init.syntax()).unwrap();
+                        self.expr_ctx().lower_expr(expr)
+                    })
+                    .collect();
+                ForInit::Assign(inits)
+            }
+            None => ForInit::Assign(SmallVec::new()),
+            _ => unreachable!(),
+        };
+
+        let stop = self.expr_ctx().lower_expr_opt(stmt.stop_expr());
+        let steps = stmt.steps().children().map(|step| self.expr_ctx().lower_expr(step)).collect();
+        let stmt = self.lower_stmt(stmt.statement());
+
+        StmtKind::For { inits, stop, steps, stmt }
+    }
+
+    fn lower_return_stmt(&mut self, stmt: ast::ReturnStatement) -> StmtKind {
+        let expr = stmt.return_value().map(|expr| self.expr_ctx().lower_expr(expr));
+        StmtKind::Jump(JumpKind::Return(expr))
+    }
+
+    fn lower_loop_stmt(&mut self, stmt: ast::LoopStatement) -> StmtKind {
+        let expr = self.expr_ctx().lower_expr(stmt.expr());
+        let stmt = self.lower_stmt(stmt.statement());
+        StmtKind::While(expr, stmt)
+    }
+
+    fn lower_wait_stmt(&mut self, stmt: ast::WaitStatement) -> StmtKind {
+        let expr = self.expr_ctx().lower_expr(stmt.expr());
+        let stmt = self.lower_stmt(stmt.statement());
+        StmtKind::Wait(WaitKind::Wait(expr), stmt)
+    }
+
+    fn lower_disable_stmt(&mut self, stmt: ast::DisableStatement) -> StmtKind {
+        let name = ast::Expression::cast(stmt.name().syntax()).unwrap();
+        let name = self.expr_ctx().lower_expr(name);
+        StmtKind::Disable(DisableKind::Disable(name))
+    }
+
+    fn lower_jump_stmt(&mut self, stmt: ast::JumpStatement) -> StmtKind {
+        let kind = match stmt.break_or_continue().unwrap().kind() {
+            TokenKind::BREAK_KEYWORD => JumpKind::Break,
+            TokenKind::CONTINUE_KEYWORD => JumpKind::Continue,
+            _ => unreachable!(),
+        };
+        StmtKind::Jump(kind)
+    }
+
+    fn lower_cond_stmt(&mut self, stmt: ast::ConditionalStatement) -> StmtKind {
+        let unique_priority = lower_unique_or_priority(stmt.unique_or_priority());
+        let pred = stmt
+            .predicate()
+            .conditions()
+            .children()
+            .map(|cond| self.expr_ctx().lower_expr(cond.expr()))
+            .collect();
+        let then_stmt = self.lower_stmt(stmt.statement());
+        let else_stmt = stmt.else_clause().map(|clause| {
+            let clause = ast::Statement::cast(clause.clause().syntax());
+            self.lower_stmt_opt(clause)
         });
-        let idx = self.arena_blocks().alloc(BlockInfo { ident, block_id });
-        let src = self.in_file(LocalBlockSrc::SeqBlock(block.to_ptr()));
-        self.src_map_blocks().insert(src, idx);
-        Some(idx)
+        StmtKind::Cond { unique_priority, pred, then_stmt, else_stmt }
     }
 
-    fn lower_par_block(&mut self, block: &ast::ParBlock) -> Option<Idx<BlockInfo>> {
-        let ident = block.identifiers().next().and_then(|ident| self.lower_ident(&ident));
-        let block_id = self.db().intern_block(BlockLoc {
-            container_id: self.container_id().into(),
-            block_src: self.in_file(LocalBlockSrc::ParBlock(block.to_ptr())),
+    fn lower_timing_ctrl_stmt(&mut self, stmt: ast::TimingControlStatement) -> StmtKind {
+        let timing_control = self.event_expr_ctx().lower_timing_control(stmt.timing_control());
+        let stmt = self.lower_stmt(stmt.statement());
+        StmtKind::TimingCtrl(timing_control, stmt)
+    }
+
+    fn lower_case_stmt(&mut self, stmt: ast::CaseStatement) -> StmtKind {
+        let unique_priority = lower_unique_or_priority(stmt.unique_or_priority());
+
+        let case = stmt.case_keyword().map(|case| match case.kind() {
+            TokenKind::CASE_KEYWORD => CaseKeyword::Case,
+            TokenKind::CASE_Z_KEYWORD => CaseKeyword::Casez,
+            TokenKind::CASE_X_KEYWORD => CaseKeyword::Casex,
+            _ => unreachable!(),
         });
-        let idx = self.arena_blocks().alloc(BlockInfo { ident, block_id });
-        let src = self.in_file(LocalBlockSrc::ParBlock(block.to_ptr()));
-        self.src_map_blocks().insert(src, idx);
-        Some(idx)
+
+        let expr = self.expr_ctx().lower_expr(stmt.expr());
+
+        let items = stmt
+            .items()
+            .children()
+            .map(|item| {
+                use ast::CaseItem::*;
+                match item {
+                    DefaultCaseItem(item) => {
+                        let clause = ast::Statement::cast(item.clause().syntax());
+                        let default = self.lower_stmt_opt(clause);
+                        CaseItem::Default(default)
+                    }
+                    StandardCaseItem(item) => {
+                        let exprs = item
+                            .expressions()
+                            .children()
+                            .map(|expr| self.expr_ctx().lower_expr(expr))
+                            .collect();
+                        let clause =
+                            self.lower_stmt_opt(ast::Statement::cast(item.clause().syntax()));
+                        CaseItem::Case { exprs, clause }
+                    }
+                    PatternCaseItem(item) => unimplemented!("PatternCaseItem"),
+                }
+            })
+            .collect();
+
+        StmtKind::Case { unique_priority, case, expr, items }
+    }
+
+    fn lower_block_stmt(&mut self, stmt: ast::BlockStatement) -> StmtKind {
+        let loc = BlockLoc { cont_id: self.cont_id, src: InFile::new(self.file_id, stmt.into()) };
+        let block_id = self.db.intern_block(loc);
+        let name = stmt.block_name().and_then(|name| lower_ident_opt(name.name()));
+        StmtKind::Block(BlockInfo { name, block_id })
+    }
+
+    fn alloc_missing(&mut self) -> StmtId {
+        self.stmts.alloc(Stmt { label: None, kind: StmtKind::Empty })
+    }
+}
+
+fn lower_unique_or_priority(up: Option<SyntaxToken>) -> Option<UniquePriority> {
+    match up?.kind() {
+        TokenKind::UNIQUE_KEYWORD => Some(UniquePriority::Unique),
+        TokenKind::UNIQUE_0_KEYWORD => Some(UniquePriority::Unique0),
+        TokenKind::PRIORITY_KEYWORD => Some(UniquePriority::Priority),
+        TokenKind::UNKNOWN => None,
+        _ => unreachable!(),
     }
 }

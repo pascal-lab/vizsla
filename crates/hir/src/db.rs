@@ -1,15 +1,14 @@
 use base_db::{impl_intern_key, impl_intern_lookup, salsa, source_db::SourceDb};
-use syntax::parse::SyntaxTree;
+use syntax::SyntaxTree;
 use triomphe::Arc;
 
 use crate::{
     file::HirFileId,
     hir_def::{
-        self,
         block::{self, Block, BlockId, BlockLoc, BlockSourceMap},
-        data::{DataType, TypeId},
-        module::{self, Module, ModuleSourceMap},
-        FileSourceMap, HirFile, ModuleId,
+        expr::data_ty::{BuiltinDataTy, BuiltinDataTyId},
+        file::{self, FileSourceMap, HirFile},
+        module::{self, Module, ModuleId, ModuleSourceMap},
     },
     scope::{BlockScope, ModuleScope, UnitScope},
 };
@@ -25,22 +24,21 @@ macro_rules! impl_intern {
 #[salsa::query_group(InternDbStorage)]
 pub trait InternDb: SourceDb {
     #[salsa::interned]
-    fn intern_block(&self, loc: BlockLoc) -> BlockId;
+    fn intern_ty(&self, ty: BuiltinDataTy) -> BuiltinDataTyId;
 
     #[salsa::interned]
-    fn intern_ty(&self, ty: DataType) -> TypeId;
+    fn intern_block(&self, block: BlockLoc) -> BlockId;
 }
 
+impl_intern!(BuiltinDataTyId, BuiltinDataTy, intern_ty, lookup_intern_ty);
 impl_intern!(BlockId, BlockLoc, intern_block, lookup_intern_block);
-impl_intern!(TypeId, DataType, intern_ty, lookup_intern_ty);
 
 #[salsa::query_group(HirDbStorage)]
 pub trait HirDb: InternDb {
-    fn hir_syntax_tree(&self, file_id: HirFileId) -> Option<Arc<SyntaxTree>>;
+    #[salsa::transparent]
+    fn parse(&self, file_id: HirFileId) -> SyntaxTree;
 
-    fn hir_file_text(&self, file_id: HirFileId) -> Arc<str>;
-
-    #[salsa::invoke(hir_def::hir_file_with_source_map_query)]
+    #[salsa::invoke(file::hir_file_with_source_map_query)]
     fn hir_file_with_source_map(&self, file_id: HirFileId) -> (Arc<HirFile>, Arc<FileSourceMap>);
 
     fn hir_file(&self, file_id: HirFileId) -> Arc<HirFile>;
@@ -65,12 +63,8 @@ pub trait HirDb: InternDb {
     fn block_scope(&self, block_id: BlockId) -> Arc<BlockScope>;
 }
 
-pub fn hir_syntax_tree(db: &dyn HirDb, file_id: HirFileId) -> Option<Arc<SyntaxTree>> {
-    db.syntax_tree(file_id.0)
-}
-
-pub fn hir_file_text(db: &dyn HirDb, file_id: HirFileId) -> Arc<str> {
-    db.file_text(file_id.0)
+fn parse(db: &dyn HirDb, file_id: HirFileId) -> SyntaxTree {
+    db.parse_src(file_id.0)
 }
 
 fn hir_file(db: &dyn HirDb, file_id: HirFileId) -> Arc<HirFile> {

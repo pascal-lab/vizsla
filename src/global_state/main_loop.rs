@@ -2,20 +2,19 @@ use std::time::{Duration, Instant};
 
 use always_assert::always;
 use const_format::formatcp;
-use crossbeam_channel::{select, Receiver};
+use crossbeam_channel::{Receiver, select};
 use lsp_server::{Connection, Message, Notification, Request, Response};
 use lsp_types::notification::Notification as _;
 use project_model::project_manifest;
 use triomphe::Arc;
-use utils::text_edit::SourceEditKind;
-use vfs::vfs_path::VfsPath;
+use vfs::{VfsPath, loader as vfs_loader};
 
 use super::{
+    GlobalState, VfsProgress,
     dispatcher::{NotifDispatcher, ReqDispatcher},
     lsp_handlers,
     reload::FetchWorkspaceProgress,
     respond::Progress,
-    GlobalState, VfsProgress,
 };
 use crate::config::Config;
 
@@ -23,7 +22,7 @@ use crate::config::Config;
 enum Event {
     Lsp(Message),
     Task(Task),
-    Vfs(vfs::loader::Message),
+    Vfs(vfs_loader::Message),
 }
 
 #[derive(Debug)]
@@ -178,7 +177,10 @@ impl GlobalState {
 
         use lsp_handlers::request::*;
         use lsp_types::request::*;
-        dispatcher.on::<GotoDefinition>(handle_goto_definition).finish();
+        dispatcher
+            .on::<GotoDefinition>(handle_goto_definition)
+            .on::<DocumentSymbolRequest>(handle_document_symbol)
+            .finish();
     }
 
     fn handle_notification(&mut self, notif: Notification) -> anyhow::Result<()> {
@@ -251,7 +253,7 @@ impl GlobalState {
         }
     }
 
-    fn handle_vfs_msg(&mut self, msg: vfs::loader::Message) {
+    fn handle_vfs_msg(&mut self, msg: vfs_loader::Message) {
         self.process_vfs_msg(msg);
 
         // Coalesce task events in one turn
@@ -260,9 +262,9 @@ impl GlobalState {
         }
     }
 
-    fn process_vfs_msg(&mut self, msg: vfs::loader::Message) {
+    fn process_vfs_msg(&mut self, msg: vfs_loader::Message) {
         match msg {
-            vfs::loader::Message::Progress { n_total, n_done, config_version } => {
+            vfs_loader::Message::Progress { n_total, n_done, config_version } => {
                 always!(config_version <= self.vfs_config_version);
 
                 self.vfs_progress = VfsProgress { config_version, n_done, n_total };
@@ -284,13 +286,13 @@ impl GlobalState {
                     None,
                 );
             }
-            vfs::loader::Message::Loaded { files } => {
+            vfs_loader::Message::Loaded { files } => {
                 let vfs = &mut self.vfs.write().0;
 
                 for (path, content) in files {
                     let path = VfsPath::from(path);
                     if !self.mem_docs.contains(&path) {
-                        vfs.set_file_contents(&path, content, SourceEditKind::Full);
+                        vfs.set_file_contents(&path, content);
                     }
                 }
             }

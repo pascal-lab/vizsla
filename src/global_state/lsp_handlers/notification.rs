@@ -7,15 +7,13 @@ use lsp_types::{
     DidSaveTextDocumentParams,
 };
 use triomphe::Arc;
-use utils::{
-    lines::{LineEnding, LineInfo, PositionEncoding},
-    text_edit::{SourceEdit, SourceEditKind, SourcePoint},
-};
+use utils::lines::{LineEnding, LineInfo, PositionEncoding};
+use vfs::loader::LoadResult;
 
 use crate::{
-    global_state::{mem_docs::DocumentData, reload, GlobalState},
-    lsp_ext::from_proto,
     DEFAULT_PROCESS_NAME,
+    global_state::{GlobalState, mem_docs::DocumentData, reload},
+    lsp_ext::from_proto,
 };
 
 pub(crate) fn handle_cancel(
@@ -43,8 +41,8 @@ pub(crate) fn handle_did_open_text_document(
             tracing::error!("duplicate DidOpenTextDocument: {}", path);
         }
 
-        let (text, line_ending) = LineEnding::normalize(params.text_document.text);
-        state.vfs.write().0.set_file_contents(&path, Ok((text, line_ending)), SourceEditKind::Full);
+        let (text, endings) = LineEnding::normalize(params.text_document.text);
+        state.vfs.write().0.set_file_contents(&path, LoadResult::Loaded(text, endings));
     }
     Ok(())
 }
@@ -67,17 +65,18 @@ pub(crate) fn handle_did_change_text_document(
             }
         };
 
-        let (text, edits) = apply_document_changes(
+        let text = apply_document_changes(
             state.config.position_encoding(),
             mem::take(data),
             params.content_changes,
         );
-        // TODO: we can calculate the line ending from the edits to speed up
-        let (text, line_ending) = LineEnding::normalize(text);
 
-        data.clone_from(&text);
+        let (text, endings) = LineEnding::normalize(text);
 
-        state.vfs.write().0.set_file_contents(&path, Ok((text, line_ending)), edits);
+        if *data != text {
+            *data = text.clone();
+            state.vfs.write().0.set_file_contents(&path, LoadResult::Loaded(text, endings));
+        }
     }
     Ok(())
 }
@@ -198,35 +197,33 @@ pub(crate) fn handle_workspace_reload(state: &mut GlobalState, _: ()) -> anyhow:
 fn apply_document_changes(
     encoding: PositionEncoding,
     file_contents: String,
-    mut content_changes: Vec<lsp_types::TextDocumentContentChangeEvent>,
-) -> (String, SourceEditKind) {
+    content_changes: Vec<lsp_types::TextDocumentContentChangeEvent>,
+) -> String {
     // Skip to the last full document change and peek at the first content change
     let (mut text, content_changes) = {
-        let last_full_change = content_changes.iter().rposition(|change| change.range.is_none());
-        if let Some(idx) = last_full_change {
-            (mem::take(&mut content_changes[idx].text), &content_changes[idx + 1..])
-        } else {
-            (file_contents, &content_changes[..])
+        match content_changes.iter().rposition(|change| change.range.is_none()) {
+            Some(idx) => {
+                let (text, rest) = content_changes.split_at(idx + 1);
+                (text[idx].text.clone(), rest)
+            }
+            None => (file_contents.clone(), &content_changes[..]),
         }
     };
 
     if content_changes.is_empty() {
-        return (text, SourceEditKind::Edits(vec![]));
+        return text;
     }
 
     // The changes can cross lines so we have to keep our line index updated.
     // Here's an optimization: we only rebuild the index if we have to, iff
     // the change's start line is greater than the last valid line.
     // The VFS will normalize the end of lines to `\n`.
-    // TODO: make line_info incremental?
     let mut line_info = LineInfo {
         index: Arc::new(LineIndex::new(&text)),
         // We don't care about line endings here.
         ending: LineEnding::Unix,
         encoding,
     };
-
-    let mut edits = vec![];
 
     // set to infinity at first, to avoid rebuilding the index on the first change
     let mut index_valid_until = !0u32;
@@ -237,21 +234,9 @@ fn apply_document_changes(
             *Arc::make_mut(&mut line_info.index) = LineIndex::new(&text);
         }
         index_valid_until = range.start.line;
-        // TODO: Use rope for better performance?
         if let Ok(range) = from_proto::text_range(&line_info, range) {
-            // TODO: The positions is not correct, but it doesn't matter for now.
-            // Maybe we should fix it?
-            let range = Range::<usize>::from(range);
-            edits.push(SourceEdit {
-                start_byte: range.start,
-                old_end_byte: range.end,
-                new_end_byte: range.start + change.text.len(),
-                start_position: SourcePoint { row: 0, column: 0 },
-                old_end_position: SourcePoint { row: 0, column: 0 },
-                new_end_position: SourcePoint { row: 0, column: 0 },
-            });
-            text.replace_range(range, &change.text);
+            text.replace_range(Range::<usize>::from(range), &change.text);
         }
     }
-    (text, SourceEditKind::Edits(edits))
+    text
 }

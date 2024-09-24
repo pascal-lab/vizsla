@@ -3,7 +3,7 @@ use base_db::source_root::SourceRootConfig;
 use itertools::Itertools;
 use triomphe::Arc;
 use utils::paths::AbsPathBuf;
-use vfs::{file_set::FileSetConfig, vfs_path::VfsPath};
+use vfs::{FileSetConfig, VfsPath};
 
 use crate::{project_manifest::ProjectManifest, toml_workspace::TomlWorkspace};
 

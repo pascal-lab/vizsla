@@ -4,8 +4,7 @@ use base_db::{
     salsa::{self, Durability},
     source_db::{FileLoader, SourceDb, SourceRootDb},
 };
-use triomphe::Arc;
-use vfs::{anchored_path::AnchoredPath, vfs::FileId};
+use vfs::{FileId, anchored_path::AnchoredPath};
 
 use crate::line_index_db::LineIndexDbStorage;
 
@@ -37,10 +36,6 @@ impl fmt::Debug for RootDb {
 }
 
 impl FileLoader for RootDb {
-    fn file_text(&self, file_id: FileId) -> Arc<str> {
-        SourceRootDb::file_text(self, file_id)
-    }
-
     fn resolve_path(&self, path: AnchoredPath<'_>) -> Option<FileId> {
         let source_root_id = SourceRootDb::source_root_id(self, path.anchor_id);
         let source_root = SourceRootDb::source_root(self, source_root_id);

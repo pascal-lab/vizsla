@@ -14,12 +14,6 @@ pub enum LineEnding {
     Dos,
 }
 
-pub struct LineInfo {
-    pub index: Arc<LineIndex>,
-    pub ending: LineEnding,
-    pub encoding: PositionEncoding,
-}
-
 impl LineEnding {
     /// Replaces `\r\n` with `\n` in-place in `src`.
     pub fn normalize(src: String) -> (String, LineEnding) {
@@ -62,4 +56,10 @@ impl LineEnding {
         };
         (src, LineEnding::Dos)
     }
+}
+
+pub struct LineInfo {
+    pub index: Arc<LineIndex>,
+    pub ending: LineEnding,
+    pub encoding: PositionEncoding,
 }

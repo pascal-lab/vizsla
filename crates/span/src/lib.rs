@@ -1,6 +1,7 @@
 use la_arena::Idx;
+use syntax::ptr::SyntaxNodePtr;
 use utils::text_edit::{TextRange, TextSize};
-use vfs::vfs::FileId;
+use vfs::FileId;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct FilePosition {
@@ -26,4 +27,4 @@ impl<T> RangeInfo<T> {
     }
 }
 
-pub type ErasedFileAstId = Idx<syntax::SyntaxNodePtr>;
+pub type ErasedFileAstId = Idx<SyntaxNodePtr>;
