@@ -194,6 +194,7 @@ impl ToNav for InContainer<StmtId> {
     }
 }
 
+#[inline]
 fn build_nav_target<'a>(
     file_id: FileId,
     node: impl HasName<'a>,

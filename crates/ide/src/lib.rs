@@ -1,4 +1,5 @@
 #![feature(try_blocks)]
+#![feature(let_chains)]
 
 pub use base_db::Cancelled;
 pub type Cancellable<T> = Result<T, Cancelled>;

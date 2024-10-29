@@ -8,11 +8,11 @@ use crate::{
         block::{BlockId, BlockSrc},
         module::{ModuleId, ModuleSrc},
     },
-    source_map::ToAstNode,
+    source_map::{IsSrc, ToAstNode},
 };
 
 pub trait HasSource {
-    type AstPtr: for<'a> ToAstNode<'a>;
+    type AstPtr: IsSrc;
 
     fn source(&self, db: &dyn HirDb) -> Option<InFile<Self::AstPtr>>;
 }

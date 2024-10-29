@@ -8,7 +8,6 @@ base-db.workspace = true
 hashbrown = { version = "0.12.3", features = ["inline-more"], default-features = false }
 itertools.workspace = true
 la-arena.workspace = true
-paste.workspace = true
 rustc-hash.workspace = true
 salsa.workspace = true
 smallvec.workspace = true

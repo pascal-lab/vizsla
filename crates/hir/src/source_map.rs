@@ -2,6 +2,7 @@ use std::{fmt::Debug, hash::Hash};
 
 pub(crate) use la_arena::{ArenaMap, Idx};
 use rustc_hash::FxHashMap;
+use syntax::ast::AstNode;
 use triomphe::Arc;
 pub(crate) use utils::get::Get;
 use utils::get::GetRef;
@@ -48,6 +49,21 @@ impl<Src: IsSrc, Hir> Default for SourceMap<Src, Hir> {
     }
 }
 
+#[inline]
+pub fn get_by_src<'a, Hir, HirIdx, Src, A, S>(
+    arena: &'a Arc<A>,
+    src_map: &'a Arc<S>,
+    src: Src,
+) -> &'a Hir
+where
+    Src: IsSrc,
+    A: GetRef<HirIdx, Output = Hir>,
+    S: Get<Src, Output = HirIdx>,
+{
+    let idx = src_map.get(src);
+    arena.get(idx)
+}
+
 #[macro_export]
 macro_rules! impl_source_map_idx {
     ($datas:ident => $($fld:ident[$src:ty, $hir_id:ty]),+ $(,)? ) => {
@@ -69,25 +85,8 @@ macro_rules! impl_source_map_idx {
     };
 }
 
-#[inline]
-pub fn get_by_src<'a, Hir, HirIdx, Src, A, S>(
-    arena: &'a Arc<A>,
-    src_map: &'a Arc<S>,
-    src: Src,
-) -> &'a Hir
-where
-    Src: IsSrc,
-    A: GetRef<HirIdx, Output = Hir>,
-    S: Get<Src, Output = HirIdx>,
-{
-    let idx = src_map.get(src);
-    arena.get(idx)
-}
-
-pub trait ToAstNode<'a> {
-    type AstNode;
-
-    fn to_node(&self, tree: &'a syntax::SyntaxTree) -> Option<Self::AstNode>;
+pub trait ToAstNode<'a, Output: AstNode<'a>> {
+    fn to_node(&self, tree: &'a syntax::SyntaxTree) -> Option<Output>;
 }
 
 #[macro_export]
@@ -98,15 +97,13 @@ macro_rules! define_src {
 
         impl $crate::source_map::IsSrc for $name {}
 
-        impl<'a> $crate::source_map::ToAstNode<'a> for $name {
-            type AstNode = ast::$ty<'a>;
-
-            fn to_node(&self, tree: &'a syntax::SyntaxTree) -> Option<Self::AstNode> {
+        impl<'a> $crate::source_map::ToAstNode<'a, ast::$ty<'a>> for $name {
+            fn to_node(&self, tree: &'a syntax::SyntaxTree) -> Option<ast::$ty<'a>> {
                 let mut node = self.0.to_node(tree)?;
-                while !<Self::AstNode as syntax::ast::AstNode>::can_cast(node.kind()) && node.child_count() == 1 {
+                while !<ast::$ty<'a> as syntax::ast::AstNode>::can_cast(node.kind()) && node.child_count() == 1 {
                     node = node.child_node(0).unwrap();
                 }
-                <Self::AstNode as syntax::ast::AstNode>::cast(node)
+                <ast::$ty<'a> as syntax::ast::AstNode>::cast(node)
             }
         }
 
@@ -127,18 +124,16 @@ macro_rules! define_src {
 
         impl $crate::source_map::IsSrc for $name {}
 
-        paste::item! {
-            impl $name {
-                $(
-                pub fn [<to_ $ty:lower _expr>]<'a>(&self, tree: &'a syntax::SyntaxTree) -> Option<ast::$ty<'a>> {
+        $(
+            impl<'a> $crate::source_map::ToAstNode<'a, ast::$ty<'a>> for $name {
+                fn to_node(&self, tree: &'a syntax::SyntaxTree) -> Option<ast::$ty<'a>> {
                     match self {
                         $name::$ty(ptr) => syntax::ast::AstNode::cast(ptr.to_node(tree)?),
                         _ => None,
                     }
                 }
-                )*
             }
-        }
+        )*
 
         $(
             impl From<ast::$ty<'_>> for $name {
