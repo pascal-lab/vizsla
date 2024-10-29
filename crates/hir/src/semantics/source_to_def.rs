@@ -26,7 +26,7 @@ impl Source2DefCtx<'_> {
         InFile { cont_id: file_id, value: src }: InFile<ModuleSrc>,
     ) -> Option<ModuleId> {
         let (_, file_source_map) = self.db.hir_file_with_source_map(file_id);
-        Some(ModuleId::new(file_id, file_source_map.modules.get(&src)))
+        Some(ModuleId::new(file_id, file_source_map.modules.get(src)))
     }
 
     pub(super) fn block_to_def(
@@ -51,18 +51,18 @@ impl Source2DefCtx<'_> {
         let block_id = match container {
             ContainerId::HirFileId(file_id) => {
                 let (file, file_src_map) = self.db.hir_file_with_source_map(file_id);
-                let local_block_id = file_src_map.get(&block_src);
-                file.get(&local_block_id).block_id
+                let local_block_id = file_src_map.get(block_src);
+                file.get(local_block_id).block_id
             }
             ContainerId::ModuleId(module_id) => {
                 let (module, module_src_map) = self.db.module_with_source_map(module_id);
-                let local_block_id = module_src_map.get(&block_src);
-                module.get(&local_block_id).block_id
+                let local_block_id = module_src_map.get(block_src);
+                module.get(local_block_id).block_id
             }
             ContainerId::BlockId(block_id) => {
                 let (block, block_src_map) = self.db.block_with_source_map(block_id);
-                let local_block_id = block_src_map.get(&block_src);
-                block.get(&local_block_id).block_id
+                let local_block_id = block_src_map.get(block_src);
+                block.get(local_block_id).block_id
             }
         };
 

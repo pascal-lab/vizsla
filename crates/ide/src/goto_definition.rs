@@ -2,8 +2,7 @@ use hir::semantics::Semantics;
 use ide_db::root_db::RootDb;
 use itertools::Itertools;
 use span::{FilePosition, RangeInfo};
-use syntax::{SyntaxNodeExt, TokenKind, ast::AstNode};
-use utils::text_edit::SourceRangeExt;
+use syntax::{ast::AstNode, has_text_range::HasTextRange, SyntaxNodeExt, TokenKind};
 
 use crate::{
     definitions::Definition,
@@ -22,7 +21,7 @@ pub(crate) fn goto_definition(
         .map(|def| def.to_nav(db))
         .unique()
         .collect_vec();
-    Some(RangeInfo::new(token.range()?.to_text_range(), navs))
+    Some(RangeInfo::new(token.text_range()?, navs))
 }
 
 fn token_precedence(kind: TokenKind) -> usize {

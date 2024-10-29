@@ -220,11 +220,10 @@ impl LowerFileCtx<'_> {
             use ast::Member::*;
             let idx = match member {
                 ModuleDeclaration(decl) => {
-                    let header = decl.header();
-                    let ident = lower_ident(header.name()).unwrap_or_default();
+                    let name = lower_ident(decl.header().name());
 
                     alloc_idx_and_src! {
-                        ModuleInfo { ident } => self.file.modules,
+                        ModuleInfo { name } => self.file.modules,
                         decl => self.file_source_map.modules,
                     }
                     .into()

@@ -3,9 +3,8 @@ use slang::{
     SyntaxElement, SyntaxElementKind, SyntaxKind, SyntaxNode, SyntaxToken, SyntaxTokenWithParent,
     SyntaxTree, TokenKind,
 };
-use utils::text_edit::SourceRangeExt;
 
-use crate::SyntaxNodeExt;
+use crate::{SyntaxNodeExt, has_text_range::HasTextRange};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct SyntaxNodePtr {
@@ -16,8 +15,7 @@ pub struct SyntaxNodePtr {
 impl SyntaxNodePtr {
     #[inline]
     pub fn from_node(node: SyntaxNode) -> SyntaxNodePtr {
-        let range = node.range().unwrap().to_text_range();
-        SyntaxNodePtr { kind: node.kind(), range }
+        SyntaxNodePtr { kind: node.kind(), range: node.text_range().unwrap() }
     }
 
     #[inline]
@@ -40,8 +38,7 @@ pub struct SyntaxTokenPtr {
 
 impl SyntaxTokenPtr {
     pub fn from_token(token: SyntaxToken) -> SyntaxTokenPtr {
-        let range = token.range().unwrap().to_text_range();
-        SyntaxTokenPtr { kind: token.kind(), range }
+        SyntaxTokenPtr { kind: token.kind(), range: token.text_range().unwrap() }
     }
 
     pub fn to_token<'a>(&self, tree: &'a SyntaxTree) -> Option<SyntaxToken<'a>> {

@@ -2,7 +2,9 @@ use std::{fmt::Debug, hash::Hash};
 
 pub(crate) use la_arena::{ArenaMap, Idx};
 use rustc_hash::FxHashMap;
+use triomphe::Arc;
 pub(crate) use utils::get::Get;
+use utils::get::GetRef;
 
 pub trait IsSrc: PartialEq + Eq + Hash + Copy + Clone + Debug {}
 
@@ -27,16 +29,16 @@ impl<Src: IsSrc, Hir> SourceMap<Src, Hir> {
 impl<Src: IsSrc, Hir> Get<Src> for SourceMap<Src, Hir> {
     type Output = Idx<Hir>;
 
-    fn get_opt(&self, src: &Src) -> Option<Self::Output> {
-        self.src2hir.get(src).copied()
+    fn get_opt(&self, src: Src) -> Option<Self::Output> {
+        self.src2hir.get(&src).copied()
     }
 }
 
 impl<Src: IsSrc, Hir> Get<Idx<Hir>> for SourceMap<Src, Hir> {
     type Output = Src;
 
-    fn get_opt(&self, idx: &Idx<Hir>) -> Option<Self::Output> {
-        self.hir2src.get(*idx).copied()
+    fn get_opt(&self, idx: Idx<Hir>) -> Option<Self::Output> {
+        self.hir2src.get(idx).copied()
     }
 }
 
@@ -52,19 +54,34 @@ macro_rules! impl_source_map_idx {
         $(
             impl $crate::source_map::Get<$src> for $datas {
                 type Output = $hir_id;
-                fn get_opt(&self, src: &$src) -> Option<Self::Output> {
+                fn get_opt(&self, src: $src) -> Option<Self::Output> {
                     self.$fld.get_opt(src)
                 }
             }
 
             impl $crate::source_map::Get<$hir_id> for $datas {
                 type Output = $src;
-                fn get_opt(&self, idx: &$hir_id) -> Option<Self::Output> {
+                fn get_opt(&self, idx: $hir_id) -> Option<Self::Output> {
                     self.$fld.get_opt(idx)
                 }
             }
         )+
     };
+}
+
+#[inline]
+pub fn get_by_src<'a, Hir, HirIdx, Src, A, S>(
+    arena: &'a Arc<A>,
+    src_map: &'a Arc<S>,
+    src: Src,
+) -> &'a Hir
+where
+    Src: IsSrc,
+    A: GetRef<HirIdx, Output = Hir>,
+    S: Get<Src, Output = HirIdx>,
+{
+    let idx = src_map.get(src);
+    arena.get(idx)
 }
 
 pub trait ToAstNode<'a> {

@@ -169,7 +169,7 @@ impl Default for PortSrcs {
 impl Get<NonAnsiPortId> for PortSrcs {
     type Output = NonAnsiPortSrc;
 
-    fn get_opt(&self, port_id: &NonAnsiPortId) -> Option<Self::Output> {
+    fn get_opt(&self, port_id: NonAnsiPortId) -> Option<Self::Output> {
         match self {
             PortSrcs::NonAnsi { ports, .. } => ports.get_opt(port_id),
             PortSrcs::Ansi(_) => None,
@@ -180,7 +180,7 @@ impl Get<NonAnsiPortId> for PortSrcs {
 impl Get<NonAnsiPortSrc> for PortSrcs {
     type Output = NonAnsiPortId;
 
-    fn get_opt(&self, src: &NonAnsiPortSrc) -> Option<Self::Output> {
+    fn get_opt(&self, src: NonAnsiPortSrc) -> Option<Self::Output> {
         match self {
             PortSrcs::NonAnsi { ports, .. } => ports.get_opt(src),
             PortSrcs::Ansi(_) => None,
@@ -191,7 +191,7 @@ impl Get<NonAnsiPortSrc> for PortSrcs {
 impl Get<PortRefId> for PortSrcs {
     type Output = PortRefSrc;
 
-    fn get_opt(&self, port_ref_id: &PortRefId) -> Option<Self::Output> {
+    fn get_opt(&self, port_ref_id: PortRefId) -> Option<Self::Output> {
         match self {
             PortSrcs::NonAnsi { refs, .. } => refs.get_opt(port_ref_id),
             PortSrcs::Ansi(_) => None,
@@ -202,7 +202,7 @@ impl Get<PortRefId> for PortSrcs {
 impl Get<PortRefSrc> for PortSrcs {
     type Output = PortRefId;
 
-    fn get_opt(&self, src: &PortRefSrc) -> Option<Self::Output> {
+    fn get_opt(&self, src: PortRefSrc) -> Option<Self::Output> {
         match self {
             PortSrcs::NonAnsi { refs, .. } => refs.get_opt(src),
             PortSrcs::Ansi(_) => None,
@@ -213,7 +213,7 @@ impl Get<PortRefSrc> for PortSrcs {
 impl Get<AnsiPortId> for PortSrcs {
     type Output = AnsiPortSrc;
 
-    fn get_opt(&self, port_id: &AnsiPortId) -> Option<Self::Output> {
+    fn get_opt(&self, port_id: AnsiPortId) -> Option<Self::Output> {
         match self {
             PortSrcs::Ansi(ports) => ports.get_opt(port_id),
             PortSrcs::NonAnsi { .. } => None,
@@ -224,7 +224,7 @@ impl Get<AnsiPortId> for PortSrcs {
 impl Get<AnsiPortSrc> for PortSrcs {
     type Output = AnsiPortId;
 
-    fn get_opt(&self, src: &AnsiPortSrc) -> Option<Self::Output> {
+    fn get_opt(&self, src: AnsiPortSrc) -> Option<Self::Output> {
         match self {
             PortSrcs::Ansi(ports) => ports.get_opt(src),
             PortSrcs::NonAnsi { .. } => None,

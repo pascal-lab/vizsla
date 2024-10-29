@@ -64,25 +64,25 @@ impl From<BlockSrc> for StmtSrc {
 impl Get<LocalBlockId> for SourceMap<StmtSrc, Stmt> {
     type Output = BlockSrc;
 
-    fn get_opt(&self, block_id: &LocalBlockId) -> Option<Self::Output> {
+    fn get_opt(&self, block_id: LocalBlockId) -> Option<Self::Output> {
         let stmt_id = block_id.0;
-        Some(BlockSrc(self.get(&stmt_id).ptr()))
+        Some(BlockSrc(self.get(stmt_id).ptr()))
     }
 }
 
 impl Get<BlockSrc> for SourceMap<StmtSrc, Stmt> {
     type Output = LocalBlockId;
 
-    fn get_opt(&self, block_src: &BlockSrc) -> Option<Self::Output> {
-        let src: StmtSrc = (*block_src).into();
-        Some(LocalBlockId(self.get(&src)))
+    fn get_opt(&self, block_src: BlockSrc) -> Option<Self::Output> {
+        let src: StmtSrc = block_src.into();
+        Some(LocalBlockId(self.get(src)))
     }
 }
 
 impl GetRef<LocalBlockId> for Arena<Stmt> {
     type Output = BlockInfo;
 
-    fn get_opt(&self, block_id: &LocalBlockId) -> Option<&Self::Output> {
+    fn get_opt(&self, block_id: LocalBlockId) -> Option<&Self::Output> {
         let stmt_id = block_id.0;
         let Stmt { kind: StmtKind::Block(block_info), .. } = &self[stmt_id] else {
             unreachable!();

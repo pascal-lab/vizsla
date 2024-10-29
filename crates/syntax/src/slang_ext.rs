@@ -3,9 +3,8 @@ use slang::{
     SyntaxAncestors, SyntaxCursor, SyntaxElement, SyntaxNode, SyntaxTokenWithParent, TokenKind,
     ast::AstNode,
 };
-use utils::text_edit::SourceRangeExt;
 
-use crate::ptr::SyntaxNodePtr;
+use crate::{has_text_range::HasTextRange, ptr::SyntaxNodePtr};
 
 #[derive(Clone, Debug)]
 pub enum TokenAtOffset<'a> {
@@ -49,7 +48,7 @@ impl<'a> SyntaxNodeExt<'a> for SyntaxNode<'a> {
         let mut cursor = self.walk();
         loop {
             let elem = cursor.to_elem();
-            let range = elem.range()?.to_text_range();
+            let range = elem.text_range()?;
 
             if !(range.contains_inclusive(start) && range.contains_inclusive(end)) {
                 return None;
@@ -64,7 +63,7 @@ impl<'a> SyntaxNodeExt<'a> for SyntaxNode<'a> {
     }
 
     fn token_at_offset(&self, offset: TextSize) -> TokenAtOffset<'a> {
-        let range = self.range().unwrap().to_text_range();
+        let range = self.text_range().unwrap();
         debug_assert!(range.contains(offset));
         if range.is_empty() {
             return TokenAtOffset::None;
@@ -73,12 +72,12 @@ impl<'a> SyntaxNodeExt<'a> for SyntaxNode<'a> {
         let mut cursor = self.walk();
         cursor.goto_last_token_before_pos(offset);
         let left = cursor.to_tok_with_parent().unwrap();
-        let left_range = left.range().unwrap().to_text_range();
+        let left_range = left.text_range().unwrap();
 
         cursor.reset(*self);
         cursor.goto_first_token_after_pos(offset);
         let right = cursor.to_tok_with_parent().unwrap();
-        let right_range = right.range().unwrap().to_text_range();
+        let right_range = right.text_range().unwrap();
 
         if left_range.end() == right_range.start() {
             debug_assert!(left_range.contains_inclusive(offset));
@@ -121,7 +120,8 @@ impl SyntaxCursorExt for SyntaxCursor<'_> {
             return false;
         }
         while self.to_node().is_some() {
-            assert!(self.goto_first_child_after_pos(offset));
+            let success = self.goto_first_child_after_pos(offset);
+            debug_assert!(success);
         }
         debug_assert!(self.to_token().is_some());
         true
@@ -137,7 +137,8 @@ impl SyntaxCursorExt for SyntaxCursor<'_> {
         }
 
         while self.to_node().is_some() {
-            assert!(self.goto_last_child_before_pos(offset));
+            let success = self.goto_last_child_before_pos(offset);
+            debug_assert!(success);
         }
         debug_assert!(self.to_token().is_some());
         true

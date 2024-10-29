@@ -20,8 +20,8 @@ macro_rules! impl_arena_idx {
         impl $crate::hir_def::GetRef<$crate::hir_def::Idx<$ty>> for $data {
             type Output = $ty;
 
-            fn get_opt(&self, idx: &$crate::hir_def::Idx<$ty>) -> Option<&Self::Output> {
-                Some(&self.$fld[*idx])
+            fn get_opt(&self, idx: $crate::hir_def::Idx<$ty>) -> Option<&Self::Output> {
+                Some(&self.$fld[idx])
             }
         }
         impl_arena_idx!($data => $($rest)*);
@@ -30,7 +30,7 @@ macro_rules! impl_arena_idx {
         impl $crate::hir_def::GetRef<$id> for $data {
             type Output = $hir;
 
-            fn get_opt(&self, idx: &$id) -> Option<&Self::Output> {
+            fn get_opt(&self, idx: $id) -> Option<&Self::Output> {
                 self.$fld.get_opt(idx)
             }
         }

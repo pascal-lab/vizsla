@@ -42,7 +42,7 @@ pub(crate) fn document_symbol(
     symbol: ide::document_symbols::DocumentSymbol,
 ) -> lsp_types::DocumentSymbol {
     lsp_types::DocumentSymbol {
-        name: symbol.label,
+        name: symbol.name,
         detail: symbol.detail,
         kind: symbol_kind(symbol.kind),
         tags: None,
@@ -60,7 +60,7 @@ pub(crate) fn document_symbol_information(
     res: &mut Vec<lsp_types::SymbolInformation>,
 ) {
     res.push(lsp_types::SymbolInformation {
-        name: symbol.label,
+        name: symbol.name,
         kind: symbol_kind(symbol.kind),
         tags: None,
         deprecated: None,

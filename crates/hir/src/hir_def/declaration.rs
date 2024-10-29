@@ -1,4 +1,4 @@
-use la_arena::{Arena, Idx};
+use la_arena::{Arena, Idx, IdxRange};
 use smallvec::SmallVec;
 use syntax::{TokenKind, ast};
 use utils::define_enum_deriving_from;
@@ -36,12 +36,22 @@ define_enum_deriving_from! {
 pub type DeclarationId = Idx<Declaration>;
 define_src!(DeclarationSrc(ast::DataDeclaration, ast::NetDeclaration, ast::ParameterDeclaration));
 
+impl Declaration {
+    pub fn decls(&self) -> IdxRange<Declarator> {
+        match self {
+            Declaration::DataDecl(data_decl) => data_decl.decls.clone(),
+            Declaration::NetDecl(net_decl) => net_decl.decls.clone(),
+            Declaration::ParamDecl(param_decl) => param_decl.decls.clone(),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct DataDecl {
     pub ty: DataTy,
     pub const_kw: bool,
     pub var_kw: bool,
-    pub decls: SmallVec<[DeclId; 2]>,
+    pub decls: IdxRange<Declarator>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -50,7 +60,7 @@ pub struct NetDecl {
     pub net_kind: Option<NetKind>,
     pub delay: Option<DelayControl>,
     pub strength: Option<NetStrength>,
-    pub decls: SmallVec<[DeclId; 2]>,
+    pub decls: IdxRange<Declarator>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
@@ -63,7 +73,7 @@ pub enum NetStrength {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ParamDecl {
     pub ty: DataTy,
-    pub decls: SmallVec<[DeclId; 2]>,
+    pub decls: IdxRange<Declarator>,
 }
 
 pub(crate) struct LowerDeclarationCtx<'a> {
@@ -128,12 +138,16 @@ impl LowerDeclarationCtx<'_> {
 
         let ty = self.expr_ctx().lower_data_ty(data_decl.type_());
 
-        let next_declaration_idx = arena_nxt_idx(self.declarations).into();
-        let decls = data_decl
-            .declarators()
-            .children()
-            .map(|decl| self.decl_ctx().lower_declarator(decl, next_declaration_idx))
-            .collect();
+        let decls = {
+            let next_declaration_idx = arena_nxt_idx(self.declarations).into();
+            let start = arena_nxt_idx(self.decls).into();
+            for decl in data_decl.declarators().children() {
+                self.decl_ctx().lower_declarator(decl, next_declaration_idx);
+            }
+            let end = arena_nxt_idx(self.decls).into();
+            IdxRange::new(start..end)
+        };
+
         alloc_idx_and_src! {
             DataDecl { ty, const_kw, var_kw, decls } => self.declarations,
             data_decl => self.declaration_srcs,
@@ -150,12 +164,17 @@ impl LowerDeclarationCtx<'_> {
                 _ => unreachable!(),
             }
         });
-        let next_declaration_idx = arena_nxt_idx(self.declarations).into();
-        let decls = net_decl
-            .declarators()
-            .children()
-            .map(|decl| self.decl_ctx().lower_declarator(decl, next_declaration_idx))
-            .collect();
+
+        let decls = {
+            let next_declaration_idx = arena_nxt_idx(self.declarations).into();
+            let start = arena_nxt_idx(self.decls).into();
+            for decl in net_decl.declarators().children() {
+                self.decl_ctx().lower_declarator(decl, next_declaration_idx);
+            }
+            let end = arena_nxt_idx(self.decls).into();
+            IdxRange::new(start..end)
+        };
+
         let strength = net_decl.strength().and_then(|strength| {
             use ast::NetStrength::*;
             match strength {
@@ -168,6 +187,7 @@ impl LowerDeclarationCtx<'_> {
                 }
             }
         });
+
         alloc_idx_and_src! {
             NetDecl { ty, net_kind, delay, strength, decls } => self.declarations,
             net_decl => self.declaration_srcs,
@@ -187,12 +207,16 @@ impl LowerDeclarationCtx<'_> {
 
     fn lower_param_decl(&mut self, param_decl: ast::ParameterDeclaration) -> DeclarationId {
         let ty = self.expr_ctx().lower_data_ty(param_decl.type_());
-        let next_declaration_idx = arena_nxt_idx(self.declarations).into();
-        let decls = param_decl
-            .declarators()
-            .children()
-            .map(|decl| self.decl_ctx().lower_declarator(decl, next_declaration_idx))
-            .collect();
+        let decls = {
+            let next_declaration_idx = arena_nxt_idx(self.declarations).into();
+            let start = arena_nxt_idx(self.decls).into();
+            for decl in param_decl.declarators().children() {
+                self.decl_ctx().lower_declarator(decl, next_declaration_idx);
+            }
+            let end = arena_nxt_idx(self.decls).into();
+            IdxRange::new(start..end)
+        };
+
         alloc_idx_and_src! {
             ParamDecl { ty, decls } => self.declarations,
             param_decl => self.declaration_srcs,

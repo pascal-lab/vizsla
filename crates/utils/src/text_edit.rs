@@ -218,16 +218,3 @@ fn coalsece_changes(changes: Vec<TextEditItem>) -> Vec<TextEditItem> {
         })
         .collect_vec()
 }
-
-pub trait SourceRangeExt {
-    fn to_text_range(self) -> TextRange;
-}
-
-impl SourceRangeExt for SourceRange {
-    #[inline]
-    fn to_text_range(self) -> TextRange {
-        let start = self.start() as u32;
-        let end = self.end() as u32;
-        TextRange::new(start.into(), end.into())
-    }
-}

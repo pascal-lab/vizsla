@@ -107,7 +107,7 @@ impl UnitScope {
             let hir_file = db.hir_file(file_id);
 
             for (module_id, module_info) in hir_file.modules.iter() {
-                scope.insert(&module_info.ident, InFile::new(file_id, module_id).into());
+                scope.insert_opt(&module_info.name, InFile::new(file_id, module_id).into());
             }
 
             for (decl_id, decl) in hir_file.decls.iter() {

@@ -6,7 +6,9 @@ use instantiation::{
 };
 use la_arena::{Arena, Idx};
 use port::{
-    AnsiPort, AnsiPortId, AnsiPortSrc, NonAnsiPort, NonAnsiPortId, NonAnsiPortSrc, ParamPort, ParamPortId, ParamPortSrc, PortDecl, PortDeclId, PortDeclSrc, PortRef, PortRefId, PortRefSrc, PortSrcs, Ports
+    AnsiPort, AnsiPortId, AnsiPortSrc, NonAnsiPort, NonAnsiPortId, NonAnsiPortSrc, ParamPort,
+    ParamPortId, ParamPortSrc, PortDecl, PortDeclId, PortDeclSrc, PortRef, PortRefId, PortRefSrc,
+    PortSrcs, Ports,
 };
 use syntax::ast::{self, AstNode, PortList};
 use triomphe::Arc;
@@ -45,7 +47,7 @@ pub mod port;
 
 #[derive(Default, Debug, PartialEq, Eq, Clone)]
 pub struct Module {
-    pub ident: Ident,
+    pub name: Option<Ident>,
     pub items: Arena<ModuleItem>,
 
     pub params: Arena<ParamPort>,
@@ -130,7 +132,7 @@ impl Module {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ModuleInfo {
-    pub ident: Ident,
+    pub name: Option<Ident>,
 }
 
 pub type LocalModuleId = Idx<ModuleInfo>;
@@ -365,10 +367,10 @@ pub(crate) fn module_with_source_map_query(
     let (file, file_source_map) = db.hir_file_with_source_map(file_id);
     let tree = db.parse(file_id);
 
-    let mut module =
-        Module { ident: file.get(&local_module_id).ident.clone(), ..Default::default() };
+    let mut module = Module { name: file.get(local_module_id).name.clone(), ..Default::default() };
     let mut module_source_map = ModuleSourceMap::default();
-    let Some(ast_module) = file_source_map.get(&local_module_id).to_node(&tree) else {
+
+    let Some(ast_module) = file_source_map.get(local_module_id).to_node(&tree) else {
         return (Arc::new(module), Arc::new(module_source_map));
     };
 
