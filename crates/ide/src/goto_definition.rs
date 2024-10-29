@@ -2,7 +2,7 @@ use hir::semantics::Semantics;
 use ide_db::root_db::RootDb;
 use itertools::Itertools;
 use span::{FilePosition, RangeInfo};
-use syntax::{ast::AstNode, has_text_range::HasTextRange, SyntaxNodeExt, TokenKind};
+use syntax::{SyntaxNodeExt, TokenKind, ast::AstNode, has_text_range::HasTextRange};
 
 use crate::{
     definitions::Definition,

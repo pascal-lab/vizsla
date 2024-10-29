@@ -8,7 +8,6 @@ use crate::{
         expr::declarator::DeclId,
         lower_ident_opt,
         module::{ModuleId, instantiation::InstanceId, port::NonAnsiPortId},
-        proc::ProcId,
         stmt::StmtId,
     },
     scope::{self, BlockEntry, ModuleEntry, UnitEntry},

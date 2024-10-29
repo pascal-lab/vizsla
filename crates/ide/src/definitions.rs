@@ -4,7 +4,6 @@ use hir::{
         block::BlockId,
         expr::declarator::DeclId,
         module::{ModuleId, instantiation::InstanceId, port::NonAnsiPortId},
-        proc::ProcId,
         stmt::StmtId,
     },
     semantics::{Semantics, pathres::PathResolution},

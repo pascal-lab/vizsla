@@ -7,14 +7,22 @@ use syntax::{
     match_ast,
 };
 use triomphe::Arc;
-use utils::{define_enum_deriving_from, get::{Get, GetRef}};
+use utils::{
+    define_enum_deriving_from,
+    get::{Get, GetRef},
+};
 
 use super::{
+    Ident,
     declaration::{
         Declaration, DeclarationId, DeclarationSrc, LowerDeclaration, LowerDeclarationCtx,
-    }, expr::{
-        declarator::{DeclId, Declarator, DeclaratorSrc, LowerDecl, LowerDeclCtx}, timing_control::{EventExpr, EventExprId, EventExprSrc, LowerEventExpr, LowerEventExprCtx}, Expr, ExprId, ExprSrc, LowerExpr, LowerExprCtx
-    }, stmt::{LowerStmt, LowerStmtCtx, Stmt, StmtId, StmtKind, StmtSrc}, Ident
+    },
+    expr::{
+        Expr, ExprId, ExprSrc, LowerExpr, LowerExprCtx,
+        declarator::{DeclId, Declarator, DeclaratorSrc, LowerDecl, LowerDeclCtx},
+        timing_control::{EventExpr, EventExprId, EventExprSrc, LowerEventExpr, LowerEventExprCtx},
+    },
+    stmt::{LowerStmt, LowerStmtCtx, Stmt, StmtId, StmtKind, StmtSrc},
 };
 use crate::{
     container::{ContainerId, InFile},

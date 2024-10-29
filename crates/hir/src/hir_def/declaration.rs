@@ -1,5 +1,4 @@
 use la_arena::{Arena, Idx, IdxRange};
-use smallvec::SmallVec;
 use syntax::{TokenKind, ast};
 use utils::define_enum_deriving_from;
 
@@ -12,7 +11,7 @@ use crate::{
         expr::{
             Expr, ExprSrc, LowerExpr, LowerExprCtx,
             data_ty::DataTy,
-            declarator::{DeclId, Declarator, DeclaratorSrc, LowerDecl, LowerDeclCtx},
+            declarator::{Declarator, DeclaratorSrc, LowerDecl, LowerDeclCtx},
             timing_control::{
                 DelayControl, EventExpr, EventExprSrc, LowerEventExpr, LowerEventExprCtx,
             },
@@ -201,7 +200,7 @@ impl LowerDeclarationCtx<'_> {
         use ast::ParameterDeclarationBase::*;
         match param_decl.parameter() {
             ParameterDeclaration(param_decl) => self.lower_param_decl(param_decl),
-            TypeParameterDeclaration(param_decl) => unimplemented!(),
+            TypeParameterDeclaration(_) => unimplemented!(),
         }
     }
 

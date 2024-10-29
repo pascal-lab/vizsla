@@ -5,11 +5,19 @@ use triomphe::Arc;
 use utils::define_enum_deriving_from;
 
 use super::{
-    block::{BlockInfo, BlockSrc, LocalBlockId}, declaration::{
+    block::{BlockInfo, BlockSrc, LocalBlockId},
+    declaration::{
         Declaration, DeclarationId, DeclarationSrc, LowerDeclaration, LowerDeclarationCtx,
-    }, expr::{
-        declarator::{DeclId, Declarator, DeclaratorSrc, LowerDecl, LowerDeclCtx}, timing_control::{EventExpr, EventExprId, EventExprSrc, LowerEventExpr, LowerEventExprCtx}, Expr, ExprId, ExprSrc, LowerExpr, LowerExprCtx
-    }, lower_ident, module::{LocalModuleId, ModuleInfo, ModuleSrc}, proc::{LowerProc, LowerProcCtx, Proc, ProcId, ProcSrc}, stmt::{LowerStmt, LowerStmtCtx, Stmt, StmtId, StmtSrc}
+    },
+    expr::{
+        Expr, ExprId, ExprSrc, LowerExpr, LowerExprCtx,
+        declarator::{DeclId, Declarator, DeclaratorSrc, LowerDecl, LowerDeclCtx},
+        timing_control::{EventExpr, EventExprId, EventExprSrc, LowerEventExpr, LowerEventExprCtx},
+    },
+    lower_ident,
+    module::{LocalModuleId, ModuleInfo, ModuleSrc},
+    proc::{LowerProc, LowerProcCtx, Proc, ProcId, ProcSrc},
+    stmt::{LowerStmt, LowerStmtCtx, Stmt, StmtId, StmtSrc},
 };
 use crate::{
     alloc_idx_and_src,

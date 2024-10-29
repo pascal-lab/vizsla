@@ -41,6 +41,10 @@ pub(crate) fn document_symbol(
     line_info: &LineInfo,
     symbol: ide::document_symbols::DocumentSymbol,
 ) -> lsp_types::DocumentSymbol {
+    let children = symbol
+        .children
+        .map(|it| it.into_iter().map(|child| document_symbol(line_info, child)).collect());
+
     lsp_types::DocumentSymbol {
         name: symbol.name,
         detail: symbol.detail,
@@ -49,7 +53,7 @@ pub(crate) fn document_symbol(
         deprecated: None,
         range: lsp_range(line_info, symbol.full_range),
         selection_range: lsp_range(line_info, symbol.focus_range),
-        children: None,
+        children,
     }
 }
 

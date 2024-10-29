@@ -2,23 +2,18 @@ use base_db::{intern::Lookup, source_db::SourceDb};
 use hir::{
     container::{ContainerId, InContainer, InFile, InModule},
     db::HirDb,
-    file::HirFileId,
     hir_def::{
         block::{BlockId, BlockLoc},
         expr::declarator::DeclId,
-        module::{
-            ModuleId,
-            instantiation::InstanceId,
-            port::{NonAnsiPortId, PortSrcs, Ports},
-        },
+        module::{ModuleId, instantiation::InstanceId, port::NonAnsiPortId},
         stmt::StmtId,
     },
-    source_map::{ToAstNode, get_by_src},
+    source_map::{IsSrc, ToAstNode},
 };
 use ide_db::root_db::RootDb;
 use line_index::TextRange;
 use smol_str::SmolStr;
-use syntax::{ast::AstNode, has_name::HasName, has_text_range::HasTextRange};
+use syntax::{has_name::HasName, has_text_range::HasTextRange};
 use utils::get::{Get, GetRef};
 use vfs::FileId;
 
@@ -69,7 +64,7 @@ impl ToNav for ModuleId {
         let decl_node = file_src_map.get(local_module_id).to_node(&tree).unwrap();
 
         let name = file.get(local_module_id).name.clone();
-        build_nav_target(file_id.file_id(), decl_node, name, SymbolKind::Module, None)
+        build_nav_target(file_id.file_id(), decl_node, name, None)
     }
 }
 
@@ -82,22 +77,22 @@ impl ToNav for BlockId {
         let (name, container_name) = match cont_id {
             ContainerId::HirFileId(file_id) => {
                 let (file, file_src_map) = db.hir_file_with_source_map(file_id);
-                let name = get_by_src(&file, &file_src_map, src).name.clone();
+                let name = src.hir(&file, &file_src_map).name.clone();
                 (name, None)
             }
             ContainerId::ModuleId(module_id) => {
                 let (module, module_src_map) = db.module_with_source_map(module_id);
-                let name = get_by_src(&module, &module_src_map, src).name.clone();
+                let name = src.hir(&module, &module_src_map).name.clone();
                 (name, module.name.clone())
             }
             ContainerId::BlockId(block_id) => {
                 let (block, block_src_map) = db.block_with_source_map(block_id);
-                let name = get_by_src(&block, &block_src_map, src).name.clone();
+                let name = src.hir(&block, &block_src_map).name.clone();
                 (name, block.name.clone())
             }
         };
 
-        build_nav_target(file_id.file_id(), block_node, name, SymbolKind::Block, container_name)
+        build_nav_target(file_id.file_id(), block_node, name, container_name)
     }
 }
 
@@ -113,7 +108,7 @@ impl ToNav for InModule<NonAnsiPortId> {
 
         let name = module.get(port_id).label.clone();
         let container_name = module.name.clone();
-        build_nav_target(file_id.file_id(), port_node, name, SymbolKind::PortLabel, container_name)
+        build_nav_target(file_id.file_id(), port_node, name, container_name)
     }
 }
 
@@ -144,7 +139,7 @@ impl ToNav for InContainer<DeclId> {
             }
         };
 
-        build_nav_target(file_id, decl_node, name, SymbolKind::Decl, container_name)
+        build_nav_target(file_id, decl_node, name, container_name)
     }
 }
 
@@ -159,7 +154,7 @@ impl ToNav for InModule<InstanceId> {
 
         let name = module.get(instance_id).name.clone();
         let container_name = module.name.clone();
-        build_nav_target(file_id, instance_node, name, SymbolKind::Instance, container_name)
+        build_nav_target(file_id, instance_node, name, container_name)
     }
 }
 
@@ -190,7 +185,7 @@ impl ToNav for InContainer<StmtId> {
             }
         };
 
-        build_nav_target(file_id, stmt_node, name, SymbolKind::Stmt, container_name)
+        build_nav_target(file_id, stmt_node, name, container_name)
     }
 }
 
@@ -199,7 +194,6 @@ fn build_nav_target<'a>(
     file_id: FileId,
     node: impl HasName<'a>,
     name: Option<SmolStr>,
-    kind: SymbolKind,
     container_name: Option<SmolStr>,
 ) -> NavTarget {
     NavTarget {
@@ -207,7 +201,7 @@ fn build_nav_target<'a>(
         full_range: node.syntax().text_range().unwrap(),
         focus_range: node.name().and_then(|name| name.text_range()),
         name,
-        kind: Some(kind),
+        kind: Some(SymbolKind::from_node(node.syntax())),
         container_name,
         description: None,
     }

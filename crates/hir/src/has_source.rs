@@ -8,7 +8,7 @@ use crate::{
         block::{BlockId, BlockSrc},
         module::{ModuleId, ModuleSrc},
     },
-    source_map::{IsSrc, ToAstNode},
+    source_map::IsSrc,
 };
 
 pub trait HasSource {

@@ -7,7 +7,21 @@ use triomphe::Arc;
 pub(crate) use utils::get::Get;
 use utils::get::GetRef;
 
-pub trait IsSrc: PartialEq + Eq + Hash + Copy + Clone + Debug {}
+pub trait IsSrc: PartialEq + Eq + Hash + Copy + Clone + Debug {
+    #[inline]
+    fn hir<'a, Hir, HirIdx, Arn, SrcMap>(
+        self,
+        arena: &'a Arc<Arn>,
+        src_map: &'a Arc<SrcMap>,
+    ) -> &'a Hir
+    where
+        Arn: GetRef<HirIdx, Output = Hir>,
+        SrcMap: Get<Self, Output = HirIdx>,
+    {
+        let idx = src_map.get(self);
+        arena.get(idx)
+    }
+}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct SourceMap<Src: IsSrc, Hir> {
@@ -47,21 +61,6 @@ impl<Src: IsSrc, Hir> Default for SourceMap<Src, Hir> {
     fn default() -> Self {
         SourceMap { src2hir: FxHashMap::default(), hir2src: ArenaMap::default() }
     }
-}
-
-#[inline]
-pub fn get_by_src<'a, Hir, HirIdx, Src, A, S>(
-    arena: &'a Arc<A>,
-    src_map: &'a Arc<S>,
-    src: Src,
-) -> &'a Hir
-where
-    Src: IsSrc,
-    A: GetRef<HirIdx, Output = Hir>,
-    S: Get<Src, Output = HirIdx>,
-{
-    let idx = src_map.get(src);
-    arena.get(idx)
 }
 
 #[macro_export]

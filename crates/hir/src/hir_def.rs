@@ -12,7 +12,7 @@ pub mod ty;
 use la_arena::{Arena, Idx, RawIdx};
 use smol_str::{SmolStr, ToSmolStr};
 use syntax::{SyntaxToken, ast};
-pub(self) use utils::get::{GetRef};
+use utils::get::GetRef;
 
 #[macro_export]
 macro_rules! impl_arena_idx {

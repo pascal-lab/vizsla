@@ -2,7 +2,6 @@ use std::cmp::max;
 
 use itertools::Itertools;
 pub use line_index::{TextRange, TextSize};
-use slang::SourceRange;
 
 // A single atomic change to text: a insertion, a deletion or a replacement.
 // Must not overlap with other `InDel`s

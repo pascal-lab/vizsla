@@ -355,10 +355,10 @@ impl LowerStmtCtx<'_> {
             .map(|cond| self.expr_ctx().lower_expr(cond.expr()))
             .collect();
         let then_stmt = self.lower_stmt(stmt.statement());
-        let else_stmt = stmt.else_clause().map(|clause| {
-            let clause = ast::Statement::cast(clause.clause().syntax());
-            self.lower_stmt_opt(clause)
-        });
+        let else_stmt = stmt
+            .else_clause()
+            .and_then(|clause| ast::Statement::cast(clause.clause().syntax()))
+            .map(|stmt| self.lower_stmt(stmt));
         StmtKind::Cond { unique_priority, pred, then_stmt, else_stmt }
     }
 
