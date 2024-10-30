@@ -1,4 +1,8 @@
-use ide::{Cancellable, SymbolKind, navigation_target::NavTarget};
+use ide::{
+    Cancellable, SymbolKind,
+    document_highlight::{DocumentHighlight, ReferenceCategory},
+    navigation_target::NavTarget,
+};
 use itertools::Itertools;
 use line_index::{TextRange, TextSize};
 use span::FileRange;
@@ -79,7 +83,22 @@ pub(crate) fn document_symbol_information(
     }
 }
 
-pub(crate) fn symbol_kind(symbol_kind: SymbolKind) -> lsp_types::SymbolKind {
+pub(crate) fn document_highlight(
+    line_info: &LineInfo,
+    DocumentHighlight { range, category }: DocumentHighlight,
+) -> lsp_types::DocumentHighlight {
+    let kind = if category.contains(ReferenceCategory::READ) {
+        Some(lsp_types::DocumentHighlightKind::READ)
+    } else if category.contains(ReferenceCategory::WRITE) {
+        Some(lsp_types::DocumentHighlightKind::WRITE)
+    } else {
+        None
+    };
+
+    lsp_types::DocumentHighlight { range: lsp_range(line_info, range), kind }
+}
+
+fn symbol_kind(symbol_kind: SymbolKind) -> lsp_types::SymbolKind {
     use lsp_types::SymbolKind as LspSymbolKind;
     match symbol_kind {
         SymbolKind::Module => LspSymbolKind::MODULE,

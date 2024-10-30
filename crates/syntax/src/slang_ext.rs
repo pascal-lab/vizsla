@@ -72,26 +72,21 @@ impl<'a> SyntaxNodeExt<'a> for SyntaxNode<'a> {
 
         let mut cursor = self.walk();
         cursor.goto_last_token_before_pos(offset);
-        let left = cursor.to_tok_with_parent().unwrap();
-        let left_range = left.text_range().unwrap();
+        let left = cursor.to_tok_with_parent();
+        let left_range = left.and_then(|left| left.text_range());
+        let left_ok = left_range.map(|range| range.contains_inclusive(offset)).unwrap_or(false);
 
         cursor.reset(*self);
         cursor.goto_first_token_after_pos(offset);
-        let right = cursor.to_tok_with_parent().unwrap();
-        let right_range = right.text_range().unwrap();
+        let right = cursor.to_tok_with_parent();
+        let right_range = right.and_then(|right| right.text_range());
+        let right_ok = right_range.map(|range| range.contains(offset)).unwrap_or(false);
 
-        if left_range.end() == right_range.start() {
-            debug_assert!(left_range.contains_inclusive(offset));
-            debug_assert!(right_range.contains(offset));
-            TokenAtOffset::Between(left, right)
-        } else if left_range.contains_inclusive(offset) {
-            TokenAtOffset::Single(left)
-        } else if right_range.contains(offset) {
-            TokenAtOffset::Single(right)
-        } else {
-            debug_assert!(left_range.end() < offset);
-            debug_assert!(right_range.start() > offset);
-            TokenAtOffset::None
+        match (left_ok, right_ok) {
+            (true, true) => TokenAtOffset::Between(left.unwrap(), right.unwrap()),
+            (true, false) => TokenAtOffset::Single(left.unwrap()),
+            (false, true) => TokenAtOffset::Single(right.unwrap()),
+            (false, false) => TokenAtOffset::None,
         }
     }
 
@@ -107,7 +102,7 @@ impl<'a> SyntaxNodeExt<'a> for SyntaxNode<'a> {
 }
 
 pub mod support {
-    use slang::{ast::AstNode, SyntaxNode, SyntaxToken, TokenKind};
+    use slang::{SyntaxNode, SyntaxToken, TokenKind, ast::AstNode};
 
     #[inline]
     pub fn child<'a, N: AstNode<'a>>(parent: SyntaxNode<'a>) -> Option<N> {
@@ -115,14 +110,8 @@ pub mod support {
     }
 
     #[inline]
-    pub fn child_token<'a>(
-        parent: SyntaxNode<'a>,
-        kind: TokenKind,
-    ) -> Option<SyntaxToken<'a>> {
-        parent
-            .children()
-            .filter_map(|elem| elem.as_token())
-            .find(|tok| tok.kind() == kind)
+    pub fn child_token<'a>(parent: SyntaxNode<'a>, kind: TokenKind) -> Option<SyntaxToken<'a>> {
+        parent.children().filter_map(|elem| elem.as_token()).find(|tok| tok.kind() == kind)
     }
 }
 

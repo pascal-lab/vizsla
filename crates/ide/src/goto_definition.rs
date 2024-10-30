@@ -48,7 +48,7 @@ fn handle_ctrl_flow_kw(
         let tok = match paired_tok_kind {
             Either::Left(kind) => {
                 match_ast! { parent in
-                    ast::ModuleDeclaration as it => support::child_token(it.header().syntax(), kind),
+                    ast::ModuleDeclaration as it => it.header().module_keyword(),
                     _ => support::child_token(parent, kind),
                 }
             }

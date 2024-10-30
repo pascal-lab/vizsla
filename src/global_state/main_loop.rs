@@ -180,6 +180,7 @@ impl GlobalState {
         dispatcher
             .on::<GotoDefinition>(handle_goto_definition)
             .on::<DocumentSymbolRequest>(handle_document_symbol)
+            .on::<DocumentHighlightRequest>(handle_document_highlight)
             .finish();
     }
 

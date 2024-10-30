@@ -7,6 +7,7 @@ use vfs::FileId;
 
 use crate::{
     Cancellable,
+    document_highlight::{self, DocumentHighlight},
     document_symbols::{self, DocumentSymbol},
     goto_definition,
     navigation_target::NavTarget,
@@ -40,5 +41,12 @@ impl Analysis {
 
     pub fn document_symbol(&self, file_id: FileId) -> Cancellable<Vec<DocumentSymbol>> {
         self.with_db(|db| document_symbols::document_symbols(db, file_id))
+    }
+
+    pub fn document_highlight(
+        &self,
+        position: FilePosition,
+    ) -> Cancellable<Option<Vec<DocumentHighlight>>> {
+        self.with_db(|db| document_highlight::document_highlight(db, position))
     }
 }

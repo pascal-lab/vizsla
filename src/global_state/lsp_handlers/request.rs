@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use span::FileRange;
+use span::{FilePosition, FileRange};
 
 use crate::{
     global_state::snapshot::GlobalStateSnapshot,
@@ -43,5 +43,22 @@ pub(crate) fn handle_document_symbol(
         res.into()
     };
 
+    Ok(Some(res))
+}
+
+pub(crate) fn handle_document_highlight(
+    snap: GlobalStateSnapshot,
+    params: lsp_types::DocumentHighlightParams,
+) -> anyhow::Result<Option<Vec<lsp_types::DocumentHighlight>>> {
+    let position = from_proto::file_position(&snap, params.text_document_position_params)?;
+    let line_info = snap.line_info(position.file_id)?;
+    let Some(highlights) = snap.analysis.document_highlight(position)? else {
+        return Ok(None);
+    };
+
+    let res = highlights
+        .into_iter()
+        .map(|highlight| to_proto::document_highlight(&line_info, highlight))
+        .collect();
     Ok(Some(res))
 }

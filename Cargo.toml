@@ -59,6 +59,7 @@ vfs = { path = "./crates/vfs", version = "0.0.0" }
 vfs-notify = { path = "./crates/vfs-notify/", version = "0.0.0" }
 
 anyhow = "1.0.75"
+bitflags = "2.6.0"
 camino = "1.1.6"
 const_format = "0.2.31"
 crossbeam-channel = "0.5.8"
