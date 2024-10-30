@@ -44,7 +44,7 @@ fn token_precedence(kind: TokenKind) -> usize {
     }
 }
 
-fn handle_ctrl_flow_kw(
+pub(crate) fn handle_ctrl_flow_kw(
     sema: &Semantics<'_, RootDb>,
     tok_with_parent @ SyntaxTokenWithParent { parent, tok }: SyntaxTokenWithParent,
 ) -> Option<Vec<References>> {

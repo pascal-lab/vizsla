@@ -1,16 +1,10 @@
 use hir::semantics::Semantics;
 use ide_db::root_db::RootDb;
-use itertools::Either;
 use line_index::TextRange;
 use span::FilePosition;
-use syntax::{
-    SyntaxNodeExt, SyntaxToken, SyntaxTokenWithParent, TokenKind,
-    ast::AstNode,
-    has_text_range::HasTextRange,
-    token::{is_pair_token, pair_token},
-};
+use syntax::{SyntaxNodeExt, SyntaxTokenWithParent, TokenKind, ast::AstNode, token::is_pair_token};
 
-use crate::references::ReferenceCategory;
+use crate::references::{self, ReferenceCategory};
 
 #[derive(Debug, Clone)]
 pub struct DocumentHighlight {
@@ -45,15 +39,14 @@ fn token_precedence(kind: TokenKind) -> usize {
 
 fn handle_ctrl_flow_kw(
     sema: &Semantics<'_, RootDb>,
-    tok_with_parent @ SyntaxTokenWithParent { parent, tok }: SyntaxTokenWithParent,
+    tok_with_parent: SyntaxTokenWithParent,
 ) -> Option<Vec<DocumentHighlight>> {
-    let file_id = sema.find_file(parent);
-    let mut res = vec![DocumentHighlight::new(tok.text_range().unwrap())];
-
-    if let Some(pair) = pair_token(tok_with_parent) {
-        let pair: SyntaxToken = pair.either_into();
-        res.push(DocumentHighlight::new(pair.text_range().unwrap()));
-    }
-
-    Some(res)
+    let cur_file_id = sema.find_file(tok_with_parent.parent).file_id();
+    let highlights = references::handle_ctrl_flow_kw(sema, tok_with_parent)?
+        .into_iter()
+        .filter_map(|mut r| r.refs.remove(&cur_file_id))
+        .flatten()
+        .map(|(range, category)| DocumentHighlight { range, category })
+        .collect();
+    Some(highlights)
 }
