@@ -1,5 +1,5 @@
 mod dispatcher;
-mod lsp_handlers;
+mod handlers;
 pub mod main_loop;
 mod mem_docs;
 mod process_changes;

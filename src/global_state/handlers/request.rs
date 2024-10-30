@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use span::{FilePosition, FileRange};
+use span::FileRange;
 
 use crate::{
     global_state::snapshot::GlobalStateSnapshot,

@@ -12,7 +12,7 @@ use vfs::{VfsPath, loader as vfs_loader};
 use super::{
     GlobalState, VfsProgress,
     dispatcher::{NotifDispatcher, ReqDispatcher},
-    lsp_handlers,
+    handlers,
     reload::FetchWorkspaceProgress,
     respond::Progress,
 };
@@ -175,7 +175,7 @@ impl GlobalState {
             _ => (),
         }
 
-        use lsp_handlers::request::*;
+        use handlers::request::*;
         use lsp_types::request::*;
         dispatcher
             .on::<GotoDefinition>(handle_goto_definition)
@@ -185,7 +185,7 @@ impl GlobalState {
     }
 
     fn handle_notification(&mut self, notif: Notification) -> anyhow::Result<()> {
-        use lsp_handlers::notification::*;
+        use handlers::notification::*;
         use lsp_types::notification::*;
 
         use crate::lsp_ext::ext::*;
