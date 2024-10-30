@@ -8,7 +8,7 @@ use syntax::{
     has_name::HasName,
     has_text_range::HasTextRange,
     match_ast, support,
-    token::token_pair,
+    token::pair_token,
 };
 
 use crate::{
@@ -44,8 +44,8 @@ fn handle_ctrl_flow_kw(
     let kind = tok.kind();
     let file_id = sema.find_file(parent);
 
-    if let Some(paired_tok_kind) = token_pair(kind) {
-        let tok = match paired_tok_kind {
+    if let Some(pair_kind) = pair_token(kind) {
+        let tok = match pair_kind {
             Either::Left(kind) => {
                 match_ast! { parent in
                     ast::ModuleDeclaration as it => it.header().module_keyword(),
@@ -75,7 +75,7 @@ fn handle_ctrl_flow_kw(
 fn token_precedence(kind: TokenKind) -> usize {
     match kind {
         TokenKind::IDENTIFIER | TokenKind::SYSTEM_IDENTIFIER => 4,
-        _ if token_pair(kind).is_some() => 4,
+        _ if pair_token(kind).is_some() => 4,
         _ => 1,
     }
 }

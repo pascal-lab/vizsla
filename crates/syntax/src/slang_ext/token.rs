@@ -3,7 +3,7 @@ use slang::{T, TokenKind};
 
 /// [`Either::Left`] represents the beg-token, and [`Either::Right`] represents
 /// the end-token.
-pub fn token_pair(kind: TokenKind) -> Option<Either<TokenKind, TokenKind>> {
+pub fn pair_token(kind: TokenKind) -> Option<Either<TokenKind, TokenKind>> {
     macro_rules! P {
         ($beg:ident, $end:ident; $($rest:tt)*) => {
             if kind == T![$beg] {

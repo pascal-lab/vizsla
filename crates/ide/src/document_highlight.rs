@@ -8,16 +8,10 @@ use syntax::{
     ast::{self, AstNode},
     has_text_range::HasTextRange,
     match_ast, support,
-    token::token_pair,
+    token::pair_token,
 };
 
-bitflags::bitflags! {
-    #[derive(Copy, Clone, Default, PartialEq, Eq, Hash, Debug)]
-    pub struct ReferenceCategory: u8 {
-        const WRITE = 1 << 0;
-        const READ = 1 << 1;
-    }
-}
+use crate::references::ReferenceCategory;
 
 #[derive(Debug, Clone)]
 pub struct DocumentHighlight {
@@ -40,10 +34,10 @@ pub(crate) fn document_highlight(
 
     let token = file.syntax().token_at_offset(offset).pick_bext_token(token_precedence)?;
 
-    handle_paired_kw(&sema, token)
+    handle_ctrl_flow_kw(&sema, token)
 }
 
-fn handle_paired_kw(
+fn handle_ctrl_flow_kw(
     sema: &Semantics<'_, RootDb>,
     SyntaxTokenWithParent { parent, tok }: SyntaxTokenWithParent,
 ) -> Option<Vec<DocumentHighlight>> {
@@ -51,7 +45,7 @@ fn handle_paired_kw(
     let file_id = sema.find_file(parent);
     let mut res = vec![DocumentHighlight::new(tok.text_range().unwrap())];
 
-    let paired_kw = match token_pair(kind)? {
+    let paired_kw = match pair_token(kind)? {
         Either::Left(kind) => {
             match_ast! { parent in
                 ast::ModuleDeclaration as it => it.header().module_keyword(),
@@ -79,7 +73,7 @@ fn handle_paired_kw(
 
 fn token_precedence(kind: TokenKind) -> usize {
     match kind {
-        _ if token_pair(kind).is_some() => 4,
+        _ if pair_token(kind).is_some() => 4,
         _ => 1,
     }
 }
