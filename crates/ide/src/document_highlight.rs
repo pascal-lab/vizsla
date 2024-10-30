@@ -37,6 +37,13 @@ pub(crate) fn document_highlight(
     handle_ctrl_flow_kw(&sema, token)
 }
 
+fn token_precedence(kind: TokenKind) -> usize {
+    match kind {
+        _ if pair_token(kind).is_some() => 4,
+        _ => 1,
+    }
+}
+
 fn handle_ctrl_flow_kw(
     sema: &Semantics<'_, RootDb>,
     SyntaxTokenWithParent { parent, tok }: SyntaxTokenWithParent,
@@ -69,11 +76,4 @@ fn handle_ctrl_flow_kw(
     }
 
     Some(res)
-}
-
-fn token_precedence(kind: TokenKind) -> usize {
-    match kind {
-        _ if pair_token(kind).is_some() => 4,
-        _ => 1,
-    }
 }

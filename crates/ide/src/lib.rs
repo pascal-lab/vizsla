@@ -13,6 +13,7 @@ pub mod navigation_target;
 pub mod document_highlight;
 pub mod document_symbols;
 pub mod goto_definition;
+pub mod references;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum SymbolKind {

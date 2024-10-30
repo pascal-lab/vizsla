@@ -1,7 +1,6 @@
 use ide::{
-    Cancellable, SymbolKind,
-    document_highlight::{DocumentHighlight, ReferenceCategory},
-    navigation_target::NavTarget,
+    Cancellable, SymbolKind, document_highlight::DocumentHighlight, navigation_target::NavTarget,
+    references::ReferenceCategory,
 };
 use itertools::Itertools;
 use line_index::{TextRange, TextSize};
@@ -193,6 +192,15 @@ pub(crate) fn lsp_range(line_info: &LineInfo, range: TextRange) -> lsp_types::Ra
     let start = position(line_info, range.start());
     let end = position(line_info, range.end());
     lsp_types::Range::new(start, end)
+}
+
+pub(crate) fn lsp_location(
+    url: lsp_types::Url,
+    line_info: &LineInfo,
+    range: TextRange,
+) -> lsp_types::Location {
+    let range = lsp_range(line_info, range);
+    lsp_types::Location::new(url, range)
 }
 
 pub(crate) fn position(

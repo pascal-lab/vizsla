@@ -1,3 +1,4 @@
+use ide::{navigation_target::NavTarget, references::References};
 use itertools::Itertools;
 use span::FileRange;
 
@@ -61,4 +62,37 @@ pub(crate) fn handle_document_highlight(
         .map(|highlight| to_proto::document_highlight(&line_info, highlight))
         .collect();
     Ok(Some(res))
+}
+
+pub(crate) fn handle_references(
+    snap: GlobalStateSnapshot,
+    params: lsp_types::ReferenceParams,
+) -> anyhow::Result<Option<Vec<lsp_types::Location>>> {
+    let position = from_proto::file_position(&snap, params.text_document_position)?;
+    let line_info = snap.line_info(position.file_id)?;
+    let Some(refs) = snap.analysis.references(position)? else {
+        return Ok(None);
+    };
+
+    let locations = refs
+        .into_iter()
+        .flat_map(|References { def, refs }| {
+            let decl = def.map(|nav| {
+                let url = to_proto::url(&snap, nav.file_id);
+                to_proto::lsp_location(url, &line_info, nav.focus_or_full_range())
+            });
+
+            let refs = refs.into_iter().flat_map(|(file_id, refs)| {
+                let url = to_proto::url(&snap, file_id);
+                refs.into_iter()
+                    .map(|(range, _)| to_proto::lsp_location(url.clone(), &line_info, range))
+                    .collect_vec()
+                    .into_iter()
+            });
+            refs.chain(decl)
+        })
+        .unique()
+        .collect();
+
+    Ok(Some(locations))
 }
