@@ -6,6 +6,8 @@ use slang::{
 
 use crate::{has_text_range::HasTextRange, ptr::SyntaxNodePtr};
 
+pub mod token;
+
 #[derive(Clone, Debug)]
 pub enum TokenAtOffset<'a> {
     None,
@@ -64,8 +66,7 @@ impl<'a> SyntaxNodeExt<'a> for SyntaxNode<'a> {
 
     fn token_at_offset(&self, offset: TextSize) -> TokenAtOffset<'a> {
         let range = self.text_range().unwrap();
-        debug_assert!(range.contains(offset));
-        if range.is_empty() {
+        if range.is_empty() || !(range.contains(offset)) {
             return TokenAtOffset::None;
         }
 
@@ -84,10 +85,8 @@ impl<'a> SyntaxNodeExt<'a> for SyntaxNode<'a> {
             debug_assert!(right_range.contains(offset));
             TokenAtOffset::Between(left, right)
         } else if left_range.contains_inclusive(offset) {
-            debug_assert!(right_range.start() > left_range.end());
             TokenAtOffset::Single(left)
         } else if right_range.contains(offset) {
-            debug_assert!(left_range.end() < right_range.start());
             TokenAtOffset::Single(right)
         } else {
             debug_assert!(left_range.end() < offset);
@@ -96,12 +95,34 @@ impl<'a> SyntaxNodeExt<'a> for SyntaxNode<'a> {
         }
     }
 
+    #[inline]
     fn find_root(&self) -> SyntaxNode<'a> {
         SyntaxAncestors::start_from(*self).last().unwrap()
     }
 
+    #[inline]
     fn to_ptr(&self) -> SyntaxNodePtr {
         SyntaxNodePtr::from_node(*self)
+    }
+}
+
+pub mod support {
+    use slang::{ast::AstNode, SyntaxNode, SyntaxToken, TokenKind};
+
+    #[inline]
+    pub fn child<'a, N: AstNode<'a>>(parent: SyntaxNode<'a>) -> Option<N> {
+        parent.children().filter_map(|elem| elem.as_node()).find_map(N::cast)
+    }
+
+    #[inline]
+    pub fn child_token<'a>(
+        parent: SyntaxNode<'a>,
+        kind: TokenKind,
+    ) -> Option<SyntaxToken<'a>> {
+        parent
+            .children()
+            .filter_map(|elem| elem.as_token())
+            .find(|tok| tok.kind() == kind)
     }
 }
 
