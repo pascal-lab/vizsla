@@ -20,7 +20,7 @@ impl SemanticsImpl<'_> {
     ) -> Option<PathResolution> {
         self.with_ctx(|ctx| {
             let db = self.db;
-            let file_id = self.find_file(&parent);
+            let file_id = self.find_file(parent);
             let container = ctx.find_container(InFile::new(file_id, parent))?;
             let ident = lower_ident_opt(Some(ident))?;
 

@@ -3,7 +3,7 @@ use std::ops::Index;
 use itertools::Either;
 use la_arena::{Arena, Idx, IdxRange, RawIdx};
 use syntax::{SyntaxToken, TokenKind, ast};
-use utils::get::{Get, GetRef};
+use utils::get::Get;
 
 use crate::{
     alloc_idx_and_src, define_src,

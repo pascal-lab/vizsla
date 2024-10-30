@@ -84,10 +84,13 @@ pub(crate) fn symbol_kind(symbol_kind: SymbolKind) -> lsp_types::SymbolKind {
     match symbol_kind {
         SymbolKind::Module => LspSymbolKind::MODULE,
         SymbolKind::PortLabel => LspSymbolKind::FIELD,
-        SymbolKind::Decl => LspSymbolKind::FIELD,
+        SymbolKind::Decl => LspSymbolKind::VARIABLE,
         SymbolKind::Instance => LspSymbolKind::OBJECT,
-        SymbolKind::Block => LspSymbolKind::VARIABLE,
-        SymbolKind::Stmt => LspSymbolKind::VARIABLE,
+        SymbolKind::Block => LspSymbolKind::NAMESPACE,
+        SymbolKind::Stmt => LspSymbolKind::NAMESPACE,
+        SymbolKind::Fn => LspSymbolKind::FUNCTION,
+        SymbolKind::Generate => LspSymbolKind::NAMESPACE,
+        SymbolKind::Interface => LspSymbolKind::INTERFACE,
     }
 }
 

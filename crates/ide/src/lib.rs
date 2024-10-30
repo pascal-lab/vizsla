@@ -10,6 +10,7 @@ pub mod analysis_host;
 pub mod definitions;
 pub mod navigation_target;
 
+pub mod document_highlight;
 pub mod document_symbols;
 pub mod goto_definition;
 
@@ -21,17 +22,37 @@ pub enum SymbolKind {
     Instance,
     Block,
     Stmt,
+    Fn,
+    Generate,
+    Interface,
 }
 
 impl SymbolKind {
     pub fn from_node(node: SyntaxNode) -> SymbolKind {
         match_ast! { node in
-            ast::ModuleDeclaration => SymbolKind::Module,
+            ast::ModuleHeader as it => {
+                use ast::ModuleHeader::*;
+                match it {
+                    ModuleHeader(_) => SymbolKind::Module,
+                    InterfaceHeader(_) => SymbolKind::Interface,
+                    _ => unimplemented!(),
+                }
+            },
+            ast::ModuleDeclaration as it => {
+                use ast::ModuleDeclaration::*;
+                match it {
+                    ModuleDeclaration(_) => SymbolKind::Module,
+                    InterfaceDeclaration(_) => SymbolKind::Interface,
+                    _ => unimplemented!(),
+                }
+            },
             ast::NonAnsiPort => SymbolKind::PortLabel,
             ast::Declarator => SymbolKind::Decl,
             ast::HierarchicalInstance => SymbolKind::Instance,
             ast::BlockStatement => SymbolKind::Block,
             ast::Statement => SymbolKind::Stmt,
+            ast::FunctionDeclaration => SymbolKind::Fn,
+            ast::GenerateBlock => SymbolKind::Generate,
             _ => unreachable!("unexpected node: {:?}", node),
         }
     }

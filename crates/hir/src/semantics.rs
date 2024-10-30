@@ -57,21 +57,9 @@ impl<'db> SemanticsImpl<'db> {
         ast::CompilationUnit::cast(root_node).unwrap()
     }
 
-    fn cache_node2file(&self, root_node: SyntaxNode<'db>, file_id: HirFileId) {
-        debug_assert!(root_node.parent().is_none());
-        let mut cache = self.root2file_cache.borrow_mut();
-        let prev = cache.insert(root_node, file_id);
-        debug_assert!(prev.is_none() || prev == Some(file_id))
-    }
-
-    fn lookup(&self, root_node: &SyntaxNode) -> Option<HirFileId> {
-        let cache = self.root2file_cache.borrow();
-        cache.get(root_node).copied()
-    }
-
-    fn find_file(&self, node: &SyntaxNode) -> HirFileId {
+    pub fn find_file(&self, node: SyntaxNode) -> HirFileId {
         let root_node = node.find_root();
-        self.lookup(&root_node).unwrap_or_else(|| {
+        self.lookup(root_node).unwrap_or_else(|| {
             panic!(
                 "\n\nFailed to lookup {:?}.\nroot node:   {:?}\nknown nodes: {}\n\n",
                 node,
@@ -79,6 +67,18 @@ impl<'db> SemanticsImpl<'db> {
                 self.root2file_cache.borrow().keys().map(|it| format!("{it:?}")).join(", ")
             )
         })
+    }
+
+    fn cache_node2file(&self, root_node: SyntaxNode<'db>, file_id: HirFileId) {
+        debug_assert!(root_node.parent().is_none());
+        let mut cache = self.root2file_cache.borrow_mut();
+        let prev = cache.insert(root_node, file_id);
+        debug_assert!(prev.is_none() || prev == Some(file_id))
+    }
+
+    fn lookup(&self, root_node: SyntaxNode) -> Option<HirFileId> {
+        let cache = self.root2file_cache.borrow();
+        cache.get(&root_node).copied()
     }
 
     fn with_ctx<F: FnOnce(&mut Source2DefCtx<'_>) -> T, T>(&self, f: F) -> T {

@@ -1,10 +1,18 @@
 use hir::semantics::Semantics;
 use ide_db::root_db::RootDb;
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use span::{FilePosition, RangeInfo};
-use syntax::{SyntaxNodeExt, TokenKind, ast::AstNode, has_text_range::HasTextRange};
+use syntax::{
+    SyntaxNodeExt, SyntaxTokenWithParent, TokenKind,
+    ast::{self, AstNode},
+    has_name::HasName,
+    has_text_range::HasTextRange,
+    match_ast, support,
+    token::token_pair,
+};
 
 use crate::{
+    SymbolKind,
     definitions::Definition,
     navigation_target::{NavTarget, ToNav},
 };
@@ -16,17 +24,58 @@ pub(crate) fn goto_definition(
     let sema = Semantics::new(db);
     let file = sema.parse(file_id);
     let token = file.syntax().token_at_offset(offset).pick_bext_token(token_precedence)?;
-    let navs = Definition::resolution(&sema, token)?
-        .into_iter()
-        .map(|def| def.to_nav(db))
-        .unique()
-        .collect_vec();
+
+    let navs = handle_ctrl_flow_kw(&sema, token).or_else(|| {
+        Definition::resolution(&sema, token)?
+            .into_iter()
+            .map(|def| def.to_nav(db))
+            .unique()
+            .collect_vec()
+            .into()
+    })?;
+
     Some(RangeInfo::new(token.text_range()?, navs))
+}
+
+fn handle_ctrl_flow_kw(
+    sema: &Semantics<RootDb>,
+    SyntaxTokenWithParent { parent, tok }: SyntaxTokenWithParent,
+) -> Option<Vec<NavTarget>> {
+    let kind = tok.kind();
+    let file_id = sema.find_file(parent);
+
+    if let Some(paired_tok_kind) = token_pair(kind) {
+        let tok = match paired_tok_kind {
+            Either::Left(kind) => {
+                match_ast! { parent in
+                    ast::ModuleDeclaration as it => support::child_token(it.header().syntax(), kind),
+                    _ => support::child_token(parent, kind),
+                }
+            }
+            Either::Right(_) => Some(tok),
+        };
+
+        // TODO: name and container_name
+        let nav = NavTarget {
+            file_id: file_id.file_id(),
+            full_range: parent.text_range().unwrap(),
+            focus_range: tok.and_then(|tok| tok.text_range()),
+            name: None,
+            kind: Some(SymbolKind::from_node(parent)),
+            container_name: None,
+            description: None,
+        };
+
+        return Some(vec![nav]);
+    }
+
+    None
 }
 
 fn token_precedence(kind: TokenKind) -> usize {
     match kind {
         TokenKind::IDENTIFIER | TokenKind::SYSTEM_IDENTIFIER => 4,
+        _ if token_pair(kind).is_some() => 4,
         _ => 1,
     }
 }
