@@ -54,7 +54,7 @@ pub(crate) struct LowerEventExprCtx<'a> {
     pub(crate) event_expr_srcs: &'a mut SourceMap<EventExprSrc, EventExpr>,
 
     pub(crate) exprs: &'a mut Arena<Expr>,
-    pub(crate) expr_source_map: &'a mut SourceMap<ExprSrc, Expr>,
+    pub(crate) expr_srcs: &'a mut SourceMap<ExprSrc, Expr>,
 }
 
 pub(crate) trait LowerEventExpr: LowerExpr {
@@ -63,7 +63,7 @@ pub(crate) trait LowerEventExpr: LowerExpr {
 
 impl LowerExpr for LowerEventExprCtx<'_> {
     fn expr_ctx(&mut self) -> LowerExprCtx {
-        LowerExprCtx { db: self.db, exprs: self.exprs, expr_source_map: self.expr_source_map }
+        LowerExprCtx { db: self.db, exprs: self.exprs, expr_srcs: self.expr_srcs }
     }
 }
 

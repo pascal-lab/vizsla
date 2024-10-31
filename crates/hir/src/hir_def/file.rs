@@ -127,7 +127,7 @@ impl LowerExpr for LowerFileCtx<'_> {
         LowerExprCtx {
             db: self.db,
             exprs: &mut self.file.exprs,
-            expr_source_map: &mut self.file_source_map.exprs,
+            expr_srcs: &mut self.file_source_map.exprs,
         }
     }
 }
@@ -140,7 +140,7 @@ impl LowerDecl for LowerFileCtx<'_> {
             decl_srcs: &mut self.file_source_map.decls,
 
             exprs: &mut self.file.exprs,
-            expr_source_map: &mut self.file_source_map.exprs,
+            expr_srcs: &mut self.file_source_map.exprs,
         }
     }
 }
@@ -153,7 +153,7 @@ impl LowerEventExpr for LowerFileCtx<'_> {
             event_expr_srcs: &mut self.file_source_map.event_exprs,
 
             exprs: &mut self.file.exprs,
-            expr_source_map: &mut self.file_source_map.exprs,
+            expr_srcs: &mut self.file_source_map.exprs,
         }
     }
 }
@@ -172,7 +172,7 @@ impl LowerDeclaration for LowerFileCtx<'_> {
             event_expr_srcs: &mut self.file_source_map.event_exprs,
 
             exprs: &mut self.file.exprs,
-            expr_source_map: &mut self.file_source_map.exprs,
+            expr_srcs: &mut self.file_source_map.exprs,
         }
     }
 }
@@ -187,7 +187,7 @@ impl LowerStmt for LowerFileCtx<'_> {
             stmt_srcs: &mut self.file_source_map.stmts,
 
             exprs: &mut self.file.exprs,
-            expr_source_map: &mut self.file_source_map.exprs,
+            expr_srcs: &mut self.file_source_map.exprs,
 
             event_exprs: &mut self.file.event_exprs,
             event_expr_srcs: &mut self.file_source_map.event_exprs,

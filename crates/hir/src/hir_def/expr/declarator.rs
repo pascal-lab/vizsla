@@ -48,7 +48,7 @@ pub(crate) struct LowerDeclCtx<'a> {
     pub(crate) decl_srcs: &'a mut SourceMap<DeclaratorSrc, Declarator>,
 
     pub(crate) exprs: &'a mut Arena<Expr>,
-    pub(crate) expr_source_map: &'a mut SourceMap<ExprSrc, Expr>,
+    pub(crate) expr_srcs: &'a mut SourceMap<ExprSrc, Expr>,
 }
 
 pub(crate) trait LowerDecl: LowerExpr {
@@ -57,7 +57,7 @@ pub(crate) trait LowerDecl: LowerExpr {
 
 impl LowerExpr for LowerDeclCtx<'_> {
     fn expr_ctx(&mut self) -> LowerExprCtx {
-        LowerExprCtx { db: self.db, exprs: self.exprs, expr_source_map: self.expr_source_map }
+        LowerExprCtx { db: self.db, exprs: self.exprs, expr_srcs: self.expr_srcs }
     }
 }
 

@@ -270,7 +270,7 @@ pub(crate) trait LowerExpr {
 pub(crate) struct LowerExprCtx<'a> {
     pub(crate) db: &'a dyn InternDb,
     pub(crate) exprs: &'a mut Arena<Expr>,
-    pub(crate) expr_source_map: &'a mut SourceMap<ExprSrc, Expr>,
+    pub(crate) expr_srcs: &'a mut SourceMap<ExprSrc, Expr>,
 }
 
 impl LowerExprCtx<'_> {
@@ -282,7 +282,7 @@ impl LowerExprCtx<'_> {
         if let Some(hir_expr) = self.lower_expr_inner(expr) {
             alloc_idx_and_src! {
                 hir_expr => self.exprs,
-                expr => self.expr_source_map,
+                expr => self.expr_srcs,
             }
         } else {
             self.alloc_missing()
@@ -375,7 +375,7 @@ impl LowerExprCtx<'_> {
                 match selectors.next() {
                     select @ Some(_) => {
                         let receiver = ctx.exprs.alloc(expr);
-                        ctx.expr_source_map.insert(src, receiver);
+                        ctx.expr_srcs.insert(src, receiver);
                         expr = Expr::ElementSelect { receiver, select };
                     }
                     None => return Some(expr),

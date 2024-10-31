@@ -76,7 +76,7 @@ impl LowerDecl for LowerProcCtx<'_> {
             decls: self.decls,
             decl_srcs: self.decl_srcs,
             exprs: self.exprs,
-            expr_source_map: self.expr_srcs,
+            expr_srcs: self.expr_srcs,
         }
     }
 }
@@ -92,7 +92,7 @@ impl LowerStmt for LowerProcCtx<'_> {
             event_exprs: self.event_exprs,
             event_expr_srcs: self.event_expr_srcs,
             exprs: self.exprs,
-            expr_source_map: self.expr_srcs,
+            expr_srcs: self.expr_srcs,
             decls: self.decls,
             decl_srcs: self.decl_srcs,
         }
@@ -106,14 +106,14 @@ impl LowerEventExpr for LowerProcCtx<'_> {
             event_exprs: self.event_exprs,
             event_expr_srcs: self.event_expr_srcs,
             exprs: self.exprs,
-            expr_source_map: self.expr_srcs,
+            expr_srcs: self.expr_srcs,
         }
     }
 }
 
 impl LowerExpr for LowerProcCtx<'_> {
     fn expr_ctx(&mut self) -> LowerExprCtx {
-        LowerExprCtx { db: self.db, exprs: self.exprs, expr_source_map: self.expr_srcs }
+        LowerExprCtx { db: self.db, exprs: self.exprs, expr_srcs: self.expr_srcs }
     }
 }
 

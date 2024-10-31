@@ -222,7 +222,7 @@ impl LowerExpr for LowerModuleCtx<'_> {
         LowerExprCtx {
             db: self.db,
             exprs: &mut self.module.exprs,
-            expr_source_map: &mut self.module_source_map.exprs,
+            expr_srcs: &mut self.module_source_map.exprs,
         }
     }
 }
@@ -235,7 +235,7 @@ impl LowerDecl for LowerModuleCtx<'_> {
             decl_srcs: &mut self.module_source_map.decls,
 
             exprs: &mut self.module.exprs,
-            expr_source_map: &mut self.module_source_map.exprs,
+            expr_srcs: &mut self.module_source_map.exprs,
         }
     }
 }
@@ -248,7 +248,7 @@ impl LowerEventExpr for LowerModuleCtx<'_> {
             event_expr_srcs: &mut self.module_source_map.event_exprs,
 
             exprs: &mut self.module.exprs,
-            expr_source_map: &mut self.module_source_map.exprs,
+            expr_srcs: &mut self.module_source_map.exprs,
         }
     }
 }
@@ -267,7 +267,7 @@ impl LowerDeclaration for LowerModuleCtx<'_> {
             event_expr_srcs: &mut self.module_source_map.event_exprs,
 
             exprs: &mut self.module.exprs,
-            expr_source_map: &mut self.module_source_map.exprs,
+            expr_srcs: &mut self.module_source_map.exprs,
         }
     }
 }
@@ -282,7 +282,7 @@ impl LowerStmt for LowerModuleCtx<'_> {
             stmt_srcs: &mut self.module_source_map.stmts,
 
             exprs: &mut self.module.exprs,
-            expr_source_map: &mut self.module_source_map.exprs,
+            expr_srcs: &mut self.module_source_map.exprs,
 
             event_exprs: &mut self.module.event_exprs,
             event_expr_srcs: &mut self.module_source_map.event_exprs,
