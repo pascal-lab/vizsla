@@ -9,50 +9,6 @@ pub(crate) enum FilesWatcherDef {
     Server,
 }
 
-fn schema(fields: &[(&'static str, &'static str, &str)]) -> serde_json::Value {
-    let map = fields
-        .iter()
-        .map(|(field, ty, default)| {
-            let name = field.replace('_', ".");
-            let name = format!("rust-analyzer.{name}");
-            let props = field_props(field, ty, default);
-            (name, props)
-        })
-        .collect::<serde_json::Map<_, _>>();
-    map.into()
-}
-
-fn field_props(field: &str, ty: &str, default: &str) -> serde_json::Value {
-    let mut map = serde_json::Map::default();
-
-    macro_rules! set {
-        ($($key:literal: $value:tt),*$(,)?) => {{$(
-            map.insert($key.into(), serde_json::json!($value));
-        )*}};
-    }
-
-    let default = default.parse::<serde_json::Value>().unwrap();
-    set!("default": default);
-
-    match ty {
-        "Vec<PathBuf>" => set! {
-            "type": "array",
-            "items": { "type": "string" },
-        },
-        "FilesWatcherDef" => set! {
-            "type": "string",
-            "enum": ["client", "server"],
-            "enumDescriptions": [
-                "Use the client (editor) to watch files for changes",
-                "Use server-side file watching",
-            ],
-        },
-        _ => panic!("missing entry for {ty}: {default}"),
-    }
-
-    map.into()
-}
-
 macro_rules! default_value {
     ($default:expr, $ty:ty) => {{
         let default_: $ty = $default;
@@ -76,14 +32,6 @@ macro_rules! config_data {
                 $name {
                     $( $field: get_field(&mut json, error_sink, stringify!($field), default_value!($default, $ty)), )*
                 }
-            }
-
-            $sv fn json_schema() -> serde_json::Value {
-                schema(&[ $(
-                    {
-                        (stringify!($field), stringify!($ty), default_value!($default, $ty))
-                    },
-                )* ])
             }
         }
 
