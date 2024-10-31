@@ -1,7 +1,7 @@
 use std::ops::Index;
 
 use itertools::Either;
-use la_arena::{Arena, Idx, IdxRange, RawIdx};
+use la_arena::{Arena, Idx, IdxRange};
 use syntax::{SyntaxToken, TokenKind, ast};
 use utils::get::Get;
 
@@ -12,7 +12,7 @@ use crate::{
         expr::{
             LowerExpr, Selector,
             data_ty::{BuiltinDataTy, DataTy},
-            declarator::{DeclIdRange, Declarator, LowerDecl},
+            declarator::{DeclsRange, LowerDecl},
         },
         lower_ident_opt,
         module::LowerModuleCtx,
@@ -29,7 +29,7 @@ use crate::{
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct PortDecl {
     pub header: PortHeader,
-    pub decls: DeclIdRange,
+    pub decls: DeclsRange,
 }
 
 pub type PortDeclId = Idx<PortDecl>;
@@ -247,38 +247,26 @@ impl PortSrcs {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ParamPort {
     pub ty: DataTy,
-    pub decl: IdxRange<Declarator>,
+    pub decls: DeclsRange,
 }
 
 pub type ParamPortId = Idx<ParamPort>;
 
 define_src!(ParamPortSrc(ast::ParameterDeclaration));
 
-impl ParamPort {
-    pub(crate) fn new(ty: DataTy, start: usize, end: usize) -> Self {
-        let start = Idx::from_raw(RawIdx::from(start as u32));
-        let end = Idx::from_raw(RawIdx::from(end as u32));
-        Self { ty, decl: IdxRange::new(start..end) }
-    }
-}
-
 impl LowerModuleCtx<'_> {
     pub(crate) fn lower_param_ports(&mut self, param_ports: ast::ParameterPortList) {
-        for decl in param_ports.declarations().children() {
+        for decls in param_ports.declarations().children() {
             use ast::ParameterDeclarationBase::*;
-            match decl {
+            match decls {
                 ParameterDeclaration(param) => {
                     let ty = self.expr_ctx().lower_data_ty(param.type_());
 
-                    let next_param_port_idx = arena_nxt_idx(&self.module.params).into();
-                    let start = arena_nxt_idx(&self.module.decls);
-                    param.declarators().children().for_each(|decl| {
-                        self.decl_ctx().lower_declarator(decl, next_param_port_idx);
-                    });
-                    let end = arena_nxt_idx(&self.module.decls);
+                    let parent = arena_nxt_idx(&self.module.params).into();
+                    let decls = self.decl_ctx().lower_declarators(param.declarators(), parent);
 
                     alloc_idx_and_src! {
-                        ParamPort { ty, decl: IdxRange::new(start..end) } => self.module.params,
+                        ParamPort { ty, decls } => self.module.params,
                         param => self.module_source_map.param_srcs,
                     };
                 }
@@ -298,9 +286,8 @@ impl LowerModuleCtx<'_> {
                 ImplicitAnsiPort(port) => {
                     header = Some(self.lower_port_header(port.header(), header));
 
-                    let next_ansi_port_idx = arena_nxt_idx(&ports).into();
-                    let decl_id =
-                        self.decl_ctx().lower_declarator(port.declarator(), next_ansi_port_idx);
+                    let parent = arena_nxt_idx(&ports).into();
+                    let decl_id = self.decl_ctx().lower_declarator(port.declarator(), parent);
                     let end = arena_nxt_idx(&self.module.decls);
 
                     let port_decl_idx = alloc_idx_and_src! {

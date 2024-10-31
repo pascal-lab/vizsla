@@ -2,6 +2,7 @@ use la_arena::{Arena, Idx, IdxRange};
 use syntax::{TokenKind, ast};
 use utils::define_enum_deriving_from;
 
+use super::expr::declarator::DeclsRange;
 use crate::{
     alloc_idx_and_src,
     db::InternDb,
@@ -35,7 +36,7 @@ pub type DeclarationId = Idx<Declaration>;
 define_src!(DeclarationSrc(ast::DataDeclaration, ast::NetDeclaration, ast::ParameterDeclaration));
 
 impl Declaration {
-    pub fn decls(&self) -> IdxRange<Declarator> {
+    pub fn decls(&self) -> DeclsRange {
         match self {
             Declaration::DataDecl(data_decl) => data_decl.decls.clone(),
             Declaration::NetDecl(net_decl) => net_decl.decls.clone(),
@@ -49,7 +50,7 @@ pub struct DataDecl {
     pub ty: DataTy,
     pub const_kw: bool,
     pub var_kw: bool,
-    pub decls: IdxRange<Declarator>,
+    pub decls: DeclsRange,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -58,7 +59,7 @@ pub struct NetDecl {
     pub net_kind: Option<NetKind>,
     pub delay: Option<DelayControl>,
     pub strength: Option<NetStrength>,
-    pub decls: IdxRange<Declarator>,
+    pub decls: DeclsRange,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
@@ -71,7 +72,7 @@ pub enum NetStrength {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ParamDecl {
     pub ty: DataTy,
-    pub decls: IdxRange<Declarator>,
+    pub decls: DeclsRange,
 }
 
 pub(crate) struct LowerDeclarationCtx<'a> {
@@ -131,15 +132,8 @@ impl LowerDeclarationCtx<'_> {
 
         let ty = self.expr_ctx().lower_data_ty(data_decl.type_());
 
-        let decls = {
-            let next_declaration_idx = arena_nxt_idx(self.declarations).into();
-            let start = arena_nxt_idx(self.decls);
-            for decl in data_decl.declarators().children() {
-                self.decl_ctx().lower_declarator(decl, next_declaration_idx);
-            }
-            let end = arena_nxt_idx(self.decls);
-            IdxRange::new(start..end)
-        };
+        let parent = arena_nxt_idx(self.declarations).into();
+        let decls = self.decl_ctx().lower_declarators(data_decl.declarators(), parent);
 
         alloc_idx_and_src! {
             DataDecl { ty, const_kw, var_kw, decls } => self.declarations,
@@ -158,15 +152,8 @@ impl LowerDeclarationCtx<'_> {
             }
         });
 
-        let decls = {
-            let next_declaration_idx = arena_nxt_idx(self.declarations).into();
-            let start = arena_nxt_idx(self.decls);
-            for decl in net_decl.declarators().children() {
-                self.decl_ctx().lower_declarator(decl, next_declaration_idx);
-            }
-            let end = arena_nxt_idx(self.decls);
-            IdxRange::new(start..end)
-        };
+        let parent = arena_nxt_idx(self.declarations).into();
+        let decls = self.decl_ctx().lower_declarators(net_decl.declarators(), parent);
 
         let strength = net_decl.strength().and_then(|strength| {
             use ast::NetStrength::*;
@@ -200,15 +187,9 @@ impl LowerDeclarationCtx<'_> {
 
     fn lower_param_decl(&mut self, param_decl: ast::ParameterDeclaration) -> DeclarationId {
         let ty = self.expr_ctx().lower_data_ty(param_decl.type_());
-        let decls = {
-            let next_declaration_idx = arena_nxt_idx(self.declarations).into();
-            let start = arena_nxt_idx(self.decls);
-            for decl in param_decl.declarators().children() {
-                self.decl_ctx().lower_declarator(decl, next_declaration_idx);
-            }
-            let end = arena_nxt_idx(self.decls);
-            IdxRange::new(start..end)
-        };
+
+        let parent = arena_nxt_idx(self.declarations).into();
+        let decls = self.decl_ctx().lower_declarators(param_decl.declarators(), parent);
 
         alloc_idx_and_src! {
             ParamDecl { ty, decls } => self.declarations,

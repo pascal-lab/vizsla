@@ -9,7 +9,7 @@ use crate::{
     db::InternDb,
     define_src,
     hir_def::{
-        Ident,
+        Ident, arena_nxt_idx,
         declaration::DeclarationId,
         lower_ident_opt,
         module::port::{AnsiPortId, ParamPortId, PortDeclId},
@@ -39,7 +39,7 @@ define_enum_deriving_from! {
 }
 
 pub type DeclId = Idx<Declarator>;
-pub type DeclIdRange = IdxRange<Declarator>;
+pub type DeclsRange = IdxRange<Declarator>;
 
 define_src!(DeclaratorSrc(ast::Declarator));
 
@@ -76,6 +76,19 @@ macro_rules! impl_lower_decl {
 impl_lower_expr!(LowerDeclCtx<'_>);
 
 impl LowerDeclCtx<'_> {
+    pub(crate) fn lower_declarators<'a>(
+        &mut self,
+        declarators: ast::SeparatedList<'a, ast::Declarator<'a>>,
+        parent: DeclaratorParent,
+    ) -> DeclsRange {
+        let start = arena_nxt_idx(self.decls);
+        declarators.children().for_each(|decl| {
+            self.lower_declarator(decl, parent);
+        });
+        let end = arena_nxt_idx(self.decls);
+        DeclsRange::new(start..end)
+    }
+
     pub(crate) fn lower_declarator(
         &mut self,
         declarator: ast::Declarator,
