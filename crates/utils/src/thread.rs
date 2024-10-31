@@ -17,12 +17,11 @@ pub enum ThreadIntent {
 }
 
 pub struct Pool {
-    // `_handles` is never read: the field is present
-    // only for its `Drop` impl.
+    // `_handles` is never read: the field is present only for its `Drop` impl.
     // The worker threads exit once the channel closes;
-    // make sure to keep `job_sender` above `handles`
-    // so that the channel is actually closed
-    // before we join the worker threads!
+    //
+    // <ake sure to keep `job_sender` above `handles` so that the channel is
+    // actually closed before we join the worker threads!
     job_sender: Sender<Job>,
     _handles: Vec<JoinHandle>,
     extant_tasks: Arc<AtomicUsize>,
@@ -77,10 +76,6 @@ impl Pool {
 
         let job = Job { requested_intent: intent, f };
         self.job_sender.send(job).unwrap();
-    }
-
-    pub fn len(&self) -> usize {
-        self.extant_tasks.load(Ordering::SeqCst)
     }
 }
 

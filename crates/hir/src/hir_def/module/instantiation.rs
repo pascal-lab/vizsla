@@ -109,7 +109,7 @@ impl LowerModuleCtx<'_> {
             .map(|conn| {
                 use ast::PortConnection::*;
                 let hir_conn = match conn {
-                    EmptyPortConnection(conn) => PortConnection::Empty,
+                    EmptyPortConnection(_) => PortConnection::Empty,
                     OrderedPortConnection(conn) => {
                         let expr = self.expr_ctx().lower_property_expr(conn.expr());
                         PortConnection::Ordered(expr)
@@ -120,7 +120,7 @@ impl LowerModuleCtx<'_> {
                             conn.expr().map(|expr| self.expr_ctx().lower_property_expr(expr));
                         PortConnection::Named(name, expr)
                     }
-                    WildcardPortConnection(conn) => PortConnection::Wildcard,
+                    WildcardPortConnection(_) => PortConnection::Wildcard,
                 };
                 alloc_idx_and_src! {
                     hir_conn => self.module.inst_port_conns,

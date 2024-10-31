@@ -229,7 +229,7 @@ impl LowerStmtCtx<'_> {
 
             BlockStatement(stmt) => self.lower_block_stmt(stmt),
 
-            EmptyStatement(stmt) => StmtKind::Empty,
+            EmptyStatement(_) => StmtKind::Empty,
             _ => unimplemented!("lower_stmt: {:?}", stmt.syntax().kind()),
         };
 
@@ -401,7 +401,7 @@ impl LowerStmtCtx<'_> {
                             self.lower_stmt_opt(ast::Statement::cast(item.clause().syntax()));
                         CaseItem::Case { exprs, clause }
                     }
-                    PatternCaseItem(item) => unimplemented!("PatternCaseItem"),
+                    PatternCaseItem(_) => unimplemented!(),
                 }
             })
             .collect();

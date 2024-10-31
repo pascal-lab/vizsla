@@ -4,10 +4,8 @@ use itertools::{Either, Itertools};
 use span::{FilePosition, RangeInfo};
 use syntax::{
     SyntaxNodeExt, SyntaxTokenWithParent, TokenKind,
-    ast::{self, AstNode},
-    has_name::HasName,
+    ast::AstNode,
     has_text_range::HasTextRange,
-    match_ast, support,
     token::{is_pair_token, pair_token},
 };
 
@@ -41,7 +39,6 @@ fn handle_ctrl_flow_kw(
     sema: &Semantics<RootDb>,
     tok_with_parent @ SyntaxTokenWithParent { parent, tok }: SyntaxTokenWithParent,
 ) -> Option<Vec<NavTarget>> {
-    let kind = tok.kind();
     let file_id = sema.find_file(parent);
 
     if let Some(pair) = pair_token(tok_with_parent) {

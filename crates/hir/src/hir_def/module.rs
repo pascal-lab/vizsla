@@ -345,7 +345,7 @@ impl LowerModuleCtx<'_> {
                 HierarchyInstantiation(instantiation) => {
                     self.lower_instantiation(instantiation).into()
                 }
-                FunctionDeclaration(fn_decl) => todo!(),
+                FunctionDeclaration(_fn_decl) => todo!(),
                 ProceduralBlock(proc) => self.proc_ctx().lower_proc(proc).into(),
                 // Ports
                 PortDeclaration(port) => {

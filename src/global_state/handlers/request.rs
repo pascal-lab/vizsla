@@ -1,4 +1,4 @@
-use ide::{navigation_target::NavTarget, references::References};
+use ide::references::References;
 use itertools::Itertools;
 use span::FileRange;
 

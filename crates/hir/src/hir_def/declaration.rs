@@ -139,11 +139,11 @@ impl LowerDeclarationCtx<'_> {
 
         let decls = {
             let next_declaration_idx = arena_nxt_idx(self.declarations).into();
-            let start = arena_nxt_idx(self.decls).into();
+            let start = arena_nxt_idx(self.decls);
             for decl in data_decl.declarators().children() {
                 self.decl_ctx().lower_declarator(decl, next_declaration_idx);
             }
-            let end = arena_nxt_idx(self.decls).into();
+            let end = arena_nxt_idx(self.decls);
             IdxRange::new(start..end)
         };
 
@@ -166,11 +166,11 @@ impl LowerDeclarationCtx<'_> {
 
         let decls = {
             let next_declaration_idx = arena_nxt_idx(self.declarations).into();
-            let start = arena_nxt_idx(self.decls).into();
+            let start = arena_nxt_idx(self.decls);
             for decl in net_decl.declarators().children() {
                 self.decl_ctx().lower_declarator(decl, next_declaration_idx);
             }
-            let end = arena_nxt_idx(self.decls).into();
+            let end = arena_nxt_idx(self.decls);
             IdxRange::new(start..end)
         };
 
@@ -208,11 +208,11 @@ impl LowerDeclarationCtx<'_> {
         let ty = self.expr_ctx().lower_data_ty(param_decl.type_());
         let decls = {
             let next_declaration_idx = arena_nxt_idx(self.declarations).into();
-            let start = arena_nxt_idx(self.decls).into();
+            let start = arena_nxt_idx(self.decls);
             for decl in param_decl.declarators().children() {
                 self.decl_ctx().lower_declarator(decl, next_declaration_idx);
             }
-            let end = arena_nxt_idx(self.decls).into();
+            let end = arena_nxt_idx(self.decls);
             IdxRange::new(start..end)
         };
 

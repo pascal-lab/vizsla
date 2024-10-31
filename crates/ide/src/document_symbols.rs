@@ -13,7 +13,7 @@ use ide_db::root_db::RootDb;
 use line_index::TextRange;
 use smol_str::SmolStr;
 use syntax::{
-    ast::{self, AstNode, ModuleDeclaration, PortList, Statement},
+    ast::{self, AstNode, PortList},
     has_name::HasName,
     has_text_range::HasTextRange,
     match_ast,
@@ -114,7 +114,7 @@ fn collect_module_items(
                     let sym = build(hir.name.clone(), decl, cont_name.cloned(), None);
                     children.push(sym);
                 }
-                ExplicitAnsiPort(port) => unimplemented!(),
+                ExplicitAnsiPort(_port) => unimplemented!(),
                 _ => unreachable!(),
             }
         }
@@ -146,7 +146,7 @@ fn collect_module_items(
                     children.push(sym);
                 }
             }
-            FunctionDeclaration(fn_decl) => todo!(),
+            FunctionDeclaration(_fn_decl) => todo!(),
             ProceduralBlock(proc) => {
                 let stmt = proc.statement();
                 build_stmt(db, children, stmt, cont_name, &module, &src_map);
@@ -250,7 +250,7 @@ fn build_stmt<'a, Arn, SrcMap>(
                             build_stmt(db, res, stmt, container_name, arena, src_map);
                         }
                     }
-                    PatternCaseItem(item) => unimplemented!(),
+                    PatternCaseItem(_) => unimplemented!(),
                 }
             }
         }

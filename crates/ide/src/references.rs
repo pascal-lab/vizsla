@@ -1,11 +1,13 @@
 use hir::semantics::Semantics;
 use ide_db::root_db::RootDb;
-use itertools::Either;
 use line_index::TextRange;
 use nohash_hasher::IntMap;
 use span::FilePosition;
 use syntax::{
-    ast::{self, AstNode}, has_text_range::HasTextRange, match_ast, support, token::{is_pair_token, pair_token}, SyntaxNodeExt, SyntaxToken, SyntaxTokenWithParent, TokenKind
+    SyntaxNodeExt, SyntaxToken, SyntaxTokenWithParent, TokenKind,
+    ast::AstNode,
+    has_text_range::HasTextRange,
+    token::{is_pair_token, pair_token},
 };
 use vfs::FileId;
 

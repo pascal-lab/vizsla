@@ -300,8 +300,7 @@ impl VirtualPath {
     /// # Returns
     /// - `None` if `self` ends with `"//"`.
     /// - `Some((name, None))` if `self`'s base contains no `.`, or only one `.`
-    ///   at
-    /// the start.
+    ///   at the start.
     /// - `Some((name, Some(extension))` else.
     ///
     /// # Note

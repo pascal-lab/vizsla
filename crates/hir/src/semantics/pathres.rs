@@ -25,7 +25,7 @@ impl SemanticsImpl<'_> {
             let ident = lower_ident_opt(Some(ident))?;
 
             ContainerParent::start_from(db, container).find_map(|id| match id {
-                ContainerId::HirFileId(file_id) => {
+                ContainerId::HirFileId(_) => {
                     let scope = db.unit_scope();
                     let entry = scope.get(&ident)?;
                     Some(entry.into())

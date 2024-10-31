@@ -1,4 +1,3 @@
-use itertools::assert_equal;
 use serde::{Deserialize, Serialize};
 use utils::{json::get_field, paths::Utf8PathBuf};
 

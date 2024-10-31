@@ -110,7 +110,7 @@ pub mod support {
     }
 
     #[inline]
-    pub fn child_token<'a>(parent: SyntaxNode<'a>, kind: TokenKind) -> Option<SyntaxToken<'a>> {
+    pub fn child_token(parent: SyntaxNode, kind: TokenKind) -> Option<SyntaxToken> {
         parent.children().filter_map(|elem| elem.as_token()).find(|tok| tok.kind() == kind)
     }
 }

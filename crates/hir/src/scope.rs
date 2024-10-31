@@ -96,12 +96,6 @@ impl UnitScope {
     pub fn unit_scope_query(db: &dyn HirDb) -> Arc<UnitScope> {
         let mut scope = Scope::default();
 
-        let insert_opt = |scope: &mut ModuleScope, ident: &Option<Ident>, entry| {
-            if let Some(ident) = ident.as_ref() {
-                scope.insert(ident, entry);
-            }
-        };
-
         for file_id in db.files().iter() {
             let file_id = HirFileId(*file_id);
             let hir_file = db.hir_file(file_id);
@@ -139,7 +133,7 @@ impl ModuleScope {
                 continue;
             };
 
-            if let Some(ModuleEntry::NonAnsiPortEntry(entry)) = scope.entries.get_mut(name) {
+            if let Some(ModuleEntry::NonAnsiPortEntry(entry)) = scope.get_mut(name) {
                 if matches!(decl.parent, DeclaratorParent::PortDeclId(_)) {
                     entry.port_decl = Some(decl_id);
                 } else {
@@ -158,7 +152,7 @@ impl ModuleScope {
             scope.insert_opt(&stmt.label, stmt_id.into());
 
             if let StmtKind::Block(BlockInfo { name, block_id }) = &stmt.kind {
-                scope.insert_opt(&name, block_id.clone().into());
+                scope.insert_opt(name, (*block_id).into());
             }
         }
 
@@ -179,7 +173,7 @@ impl BlockScope {
             scope.insert_opt(&stmt.label, stmt_id.into());
 
             if let StmtKind::Block(BlockInfo { name, block_id }) = &stmt.kind {
-                scope.insert_opt(&name, block_id.clone().into());
+                scope.insert_opt(name, (*block_id).into());
             }
         }
 

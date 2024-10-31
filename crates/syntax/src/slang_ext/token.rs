@@ -1,6 +1,7 @@
 use either::Either;
 use slang::{
-    ast::{self, AstNode}, SyntaxToken, SyntaxTokenWithParent, TokenKind, T
+    SyntaxToken, SyntaxTokenWithParent, T, TokenKind,
+    ast::{self, AstNode},
 };
 
 use crate::support;

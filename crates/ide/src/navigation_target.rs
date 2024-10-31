@@ -50,7 +50,6 @@ impl ToNav for Definition {
             Definition::NonAnsiPort(nonansi_port_id) => nonansi_port_id.to_nav(db),
             Definition::Decl(decl_id) => decl_id.to_nav(db),
             Definition::Instance(instance_id) => instance_id.to_nav(db),
-            Definition::BlockId(block_id) => block_id.to_nav(db),
             Definition::Stmt(stmt_id) => stmt_id.to_nav(db),
         }
     }

@@ -136,7 +136,7 @@ impl GlobalState {
 
         let event_handling_duration = loop_start.elapsed();
 
-        let state_changed = self.process_changes();
+        self.process_changes();
 
         if self.config.user_config.workspace_auto_reload
             && let Some(cause) = self.fetch_workspaces_task.should_start()

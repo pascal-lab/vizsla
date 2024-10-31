@@ -99,8 +99,8 @@ impl Iterator for ContainerParent<'_> {
     fn next(&mut self) -> Option<Self::Item> {
         let next = self.cont_id;
         self.cont_id = match self.cont_id? {
+            ContainerId::HirFileId(_) => None,
             ContainerId::ModuleId(module_id) => Some(module_id.cont_id.into()),
-            ContainerId::HirFileId(file_id) => None,
             ContainerId::BlockId(block_id) => Some(block_id.lookup(self.db).cont_id),
         };
         next

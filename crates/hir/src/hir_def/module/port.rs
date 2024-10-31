@@ -316,7 +316,7 @@ impl LowerModuleCtx<'_> {
                         port => srcs,
                     };
                 }
-                ExplicitAnsiPort(port) => unimplemented!(),
+                ExplicitAnsiPort(_port) => unimplemented!(),
                 _ => unreachable!(),
             };
         }
@@ -461,7 +461,7 @@ impl LowerModuleCtx<'_> {
                     },
                 }
             }
-            InterfacePortHeader(header) => unimplemented!(),
+            InterfacePortHeader(_header) => unimplemented!(),
         }
     }
 

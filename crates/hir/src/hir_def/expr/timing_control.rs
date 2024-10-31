@@ -128,7 +128,7 @@ impl LowerEventExprCtx<'_> {
             ast::TimingControl::Delay3(delay3) => {
                 TimingControl::DelayControl(self.lower_delay3(delay3))
             }
-            ast::TimingControl::ImplicitEventControl(implicit_event_control) => {
+            ast::TimingControl::ImplicitEventControl(_) => {
                 TimingControl::EventControl(EventControl::Implicit)
             }
             ast::TimingControl::EventControlWithExpression(expr) => {
