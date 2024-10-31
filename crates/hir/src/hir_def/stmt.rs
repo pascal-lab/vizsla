@@ -7,7 +7,7 @@ use syntax::{
 };
 
 use super::{
-    Ident, arena_nxt_idx,
+    HirData, Ident,
     block::{BlockInfo, BlockLoc},
     expr::{
         Expr, ExprId, ExprSrc, LowerExpr,
@@ -279,7 +279,7 @@ impl LowerStmtCtx<'_> {
             Some(SyntaxKind::FOR_VARIABLE_DECLARATION) => {
                 let mut ty = None;
                 let mut inits = SmallVec::new();
-                let next_stmt_id = arena_nxt_idx(self.stmts).into();
+                let next_stmt_id = self.stmts.nxt_idx().into();
                 for init in initializers {
                     let init = ast::ForVariableDeclaration::cast(init.syntax()).unwrap();
                     if let Some(ast_ty) = init.type_() {

@@ -9,7 +9,7 @@ use crate::{
     db::InternDb,
     define_src,
     hir_def::{
-        Ident, arena_nxt_idx,
+        HirData, Ident,
         declaration::DeclarationId,
         lower_ident_opt,
         module::port::{AnsiPortId, ParamPortId, PortDeclId},
@@ -81,11 +81,11 @@ impl LowerDeclCtx<'_> {
         declarators: ast::SeparatedList<'a, ast::Declarator<'a>>,
         parent: DeclaratorParent,
     ) -> DeclsRange {
-        let start = arena_nxt_idx(self.decls);
+        let start = self.decls.nxt_idx();
         declarators.children().for_each(|decl| {
             self.lower_declarator(decl, parent);
         });
-        let end = arena_nxt_idx(self.decls);
+        let end = self.decls.nxt_idx();
         DeclsRange::new(start..end)
     }
 

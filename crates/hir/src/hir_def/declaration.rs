@@ -1,4 +1,4 @@
-use la_arena::{Arena, Idx, IdxRange};
+use la_arena::{Arena, Idx};
 use syntax::{TokenKind, ast};
 use utils::define_enum_deriving_from;
 
@@ -8,7 +8,7 @@ use crate::{
     db::InternDb,
     define_src,
     hir_def::{
-        arena_nxt_idx,
+        HirData,
         expr::{
             Expr, ExprSrc, LowerExpr,
             data_ty::DataTy,
@@ -132,7 +132,7 @@ impl LowerDeclarationCtx<'_> {
 
         let ty = self.expr_ctx().lower_data_ty(data_decl.type_());
 
-        let parent = arena_nxt_idx(self.declarations).into();
+        let parent = self.declarations.nxt_idx().into();
         let decls = self.decl_ctx().lower_declarators(data_decl.declarators(), parent);
 
         alloc_idx_and_src! {
@@ -152,7 +152,7 @@ impl LowerDeclarationCtx<'_> {
             }
         });
 
-        let parent = arena_nxt_idx(self.declarations).into();
+        let parent = self.declarations.nxt_idx().into();
         let decls = self.decl_ctx().lower_declarators(net_decl.declarators(), parent);
 
         let strength = net_decl.strength().and_then(|strength| {
@@ -188,7 +188,7 @@ impl LowerDeclarationCtx<'_> {
     fn lower_param_decl(&mut self, param_decl: ast::ParameterDeclaration) -> DeclarationId {
         let ty = self.expr_ctx().lower_data_ty(param_decl.type_());
 
-        let parent = arena_nxt_idx(self.declarations).into();
+        let parent = self.declarations.nxt_idx().into();
         let decls = self.decl_ctx().lower_declarators(param_decl.declarators(), parent);
 
         alloc_idx_and_src! {

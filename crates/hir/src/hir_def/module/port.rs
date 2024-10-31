@@ -8,7 +8,7 @@ use utils::get::Get;
 use crate::{
     alloc_idx_and_src, define_src,
     hir_def::{
-        Ident, arena_nxt_idx,
+        HirData, Ident,
         expr::{
             LowerExpr, Selector,
             data_ty::{BuiltinDataTy, DataTy},
@@ -262,7 +262,7 @@ impl LowerModuleCtx<'_> {
                 ParameterDeclaration(param) => {
                     let ty = self.expr_ctx().lower_data_ty(param.type_());
 
-                    let parent = arena_nxt_idx(&self.module.params).into();
+                    let parent = self.module.params.nxt_idx().into();
                     let decls = self.decl_ctx().lower_declarators(param.declarators(), parent);
 
                     alloc_idx_and_src! {
@@ -286,9 +286,9 @@ impl LowerModuleCtx<'_> {
                 ImplicitAnsiPort(port) => {
                     header = Some(self.lower_port_header(port.header(), header));
 
-                    let parent = arena_nxt_idx(&ports).into();
+                    let parent = ports.nxt_idx().into();
                     let decl_id = self.decl_ctx().lower_declarator(port.declarator(), parent);
-                    let end = arena_nxt_idx(&self.module.decls);
+                    let end = self.module.decls.nxt_idx();
 
                     let port_decl_idx = alloc_idx_and_src! {
                         PortDecl {
@@ -327,7 +327,7 @@ impl LowerModuleCtx<'_> {
                     EmptyNonAnsiPort(_) => (None, None),
                 };
 
-                let start = arena_nxt_idx(&refs);
+                let start = refs.nxt_idx();
 
                 let mut lower_port_ref = |port_ref: ast::PortReference| {
                     let ident = lower_ident_opt(port_ref.name());
@@ -346,12 +346,12 @@ impl LowerModuleCtx<'_> {
                         concat.references().children().for_each(|port_ref| {
                             lower_port_ref(port_ref);
                         });
-                        let end = arena_nxt_idx(&refs);
+                        let end = refs.nxt_idx();
                         NonAnsiPort { label, refs: Some(IdxRange::new(start..end)) }
                     }
                     Some(PortReference(port_ref)) => {
                         lower_port_ref(port_ref);
-                        let end = arena_nxt_idx(&refs);
+                        let end = refs.nxt_idx();
                         NonAnsiPort { label, refs: Some(IdxRange::new(start..end)) }
                     }
                     None => NonAnsiPort { label, refs: None },
@@ -371,15 +371,11 @@ impl LowerModuleCtx<'_> {
     pub(crate) fn lower_port_decl(&mut self, decl: ast::PortDeclaration) {
         let header = self.lower_port_header(decl.header(), None);
 
-        let next_port_decl_idx = arena_nxt_idx(&self.module.port_decls).into();
-        let start = arena_nxt_idx(&self.module.decls);
-        decl.declarators().children().for_each(|decl| {
-            self.decl_ctx().lower_declarator(decl, next_port_decl_idx);
-        });
-        let end = arena_nxt_idx(&self.module.decls);
+        let parent = self.module.port_decls.nxt_idx().into();
+        let decls = self.decl_ctx().lower_declarators(decl.declarators(), parent);
 
         alloc_idx_and_src! {
-            PortDecl { header, decls: IdxRange::new(start..end) } => self.module.port_decls,
+            PortDecl { header, decls } => self.module.port_decls,
             decl => self.module_source_map.prot_decl_srcs,
         };
     }

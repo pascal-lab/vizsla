@@ -59,11 +59,6 @@ pub(crate) fn lower_named_label_opt(label: Option<ast::NamedLabel>) -> Option<Id
     if ident.is_empty() { None } else { Some(ident) }
 }
 
-#[inline]
-pub(crate) fn arena_nxt_idx<T>(arena: &Arena<T>) -> Idx<T> {
-    Idx::from_raw(RawIdx::from(arena.len() as u32))
-}
-
 #[macro_export]
 macro_rules! alloc_idx_and_src {
     ($hir:expr => $arena:expr, $ast:expr => $src_map:expr $(,)?) => {{
@@ -72,4 +67,15 @@ macro_rules! alloc_idx_and_src {
         $src_map.insert(src, idx);
         idx
     }};
+}
+
+trait HirData<T> {
+    fn nxt_idx(&self) -> Idx<T>;
+}
+
+impl<T> HirData<T> for Arena<T> {
+    #[inline]
+    fn nxt_idx(&self) -> Idx<T> {
+        Idx::from_raw(RawIdx::from(self.len() as u32))
+    }
 }
