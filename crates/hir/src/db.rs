@@ -56,6 +56,9 @@ pub trait HirDb: InternDb {
     #[salsa::invoke(UnitScope::unit_scope_query)]
     fn unit_scope(&self) -> Arc<UnitScope>;
 
+    #[salsa::invoke(UnitScope::file_scope_query)]
+    fn file_scope(&self, file_id: HirFileId) -> Arc<UnitScope>;
+
     #[salsa::invoke(ModuleScope::module_scope_query)]
     fn module_scope(&self, module_id: ModuleId) -> Arc<ModuleScope>;
 

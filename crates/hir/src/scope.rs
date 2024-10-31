@@ -59,7 +59,7 @@ define_enum_deriving_from! {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Scope<Entry> {
-    pub entries: FxHashMap<Ident, Entry>,
+    entries: FxHashMap<Ident, Entry>,
 }
 
 impl<Entry> Default for Scope<Entry> {
@@ -98,15 +98,23 @@ impl UnitScope {
 
         for file_id in db.files().iter() {
             let file_id = HirFileId(*file_id);
-            let hir_file = db.hir_file(file_id);
+            let file_scope = db.file_scope(file_id);
+            scope.entries.extend(file_scope.entries.clone().into_iter());
+        }
 
-            for (module_id, module_info) in hir_file.modules.iter() {
-                scope.insert_opt(&module_info.name, InFile::new(file_id, module_id).into());
-            }
+        Arc::new(scope)
+    }
 
-            for (decl_id, decl) in hir_file.decls.iter() {
-                scope.insert_opt(&decl.name, InFile::new(file_id, decl_id).into());
-            }
+    pub(super) fn file_scope_query(db: &dyn HirDb, file_id: HirFileId) -> Arc<UnitScope> {
+        let mut scope = Scope::default();
+        let hir_file = db.hir_file(file_id);
+
+        for (module_id, module_info) in hir_file.modules.iter() {
+            scope.insert_opt(&module_info.name, InFile::new(file_id, module_id).into());
+        }
+
+        for (decl_id, decl) in hir_file.decls.iter() {
+            scope.insert_opt(&decl.name, InFile::new(file_id, decl_id).into());
         }
 
         Arc::new(scope)
