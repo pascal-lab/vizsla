@@ -15,23 +15,23 @@ use utils::{
 
 use super::{
     Ident,
-    declaration::{Declaration, DeclarationId, DeclarationSrc, LowerDeclaration},
+    declaration::{
+        Declaration, DeclarationId, DeclarationSrc, LowerDeclaration, impl_lower_declaration,
+    },
     expr::{
         Expr, ExprId, ExprSrc,
-        declarator::{DeclId, Declarator, DeclaratorSrc},
-        timing_control::{EventExpr, EventExprId, EventExprSrc},
+        declarator::{DeclId, Declarator, DeclaratorSrc, impl_lower_decl},
+        impl_lower_expr,
+        timing_control::{EventExpr, EventExprId, EventExprSrc, impl_lower_event_expr},
     },
-    stmt::{LowerStmt, Stmt, StmtId, StmtKind, StmtSrc},
+    impl_arena_idx, lower_ident_opt,
+    stmt::{LowerStmt, Stmt, StmtId, StmtKind, StmtSrc, impl_lower_stmt},
 };
 use crate::{
     container::{ContainerId, InFile},
     db::{HirDb, InternDb},
-    define_src,
     file::HirFileId,
-    hir_def::lower_ident_opt,
-    impl_arena_idx, impl_lower_decl, impl_lower_declaration, impl_lower_event_expr,
-    impl_lower_expr, impl_lower_stmt, impl_source_map_idx,
-    source_map::{SourceMap, ToAstNode},
+    source_map::{SourceMap, ToAstNode, define_src, impl_source_map_idx},
 };
 
 define_hir_container_data! {
@@ -70,7 +70,7 @@ define_src!(BlockSrc(ast::BlockStatement));
 
 impl From<BlockSrc> for StmtSrc {
     fn from(src: BlockSrc) -> Self {
-        StmtSrc::new(src.0)
+        StmtSrc::new(src.into())
     }
 }
 
@@ -79,7 +79,7 @@ impl Get<LocalBlockId> for SourceMap<StmtSrc, Stmt> {
 
     fn get_opt(&self, block_id: LocalBlockId) -> Option<Self::Output> {
         let stmt_id = block_id.0;
-        Some(BlockSrc(self.get(stmt_id).ptr()))
+        Some(BlockSrc(self.get(stmt_id).into()))
     }
 }
 

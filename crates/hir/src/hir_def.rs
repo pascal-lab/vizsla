@@ -14,8 +14,7 @@ use smol_str::{SmolStr, ToSmolStr};
 use syntax::{SyntaxToken, ast};
 use utils::get::GetRef;
 
-#[macro_export]
-macro_rules! impl_arena_idx {
+pub(self) macro impl_arena_idx {
     ($data:ident => $fld:ident[$ty:ty], $($rest:tt)* ) => {
         impl $crate::hir_def::GetRef<$crate::hir_def::Idx<$ty>> for $data {
             type Output = $ty;
@@ -25,7 +24,7 @@ macro_rules! impl_arena_idx {
             }
         }
         impl_arena_idx!($data => $($rest)*);
-    };
+    },
     ($data:ident => $fld:ident[$id:ty => $hir:ty], $($rest:tt)* ) => {
         impl $crate::hir_def::GetRef<$id> for $data {
             type Output = $hir;
@@ -35,8 +34,8 @@ macro_rules! impl_arena_idx {
             }
         }
         impl_arena_idx!($data => $($rest)*);
-    };
-    ($data:ident =>) => {};
+    },
+    ($data:ident =>) => {},
 }
 
 pub type Ident = SmolStr;
@@ -59,15 +58,12 @@ pub(crate) fn lower_named_label_opt(label: Option<ast::NamedLabel>) -> Option<Id
     if ident.is_empty() { None } else { Some(ident) }
 }
 
-#[macro_export]
-macro_rules! alloc_idx_and_src {
-    ($hir:expr => $arena:expr, $ast:expr => $src_map:expr $(,)?) => {{
-        let idx = $arena.alloc($hir.into());
-        let src = $ast.into();
-        $src_map.insert(src, idx);
-        idx
-    }};
-}
+macro alloc_idx_and_src($hir:expr => $arena:expr, $ast:expr => $src_map:expr $(,)?) {{
+    let idx = $arena.alloc($hir.into());
+    let src = $ast.into();
+    $src_map.insert(src, idx);
+    idx
+}}
 
 trait HirData<T> {
     fn nxt_idx(&self) -> Idx<T>;

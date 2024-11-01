@@ -6,25 +6,26 @@ use triomphe::Arc;
 use utils::define_enum_deriving_from;
 
 use super::{
+    alloc_idx_and_src,
     block::{BlockInfo, BlockSrc, LocalBlockId},
-    declaration::{Declaration, DeclarationId, DeclarationSrc, LowerDeclaration},
+    declaration::{
+        Declaration, DeclarationId, DeclarationSrc, LowerDeclaration, impl_lower_declaration,
+    },
     expr::{
         Expr, ExprId, ExprSrc,
-        declarator::{DeclId, Declarator, DeclaratorSrc},
-        timing_control::{EventExpr, EventExprId, EventExprSrc},
+        declarator::{DeclId, Declarator, DeclaratorSrc, impl_lower_decl},
+        impl_lower_expr,
+        timing_control::{EventExpr, EventExprId, EventExprSrc, impl_lower_event_expr},
     },
-    lower_ident,
+    impl_arena_idx, lower_ident,
     module::{LocalModuleId, ModuleInfo, ModuleSrc},
     proc::{LowerProc, LowerProcCtx, Proc, ProcId, ProcSrc},
-    stmt::{Stmt, StmtId, StmtSrc},
+    stmt::{Stmt, StmtId, StmtSrc, impl_lower_stmt},
 };
 use crate::{
-    alloc_idx_and_src,
     db::{HirDb, InternDb},
     file::HirFileId,
-    impl_arena_idx, impl_lower_decl, impl_lower_declaration, impl_lower_event_expr,
-    impl_lower_expr, impl_lower_stmt, impl_source_map_idx,
-    source_map::SourceMap,
+    source_map::{SourceMap, impl_source_map_idx},
 };
 
 define_hir_container_data! {

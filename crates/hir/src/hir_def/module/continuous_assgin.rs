@@ -4,14 +4,15 @@ use syntax::ast;
 
 use super::LowerModuleCtx;
 use crate::{
-    alloc_idx_and_src, define_src,
     hir_def::{
+        alloc_idx_and_src,
         expr::{
             Assign, LowerExpr,
             timing_control::{DelayControl, LowerEventExpr, TimingControl},
         },
         ty::{DriveStrength, lower_drive_strength},
     },
+    source_map::define_src,
 };
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]

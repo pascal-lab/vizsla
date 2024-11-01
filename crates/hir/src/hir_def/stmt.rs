@@ -12,20 +12,20 @@ use super::{
     expr::{
         Expr, ExprId, ExprSrc, LowerExpr,
         data_ty::DataTy,
-        declarator::{DeclId, Declarator, DeclaratorSrc, LowerDecl},
-        timing_control::{EventExpr, EventExprSrc, LowerEventExpr, TimingControl},
+        declarator::{DeclId, Declarator, DeclaratorSrc, LowerDecl, impl_lower_decl},
+        impl_lower_expr,
+        timing_control::{
+            EventExpr, EventExprSrc, LowerEventExpr, TimingControl, impl_lower_event_expr,
+        },
     },
     lower_ident_opt,
 };
 use crate::{
-    alloc_idx_and_src,
     container::{ContainerId, InFile},
     db::InternDb,
-    define_src,
     file::HirFileId,
-    hir_def::lower_named_label_opt,
-    impl_lower_decl, impl_lower_event_expr, impl_lower_expr,
-    source_map::SourceMap,
+    hir_def::{alloc_idx_and_src, lower_named_label_opt},
+    source_map::{SourceMap, define_src},
 };
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -79,10 +79,6 @@ define_src!(StmtSrc(ast::Statement));
 impl StmtSrc {
     pub(super) fn new(src: SyntaxNodePtr) -> Self {
         Self(src)
-    }
-
-    pub(super) fn ptr(&self) -> SyntaxNodePtr {
-        self.0
     }
 }
 
@@ -143,8 +139,7 @@ pub(crate) trait LowerStmt: LowerExpr + LowerEventExpr + LowerDecl {
     fn stmt_ctx(&mut self) -> LowerStmtCtx;
 }
 
-#[macro_export]
-macro_rules! impl_lower_stmt {
+pub(in crate::hir_def) macro impl_lower_stmt {
     ($ctx:ty, $cont_id:ident $(,$data:ident, $src_map:ident)?) => {
         impl $crate::hir_def::stmt::LowerStmt for $ctx {
             fn stmt_ctx(&mut self) -> $crate::hir_def::stmt::LowerStmtCtx {
@@ -163,7 +158,7 @@ macro_rules! impl_lower_stmt {
                 }
             }
         }
-    };
+    }
 }
 
 pub(crate) struct LowerStmtCtx<'a> {

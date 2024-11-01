@@ -1,13 +1,16 @@
 use la_arena::{Arena, Idx};
 use syntax::ast;
 
+use super::{
+    expr::{declarator::impl_lower_decl, impl_lower_expr, timing_control::impl_lower_event_expr},
+    stmt::impl_lower_stmt,
+};
 use crate::{
-    alloc_idx_and_src,
     container::ContainerId,
     db::InternDb,
-    define_src,
     file::HirFileId,
     hir_def::{
+        alloc_idx_and_src,
         expr::{
             Expr, ExprSrc,
             declarator::{Declarator, DeclaratorSrc},
@@ -15,8 +18,7 @@ use crate::{
         },
         stmt::{LowerStmt, Stmt, StmtId, StmtSrc},
     },
-    impl_lower_decl, impl_lower_event_expr, impl_lower_expr, impl_lower_stmt,
-    source_map::SourceMap,
+    source_map::{SourceMap, define_src},
 };
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]

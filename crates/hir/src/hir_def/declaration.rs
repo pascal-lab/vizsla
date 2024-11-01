@@ -2,13 +2,15 @@ use la_arena::{Arena, Idx};
 use syntax::{TokenKind, ast};
 use utils::define_enum_deriving_from;
 
-use super::expr::declarator::DeclsRange;
+use super::expr::{
+    declarator::{DeclsRange, impl_lower_decl},
+    impl_lower_expr,
+    timing_control::impl_lower_event_expr,
+};
 use crate::{
-    alloc_idx_and_src,
     db::InternDb,
-    define_src,
     hir_def::{
-        HirData,
+        HirData, alloc_idx_and_src,
         expr::{
             Expr, ExprSrc, LowerExpr,
             data_ty::DataTy,
@@ -19,8 +21,7 @@ use crate::{
             DriveStrength, NetKind, Strength, lower_drive_strength, lower_net_kind, lower_strength,
         },
     },
-    impl_lower_decl, impl_lower_event_expr, impl_lower_expr,
-    source_map::SourceMap,
+    source_map::{SourceMap, define_src},
 };
 
 define_enum_deriving_from! {
@@ -94,25 +95,22 @@ pub(crate) trait LowerDeclaration: LowerDecl + LowerEventExpr {
     fn declaration_ctx(&mut self) -> LowerDeclarationCtx<'_>;
 }
 
-#[macro_export]
-macro_rules! impl_lower_declaration {
-    ($ctx:ty, $data:ident, $src_map:ident) => {
-        impl $crate::hir_def::declaration::LowerDeclaration for $ctx {
-            fn declaration_ctx(&mut self) -> $crate::hir_def::declaration::LowerDeclarationCtx {
-                $crate::hir_def::declaration::LowerDeclarationCtx {
-                    db: self.db,
-                    declarations: &mut self.$data.declarations,
-                    declaration_srcs: &mut self.$src_map.declaration_srcs,
-                    decls: &mut self.$data.decls,
-                    decl_srcs: &mut self.$src_map.decl_srcs,
-                    event_exprs: &mut self.$data.event_exprs,
-                    event_expr_srcs: &mut self.$src_map.event_expr_srcs,
-                    exprs: &mut self.$data.exprs,
-                    expr_srcs: &mut self.$src_map.expr_srcs,
-                }
+pub(in crate::hir_def) macro impl_lower_declaration($ctx:ty, $data:ident, $src_map:ident) {
+    impl $crate::hir_def::declaration::LowerDeclaration for $ctx {
+        fn declaration_ctx(&mut self) -> $crate::hir_def::declaration::LowerDeclarationCtx {
+            $crate::hir_def::declaration::LowerDeclarationCtx {
+                db: self.db,
+                declarations: &mut self.$data.declarations,
+                declaration_srcs: &mut self.$src_map.declaration_srcs,
+                decls: &mut self.$data.decls,
+                decl_srcs: &mut self.$src_map.decl_srcs,
+                event_exprs: &mut self.$data.event_exprs,
+                event_expr_srcs: &mut self.$src_map.event_expr_srcs,
+                exprs: &mut self.$data.exprs,
+                expr_srcs: &mut self.$src_map.expr_srcs,
             }
         }
-    };
+    }
 }
 
 impl_lower_expr!(LowerDeclarationCtx<'_>);

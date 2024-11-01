@@ -6,9 +6,8 @@ use syntax::{SyntaxToken, TokenKind, ast};
 use utils::get::Get;
 
 use crate::{
-    alloc_idx_and_src, define_src,
     hir_def::{
-        HirData, Ident,
+        HirData, Ident, alloc_idx_and_src,
         expr::{
             LowerExpr, Selector,
             data_ty::{BuiltinDataTy, DataTy},
@@ -18,7 +17,7 @@ use crate::{
         module::LowerModuleCtx,
         ty::{NetType, lower_net_kind},
     },
-    source_map::SourceMap,
+    source_map::{SourceMap, define_src},
 };
 
 // module IDENT (port_list);

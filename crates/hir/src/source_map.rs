@@ -2,7 +2,7 @@ use std::{fmt::Debug, hash::Hash};
 
 pub(crate) use la_arena::{ArenaMap, Idx};
 use rustc_hash::FxHashMap;
-use syntax::ast::AstNode;
+use syntax::{ast, ast::AstNode};
 use triomphe::Arc;
 pub(crate) use utils::get::Get;
 use utils::get::GetRef;
@@ -63,8 +63,7 @@ impl<Src: IsSrc, Hir> Default for SourceMap<Src, Hir> {
     }
 }
 
-#[macro_export]
-macro_rules! impl_source_map_idx {
+pub(crate) macro impl_source_map_idx {
     ($datas:ident => $($fld:ident[$src:ty, $hir_id:ty]),+ $(,)? ) => {
         $(
             impl $crate::source_map::Get<$src> for $datas {
@@ -81,15 +80,14 @@ macro_rules! impl_source_map_idx {
                 }
             }
         )+
-    };
+    }
 }
 
 pub trait ToAstNode<'a, Output: AstNode<'a>> {
     fn to_node(&self, tree: &'a syntax::SyntaxTree) -> Option<Output>;
 }
 
-#[macro_export]
-macro_rules! define_src {
+pub(crate) macro define_src {
     ($name:ident(ast::$ty:ident)) => {
         #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
         pub struct $name(syntax::ptr::SyntaxNodePtr);
@@ -111,7 +109,13 @@ macro_rules! define_src {
                 Self(syntax::slang_ext::AstNodeExt::to_ptr(&node))
             }
         }
-    };
+
+        impl From<$name> for syntax::ptr::SyntaxNodePtr {
+            fn from(src: $name) -> Self {
+                src.0
+            }
+        }
+    },
 
     ($name:ident($(ast::$ty:ident),*)$(,)?) => {
         #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]

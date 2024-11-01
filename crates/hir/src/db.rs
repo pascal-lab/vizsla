@@ -13,12 +13,9 @@ use crate::{
     scope::{BlockScope, ModuleScope, UnitScope},
 };
 
-#[macro_export]
-macro_rules! impl_intern {
-    ($id:ident, $loc:ident, $intern:ident, $lookup:ident) => {
-        impl_intern_key!($id);
-        impl_intern_lookup!(InternDb, $id, $loc, $intern, $lookup);
-    };
+pub(crate) macro impl_intern($id:ident, $loc:ident, $intern:ident, $lookup:ident) {
+    impl_intern_key!($id);
+    impl_intern_lookup!(InternDb, $id, $loc, $intern, $lookup);
 }
 
 #[salsa::query_group(InternDbStorage)]
