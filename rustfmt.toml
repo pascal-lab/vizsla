@@ -1,5 +1,5 @@
 unstable_features = true
-version = "Two"
+style_edition = "2024"
 
 format_macro_matchers = true
 group_imports = "StdExternalCrate"
