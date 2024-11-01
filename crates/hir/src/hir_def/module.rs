@@ -1,8 +1,7 @@
-use continuous_assgin::{ContinuousAssign, ContinuousAssignId, ContinuousAssignSrc};
+use continuous_assgin::{ContAssign, ContAssignId, ContAssignSrc};
 use instantiation::{
     Instance, InstanceId, InstanceSrc, Instantiation, InstantiationId, InstantiationSrc,
-    ParamAssign, ParamAssignId, ParamAssignSrc, PortConnection, PortConnectionId,
-    PortConnectionSrc,
+    ParamAssign, ParamAssignId, ParamAssignSrc, PortConn, PortConnId, PortConnSrc,
 };
 use la_arena::{Arena, Idx};
 use port::{
@@ -10,6 +9,7 @@ use port::{
     ParamPortId, ParamPortSrc, PortDecl, PortDeclId, PortDeclSrc, PortRef, PortRefId, PortRefSrc,
     PortSrcs, Ports,
 };
+use proc_macro_utils::define_hir_container_data;
 use syntax::ast::{self, AstNode, PortList};
 use triomphe::Arc;
 use utils::{
@@ -44,88 +44,49 @@ pub mod continuous_assgin;
 pub mod instantiation;
 pub mod port;
 
-#[derive(Default, Debug, PartialEq, Eq, Clone)]
-pub struct Module {
-    pub name: Option<Ident>,
-    pub items: Arena<ModuleItem>,
+define_hir_container_data! {
+    #[derive(Default, Debug, PartialEq, Eq, Clone)]
+    pub struct Module | ModuleSourceMap {
+        name: Option<Ident>,
+        items: Arena<ModuleItem>,
 
-    pub params: Arena<ParamPort>,
-    pub ports: Ports,
-    pub port_decls: Arena<PortDecl>,
+        params | param_srcs: ParamPort[ParamPortId | ParamPortSrc],
+        ports | port_srcs: Ports[_ | PortSrcs] => {
+            NonAnsiPort[NonAnsiPortId | NonAnsiPortSrc],
+            AnsiPort[AnsiPortId | AnsiPortSrc],
+            PortRef[PortRefId | PortRefSrc],
+        },
+        port_decls | prot_decl_srcs: PortDecl[PortDeclId | PortDeclSrc],
 
-    pub cont_assigns: Arena<ContinuousAssign>,
-    pub declarations: Arena<Declaration>,
+        cont_assigns | assign_srcs: ContAssign[ContAssignId | ContAssignSrc],
+        declarations | declaration_srcs: Declaration[DeclarationId | DeclarationSrc],
 
-    pub instantiations: Arena<Instantiation>,
-    pub inst_param_assigns: Arena<ParamAssign>,
-    pub inst_port_conns: Arena<PortConnection>,
-    pub instances: Arena<Instance>,
+        instantiations | instantiation_srcs: Instantiation[InstantiationId | InstantiationSrc],
+        inst_param_assigns | inst_param_assign_srcs: ParamAssign[ParamAssignId | ParamAssignSrc],
+        instances | instance_srcs: Instance[InstanceId | InstanceSrc],
+        inst_port_conns | inst_port_conn_srcs: PortConn[PortConnId | PortConnSrc],
 
-    pub procs: Arena<Proc>,
+        procs | proc_srcs: Proc[ProcId | ProcSrc],
 
-    pub exprs: Arena<Expr>,
-    pub event_exprs: Arena<EventExpr>,
-    pub decls: Arena<Declarator>,
-    pub stmts: Arena<Stmt>,
+        exprs | expr_srcs: Expr[ExprId | ExprSrc],
+        event_exprs | event_expr_srcs: EventExpr[EventExprId | EventExprSrc],
+        decls | decl_srcs: Declarator[DeclId | DeclaratorSrc],
+        stmts | stmt_srcs: Stmt[StmtId | StmtSrc] => {
+            Stmt[StmtId | StmtSrc],
+            BlockInfo[LocalBlockId => BlockSrc],
+        }
+    }
 }
 
 define_src!(ModuleSrc(ast::ModuleDeclaration));
 
-impl_arena_idx! { Module =>
-    params[ParamPort],
-    ports[NonAnsiPort],
-    ports[AnsiPort],
-    ports[PortRef],
-    port_decls[PortDecl],
-
-    items[ModuleItem],
-    cont_assigns[ContinuousAssign],
-    declarations[Declaration],
-
-    instantiations[Instantiation],
-    inst_param_assigns[ParamAssign],
-    instances[Instance],
-    inst_port_conns[PortConnection],
-
-    procs[Proc],
-
-    exprs[Expr],
-    event_exprs[EventExpr],
-    decls[Declarator],
-    stmts[Stmt],
-    stmts[LocalBlockId => BlockInfo],
-}
-
 define_enum_deriving_from! {
     #[derive(Debug, PartialEq, Eq, Clone)]
     pub enum ModuleItem {
-        ContinuousAssignId,
+        ContAssignId,
         DeclarationId,
         InstantiationId,
         ProcId,
-    }
-}
-
-impl Module {
-    pub fn shrink_to_fit(&mut self) {
-        self.params.shrink_to_fit();
-        self.ports.shrink_to_fit();
-        self.port_decls.shrink_to_fit();
-
-        self.cont_assigns.shrink_to_fit();
-        self.declarations.shrink_to_fit();
-
-        self.instantiations.shrink_to_fit();
-        self.inst_param_assigns.shrink_to_fit();
-        self.instances.shrink_to_fit();
-        self.inst_port_conns.shrink_to_fit();
-
-        self.procs.shrink_to_fit();
-
-        self.exprs.shrink_to_fit();
-        self.event_exprs.shrink_to_fit();
-        self.decls.shrink_to_fit();
-        self.stmts.shrink_to_fit();
     }
 }
 
@@ -136,75 +97,6 @@ pub struct ModuleInfo {
 
 pub type LocalModuleId = Idx<ModuleInfo>;
 pub type ModuleId = InFile<LocalModuleId>;
-
-#[derive(Debug, Default, PartialEq, Eq, Clone)]
-pub struct ModuleSourceMap {
-    pub param_srcs: SourceMap<ParamPortSrc, ParamPort>,
-    pub port_srcs: PortSrcs,
-    pub prot_decl_srcs: SourceMap<PortDeclSrc, PortDecl>,
-
-    pub assign_srcs: SourceMap<ContinuousAssignSrc, ContinuousAssign>,
-    pub declaration_srcs: SourceMap<DeclarationSrc, Declaration>,
-
-    pub instantiation_srcs: SourceMap<InstantiationSrc, Instantiation>,
-    pub inst_param_assign_srcs: SourceMap<ParamAssignSrc, ParamAssign>,
-    pub inst_port_conn_srcs: SourceMap<PortConnectionSrc, PortConnection>,
-    pub instance_srcs: SourceMap<InstanceSrc, Instance>,
-
-    pub proc_srcs: SourceMap<ProcSrc, Proc>,
-
-    pub expr_srcs: SourceMap<ExprSrc, Expr>,
-    pub event_expr_srcs: SourceMap<EventExprSrc, EventExpr>,
-    pub decl_srcs: SourceMap<DeclaratorSrc, Declarator>,
-    pub stmt_srcs: SourceMap<StmtSrc, Stmt>,
-}
-
-impl_source_map_idx! { ModuleSourceMap =>
-    param_srcs[ParamPortSrc, ParamPortId],
-    prot_decl_srcs[PortDeclSrc, PortDeclId],
-    port_srcs[NonAnsiPortSrc, NonAnsiPortId],
-    port_srcs[AnsiPortSrc, AnsiPortId],
-    port_srcs[PortRefSrc, PortRefId],
-
-    assign_srcs[ContinuousAssignSrc, ContinuousAssignId],
-    declaration_srcs[DeclarationSrc, DeclarationId],
-
-    instantiation_srcs[InstantiationSrc, InstantiationId],
-    inst_param_assign_srcs[ParamAssignSrc, ParamAssignId],
-    inst_port_conn_srcs[PortConnectionSrc, PortConnectionId],
-    instance_srcs[InstanceSrc, InstanceId],
-
-    proc_srcs[ProcSrc, ProcId],
-
-    expr_srcs[ExprSrc, ExprId],
-    event_expr_srcs[EventExprSrc, EventExprId],
-    decl_srcs[DeclaratorSrc, DeclId],
-    stmt_srcs[StmtSrc, StmtId],
-    stmt_srcs[BlockSrc, LocalBlockId],
-}
-
-impl ModuleSourceMap {
-    pub fn shrink_to_fit(&mut self) {
-        self.param_srcs.shrink_to_fit();
-        self.port_srcs.shrink_to_fit();
-        self.prot_decl_srcs.shrink_to_fit();
-
-        self.assign_srcs.shrink_to_fit();
-        self.declaration_srcs.shrink_to_fit();
-
-        self.instantiation_srcs.shrink_to_fit();
-        self.inst_param_assign_srcs.shrink_to_fit();
-        self.instance_srcs.shrink_to_fit();
-        self.inst_port_conn_srcs.shrink_to_fit();
-
-        self.proc_srcs.shrink_to_fit();
-
-        self.expr_srcs.shrink_to_fit();
-        self.event_expr_srcs.shrink_to_fit();
-        self.decl_srcs.shrink_to_fit();
-        self.stmt_srcs.shrink_to_fit();
-    }
-}
 
 pub(crate) struct LowerModuleCtx<'a> {
     pub(crate) db: &'a dyn InternDb,

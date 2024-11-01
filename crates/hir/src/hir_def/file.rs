@@ -1,4 +1,5 @@
 use la_arena::Arena;
+use proc_macro_utils::define_hir_container_data;
 use smallvec::SmallVec;
 use syntax::ast::{self, AstNode};
 use triomphe::Arc;
@@ -26,44 +27,21 @@ use crate::{
     source_map::SourceMap,
 };
 
-#[derive(Default, Debug, PartialEq, Eq, Clone)]
-pub struct HirFile {
-    // Represente the item in order
-    pub items: SmallVec<[FileItem; 3]>,
+define_hir_container_data! {
+    #[derive(Default, Debug, PartialEq, Eq, Clone)]
+    pub struct HirFile | FileSourceMap {
+        items: SmallVec<[FileItem; 3]>,
 
-    // TODO: DataDecl, InterfaceDecl
-    pub modules: Arena<ModuleInfo>,
-    pub procs: Arena<Proc>,
-    pub declarations: Arena<Declaration>,
-
-    pub exprs: Arena<Expr>,
-    pub event_exprs: Arena<EventExpr>,
-    pub decls: Arena<Declarator>,
-    pub stmts: Arena<Stmt>,
-}
-
-impl_arena_idx! { HirFile =>
-    modules[ModuleInfo],
-    procs[Proc],
-    declarations[Declaration],
-
-    exprs[Expr],
-    event_exprs[EventExpr],
-    decls[Declarator],
-    stmts[Stmt],
-    stmts[LocalBlockId => BlockInfo],
-}
-
-impl HirFile {
-    pub fn shrink_to_fit(&mut self) {
-        self.items.shrink_to_fit();
-        self.modules.shrink_to_fit();
-        self.procs.shrink_to_fit();
-        self.declarations.shrink_to_fit();
-        self.exprs.shrink_to_fit();
-        self.event_exprs.shrink_to_fit();
-        self.decls.shrink_to_fit();
-        self.stmts.shrink_to_fit();
+        modules | module_srcs: ModuleInfo[LocalModuleId | ModuleSrc],
+        procs | proc_srcs: Proc[ProcId | ProcSrc],
+        declarations | declaration_srcs: Declaration[DeclarationId | DeclarationSrc],
+        exprs | expr_srcs: Expr[ExprId | ExprSrc],
+        event_exprs | event_expr_srcs: EventExpr[EventExprId | EventExprSrc],
+        decls | decl_srcs: Declarator[DeclId | DeclaratorSrc],
+        stmts | stmt_srcs: Stmt[StmtId | StmtSrc] => {
+            Stmt[StmtId | StmtSrc],
+            BlockInfo[LocalBlockId => BlockSrc],
+        },
     }
 }
 
@@ -73,43 +51,6 @@ define_enum_deriving_from! {
         LocalModuleId,
         ProcId,
         DeclarationId,
-    }
-}
-
-// Definition for HirFileSourceMap
-#[derive(Debug, Default, PartialEq, Eq, Clone)]
-pub struct FileSourceMap {
-    pub module_srcs: SourceMap<ModuleSrc, ModuleInfo>,
-    pub proc_srcs: SourceMap<ProcSrc, Proc>,
-    pub declaration_srcs: SourceMap<DeclarationSrc, Declaration>,
-
-    pub expr_srcs: SourceMap<ExprSrc, Expr>,
-    pub event_expr_srcs: SourceMap<EventExprSrc, EventExpr>,
-    pub decl_srcs: SourceMap<DeclaratorSrc, Declarator>,
-    pub stmt_srcs: SourceMap<StmtSrc, Stmt>,
-}
-
-impl_source_map_idx! { FileSourceMap =>
-    module_srcs[ModuleSrc, LocalModuleId],
-    proc_srcs[ProcSrc, ProcId],
-    declaration_srcs[DeclarationSrc, DeclarationId],
-    expr_srcs[ExprSrc, ExprId],
-    event_expr_srcs[EventExprSrc, EventExprId],
-    decl_srcs[DeclaratorSrc, DeclId],
-    stmt_srcs[StmtSrc, StmtId],
-    stmt_srcs[BlockSrc, LocalBlockId],
-}
-
-impl FileSourceMap {
-    pub fn shrink_to_fit(&mut self) {
-        self.module_srcs.shrink_to_fit();
-        self.proc_srcs.shrink_to_fit();
-        self.declaration_srcs.shrink_to_fit();
-
-        self.expr_srcs.shrink_to_fit();
-        self.event_expr_srcs.shrink_to_fit();
-        self.decl_srcs.shrink_to_fit();
-        self.stmt_srcs.shrink_to_fit();
     }
 }
 

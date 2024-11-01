@@ -1,5 +1,6 @@
 use base_db::intern::Lookup;
 use la_arena::Arena;
+use proc_macro_utils::define_hir_container_data;
 use smallvec::SmallVec;
 use syntax::{
     TokenKind,
@@ -33,17 +34,22 @@ use crate::{
     source_map::{SourceMap, ToAstNode},
 };
 
-#[derive(Default, Debug, PartialEq, Eq, Clone)]
-pub struct Block {
-    pub name: Option<Ident>,
-    pub kind: BlockKind,
-    pub items: SmallVec<[BlockItem; 2]>,
+define_hir_container_data! {
+    #[derive(Default, Debug, PartialEq, Eq, Clone)]
+    pub struct Block | BlockSourceMap {
+        name: Option<Ident>,
+        kind: BlockKind,
+        items: SmallVec<[BlockItem; 2]>,
 
-    pub declarations: Arena<Declaration>,
-    pub stmts: Arena<Stmt>,
-    pub exprs: Arena<Expr>,
-    pub event_exprs: Arena<EventExpr>,
-    pub decls: Arena<Declarator>,
+        declarations | declaration_srcs: Declaration[DeclarationId | DeclarationSrc],
+        stmts | stmt_srcs: Stmt[StmtId | StmtSrc] => {
+            Stmt[StmtId | StmtSrc],
+            BlockInfo[LocalBlockId => BlockSrc],
+        },
+        exprs | expr_srcs: Expr[ExprId | ExprSrc],
+        event_exprs | event_expr_srcs: EventExpr[EventExprId | EventExprSrc],
+        decls | decl_srcs: Declarator[DeclId | DeclaratorSrc],
+    }
 }
 
 #[derive(Default, Debug, PartialEq, Eq, Clone, Hash)]
@@ -98,30 +104,11 @@ impl GetRef<LocalBlockId> for Arena<Stmt> {
     }
 }
 
-impl_arena_idx! { Block =>
-    declarations[Declaration],
-    stmts[Stmt],
-    stmts[LocalBlockId => BlockInfo],
-    exprs[Expr],
-    event_exprs[EventExpr],
-    decls[Declarator],
-}
-
 define_enum_deriving_from! {
     #[derive(Debug, PartialEq, Eq, Clone)]
     pub enum BlockItem {
         DeclarationId,
         StmtId,
-    }
-}
-
-impl Block {
-    pub fn shrink_to_fit(&mut self) {
-        self.declarations.shrink_to_fit();
-        self.stmts.shrink_to_fit();
-        self.exprs.shrink_to_fit();
-        self.event_exprs.shrink_to_fit();
-        self.decls.shrink_to_fit();
     }
 }
 
@@ -140,34 +127,6 @@ pub struct BlockId(pub salsa::InternId);
 pub struct BlockLoc {
     pub cont_id: ContainerId,
     pub src: InFile<BlockSrc>,
-}
-
-#[derive(Default, Debug, PartialEq, Eq, Clone)]
-pub struct BlockSourceMap {
-    pub declaration_srcs: SourceMap<DeclarationSrc, Declaration>,
-    pub stmt_srcs: SourceMap<StmtSrc, Stmt>,
-    pub expr_srcs: SourceMap<ExprSrc, Expr>,
-    pub event_expr_srcs: SourceMap<EventExprSrc, EventExpr>,
-    pub decl_srcs: SourceMap<DeclaratorSrc, Declarator>,
-}
-
-impl_source_map_idx! { BlockSourceMap =>
-    declaration_srcs[DeclarationSrc, DeclarationId],
-    stmt_srcs[StmtSrc, StmtId],
-    stmt_srcs[BlockSrc, LocalBlockId],
-    expr_srcs[ExprSrc, ExprId],
-    event_expr_srcs[EventExprSrc, EventExprId],
-    decl_srcs[DeclaratorSrc, DeclId],
-}
-
-impl BlockSourceMap {
-    pub fn shrink_to_fit(&mut self) {
-        self.declaration_srcs.shrink_to_fit();
-        self.stmt_srcs.shrink_to_fit();
-        self.expr_srcs.shrink_to_fit();
-        self.event_expr_srcs.shrink_to_fit();
-        self.decl_srcs.shrink_to_fit();
-    }
 }
 
 pub(crate) struct LowerBlockCtx<'a> {

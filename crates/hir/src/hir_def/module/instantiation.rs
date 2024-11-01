@@ -27,7 +27,7 @@ define_src!(InstantiationSrc(ast::HierarchyInstantiation));
 pub struct Instance {
     pub name: Option<Ident>,
     pub dimensions: SmallVec<[Option<Dimension>; 2]>,
-    pub connections: Vec<PortConnectionId>,
+    pub connections: Vec<PortConnId>,
 }
 
 pub type InstanceId = Idx<Instance>;
@@ -45,16 +45,16 @@ pub type ParamAssignId = Idx<ParamAssign>;
 define_src!(ParamAssignSrc(ast::ParamAssignment));
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub enum PortConnection {
+pub enum PortConn {
     Empty,
     Ordered(ExprId),
     Named(Option<Ident>, Option<ExprId>),
     Wildcard,
 }
 
-pub type PortConnectionId = Idx<PortConnection>;
+pub type PortConnId = Idx<PortConn>;
 
-define_src!(PortConnectionSrc(ast::PortConnection));
+define_src!(PortConnSrc(ast::PortConnection));
 
 impl LowerModuleCtx<'_> {
     pub(crate) fn lower_instantiation(
@@ -109,18 +109,18 @@ impl LowerModuleCtx<'_> {
             .map(|conn| {
                 use ast::PortConnection::*;
                 let hir_conn = match conn {
-                    EmptyPortConnection(_) => PortConnection::Empty,
+                    EmptyPortConnection(_) => PortConn::Empty,
                     OrderedPortConnection(conn) => {
                         let expr = self.expr_ctx().lower_property_expr(conn.expr());
-                        PortConnection::Ordered(expr)
+                        PortConn::Ordered(expr)
                     }
                     NamedPortConnection(conn) => {
                         let name = lower_ident_opt(conn.name());
                         let expr =
                             conn.expr().map(|expr| self.expr_ctx().lower_property_expr(expr));
-                        PortConnection::Named(name, expr)
+                        PortConn::Named(name, expr)
                     }
-                    WildcardPortConnection(_) => PortConnection::Wildcard,
+                    WildcardPortConnection(_) => PortConn::Wildcard,
                 };
                 alloc_idx_and_src! {
                     hir_conn => self.module.inst_port_conns,
