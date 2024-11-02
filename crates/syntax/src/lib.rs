@@ -10,8 +10,9 @@ pub use slang_ext::*;
 macro_rules! match_ast {
     ($node:ident in _ => $body:expr,) => { $body };
 
-    ($node:ident in $path:ty as $it:pat => $body:expr, $($rest:tt)* ) => {{
-        if let Some($it) = <$path as $crate::ast::AstNode>::cast($node) {
+    ($node:ident in $path:ty[$it:pat] $(if $cond:expr)? => $body:expr, $($rest:tt)* ) => {{
+        if let Some($it) = <$path as $crate::ast::AstNode>::cast($node)
+        $( && ($cond) )? {
             $body
         } else {
             match_ast!($node in $($rest)*)

@@ -2,7 +2,7 @@ use hir::semantics::Semantics;
 use ide_db::root_db::RootDb;
 use line_index::TextRange;
 use span::FilePosition;
-use syntax::{ast::AstNode, token::TokenKindExt, SyntaxNodeExt, SyntaxTokenWithParent, TokenKind};
+use syntax::{SyntaxNodeExt, SyntaxTokenWithParent, TokenKind, ast::AstNode, token::TokenKindExt};
 
 use crate::references::{self, ReferenceCategory};
 
@@ -39,10 +39,10 @@ fn token_precedence(kind: TokenKind) -> usize {
 
 fn handle_ctrl_flow_kw(
     sema: &Semantics<'_, RootDb>,
-    tok_with_parent: SyntaxTokenWithParent,
+    tp: SyntaxTokenWithParent,
 ) -> Option<Vec<DocumentHighlight>> {
-    let cur_file_id = sema.find_file(tok_with_parent.parent).file_id();
-    let highlights = references::handle_ctrl_flow_kw(sema, tok_with_parent)?
+    let cur_file_id = sema.find_file(tp.parent).file_id();
+    let highlights = references::handle_ctrl_flow_kw(sema, tp)?
         .into_iter()
         .filter_map(|mut r| r.refs.remove(&cur_file_id))
         .flatten()

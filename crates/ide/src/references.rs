@@ -41,14 +41,14 @@ pub(crate) fn references(
 
 pub(crate) fn handle_ctrl_flow_kw(
     sema: &Semantics<'_, RootDb>,
-    tok_with_parent @ SyntaxTokenWithParent { parent, tok }: SyntaxTokenWithParent,
+    tp @ SyntaxTokenWithParent { parent, tok }: SyntaxTokenWithParent,
 ) -> Option<Vec<References>> {
     let file_id = sema.find_file(parent);
     let kind = tok.kind();
     let mut refs = vec![];
 
     match kind {
-        _ if let Some(pair) = pair_token(tok_with_parent) => {
+        _ if let Some(pair) = pair_token(tp) => {
             let pair: SyntaxToken = pair.either_into();
             refs.push((tok.text_range().unwrap(), ReferenceCategory::empty()));
             refs.push((pair.text_range().unwrap(), ReferenceCategory::empty()));

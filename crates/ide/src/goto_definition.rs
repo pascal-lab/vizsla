@@ -1,9 +1,14 @@
 use hir::semantics::Semantics;
 use ide_db::root_db::RootDb;
 use itertools::Itertools;
+use smallvec::SmallVec;
 use span::{FilePosition, RangeInfo};
 use syntax::{
-    ast::AstNode, has_text_range::HasTextRange, token::{pair_token, TokenKindExt}, SyntaxNodeExt, SyntaxTokenWithParent, TokenKind
+    SyntaxNodeExt, SyntaxTokenWithParent, TokenKind,
+    ast::{self, AstNode},
+    has_text_range::HasTextRange,
+    match_ast,
+    token::{TokenKindExt, pair_token},
 };
 
 use crate::{
@@ -21,7 +26,7 @@ pub(crate) fn goto_definition(
     let token = file.syntax().token_at_offset(offset).pick_bext_token(token_precedence)?;
 
     let navs = handle_ctrl_flow_kw(&sema, token).or_else(|| {
-        Definition::resolution(&sema, token)?
+        resolution(&sema, token)?
             .into_iter()
             .map(|def| def.to_nav(db))
             .unique()
@@ -32,15 +37,32 @@ pub(crate) fn goto_definition(
     Some(RangeInfo::new(token.text_range()?, navs))
 }
 
+pub(crate) fn resolution(
+    sema: &Semantics<'_, RootDb>,
+    tp @ SyntaxTokenWithParent { parent, tok }: SyntaxTokenWithParent,
+) -> Option<SmallVec<[Definition; 3]>> {
+    if !matches!(tok.kind(), TokenKind::IDENTIFIER | TokenKind::SYSTEM_IDENTIFIER) {
+        return None;
+    }
+
+    let res = match_ast! { parent in
+        ast::MemberAccessExpression => unimplemented!(),
+        ast::ScopedName => unimplemented!(),
+        _ => sema.resolve_ident(tp),
+    }?;
+
+    Some(Definition::from_pathres(res))
+}
+
 fn handle_ctrl_flow_kw(
     sema: &Semantics<RootDb>,
-    tok_with_parent @ SyntaxTokenWithParent { parent, tok }: SyntaxTokenWithParent,
+    tp @ SyntaxTokenWithParent { parent, tok }: SyntaxTokenWithParent,
 ) -> Option<Vec<NavTarget>> {
     let file_id = sema.find_file(parent);
     let kind = tok.kind();
 
     match kind {
-        _ if let Some(pair) = pair_token(tok_with_parent) => {
+        _ if let Some(pair) = pair_token(tp) => {
             let pair = pair.either(|pair| pair, |_| tok);
 
             // TODO: name and container_name

@@ -182,12 +182,12 @@ fn collect_block_items(
     for node in decl.items().children() {
         let node = node.syntax();
         match_ast! { node in
-            ast::Statement as it => {
+            ast::Statement[it] => {
                 let hir = StmtSrc::from(it).hir(&block, &src_map);
                 let sym = build(hir.label.clone(), it, cont_name.cloned(), None);
                 children.push(sym);
             },
-            ast::DataDeclaration as it => {
+            ast::DataDeclaration[it] => {
                 build_decls(children, it.declarators(), cont_name, &block, &src_map);
             },
             _ => unimplemented!("{:?}", node.kind()),

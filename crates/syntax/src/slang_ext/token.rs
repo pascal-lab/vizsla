@@ -7,14 +7,14 @@ use slang::{
 use crate::support;
 
 pub trait TokenKindExt {
-    fn is_pair_token(self) -> bool;
+    fn is_pair_token(&self) -> bool;
 }
 
 impl TokenKindExt for TokenKind {
-    fn is_pair_token(self) -> bool {
+    fn is_pair_token(&self) -> bool {
         macro_rules! P {
         ($($tok:ident)|* $(|)?) => {
-            $(self == T![$tok] ||)* false
+            $(*self == T![$tok] ||)* false
         };
     }
         P! {

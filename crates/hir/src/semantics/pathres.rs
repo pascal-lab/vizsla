@@ -16,13 +16,13 @@ use crate::{
 impl SemanticsImpl<'_> {
     pub fn resolve_ident(
         &self,
-        SyntaxTokenWithParent { parent, tok: ident }: SyntaxTokenWithParent,
+        SyntaxTokenWithParent { parent, tok }: SyntaxTokenWithParent,
     ) -> Option<PathResolution> {
         self.with_ctx(|ctx| {
             let db = self.db;
             let file_id = self.find_file(parent);
             let container = ctx.find_container(InFile::new(file_id, parent))?;
-            let ident = lower_ident_opt(Some(ident))?;
+            let ident = lower_ident_opt(Some(tok))?;
 
             ContainerParent::start_from(db, container).find_map(|id| match id {
                 ContainerId::HirFileId(_) => {

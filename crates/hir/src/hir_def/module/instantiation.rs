@@ -48,7 +48,7 @@ define_src!(ParamAssignSrc(ast::ParamAssignment));
 pub enum PortConn {
     Empty,
     Ordered(ExprId),
-    Named(Option<Ident>, Option<ExprId>),
+    Named(Option<Ident>, Option<ExprId>), // .a(b) or .a or .(b)
     Wildcard,
 }
 
