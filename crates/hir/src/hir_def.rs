@@ -14,7 +14,7 @@ use smol_str::{SmolStr, ToSmolStr};
 use syntax::{SyntaxToken, ast};
 use utils::get::GetRef;
 
-pub(self) macro impl_arena_idx {
+macro impl_arena_idx {
     ($data:ident => $fld:ident[$ty:ty], $($rest:tt)* ) => {
         impl $crate::hir_def::GetRef<$crate::hir_def::Idx<$ty>> for $data {
             type Output = $ty;

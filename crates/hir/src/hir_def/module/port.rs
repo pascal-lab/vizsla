@@ -2,7 +2,10 @@ use std::ops::Index;
 
 use itertools::Either;
 use la_arena::{Arena, Idx, IdxRange};
-use syntax::{SyntaxToken, TokenKind, ast};
+use syntax::{
+    SyntaxToken, TokenKind,
+    ast::{self, PortExpression},
+};
 use utils::get::Get;
 
 use crate::{
@@ -319,15 +322,9 @@ impl LowerModuleCtx<'_> {
 
         for port in port_list.ports().children() {
             use ast::{NonAnsiPort::*, PortExpression::*};
-            let hir_port = {
-                let (label, exprs) = match port {
-                    ExplicitNonAnsiPort(port) => (lower_ident_opt(port.name()), port.expr()),
-                    ImplicitNonAnsiPort(port) => (None, Some(port.expr())),
-                    EmptyNonAnsiPort(_) => (None, None),
-                };
 
-                let start = refs.nxt_idx();
-
+            let start = refs.nxt_idx();
+            let mut lower_port_exprs = |exprs: Option<PortExpression>| {
                 let mut lower_port_ref = |port_ref: ast::PortReference| {
                     let ident = lower_ident_opt(port_ref.name());
                     let select = port_ref
@@ -342,19 +339,30 @@ impl LowerModuleCtx<'_> {
 
                 match exprs {
                     Some(PortConcatenation(concat)) => {
-                        concat.references().children().for_each(|port_ref| {
-                            lower_port_ref(port_ref);
-                        });
-                        let end = refs.nxt_idx();
-                        NonAnsiPort { label, refs: Some(IdxRange::new(start..end)) }
+                        concat.references().children().for_each(lower_port_ref);
+                        Some(IdxRange::new(start..refs.nxt_idx()))
                     }
                     Some(PortReference(port_ref)) => {
                         lower_port_ref(port_ref);
-                        let end = refs.nxt_idx();
-                        NonAnsiPort { label, refs: Some(IdxRange::new(start..end)) }
+                        Some(IdxRange::new(start..refs.nxt_idx()))
                     }
-                    None => NonAnsiPort { label, refs: None },
+                    None => None,
                 }
+            };
+
+            let hir_port = match port {
+                ExplicitNonAnsiPort(port) => NonAnsiPort {
+                    label: lower_ident_opt(port.name()),
+                    refs: lower_port_exprs(port.expr()),
+                },
+                ImplicitNonAnsiPort(port) => {
+                    let sub_refs = lower_port_exprs(Some(port.expr()));
+                    debug_assert!(sub_refs.as_ref().is_none_or(|refs| refs.len() == 1));
+
+                    let label = refs[sub_refs.as_ref().unwrap().start()].ident.clone();
+                    NonAnsiPort { label, refs: sub_refs }
+                }
+                EmptyNonAnsiPort(_) => NonAnsiPort { label: None, refs: None },
             };
 
             alloc_idx_and_src! {
