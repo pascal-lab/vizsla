@@ -33,7 +33,8 @@ define_enum_deriving_from! {
     #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
     pub enum ModuleEntry {
         DeclId,
-        NonAnsiPortEntry, // AnsiPorts are handled in DeclId
+        NonAnsiPortEntry,
+        AnsiPortEntry,
         InstanceId,
         StmtId,
         BlockId,
@@ -47,6 +48,9 @@ pub struct NonAnsiPortEntry {
     pub port_decl: Option<DeclId>,
     pub data_decl: Option<DeclId>,
 }
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+pub struct AnsiPortEntry(pub DeclId);
 
 define_enum_deriving_from! {
     #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
@@ -126,7 +130,7 @@ impl ModuleScope {
         let mut scope = Scope::default();
         let module = db.module(module_id);
 
-        // handle ports
+        // handle labels of non-ansi ports
         if let Ports::NonAnsi { ports, .. } = &module.ports {
             for (port_id, port) in ports.iter() {
                 let entry = NonAnsiPortEntry { label: Some(port_id), ..Default::default() }.into();
@@ -136,7 +140,6 @@ impl ModuleScope {
 
         // handle other members
         for (decl_id, decl) in module.decls.iter() {
-            // We have handled port declarations separately
             let Some(name) = &decl.name else {
                 continue;
             };
@@ -147,6 +150,8 @@ impl ModuleScope {
                 } else {
                     entry.data_decl = Some(decl_id);
                 }
+            } else if matches!(decl.parent, DeclaratorParent::AnsiPortId(_)) {
+                scope.insert(name, AnsiPortEntry(decl_id).into());
             } else {
                 scope.insert(name, decl_id.into());
             }

@@ -4,12 +4,12 @@ use syntax::ast;
 
 use super::LowerModuleCtx;
 use crate::{
+    define_src,
     hir_def::{
         Ident, alloc_idx_and_src,
         expr::{ExprId, LowerExpr, data_ty::Dimension},
         lower_ident_opt,
     },
-    source_map::define_src,
 };
 
 #[derive(Debug, PartialEq, Eq, Clone)]

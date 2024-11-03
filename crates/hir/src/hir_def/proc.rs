@@ -8,6 +8,7 @@ use super::{
 use crate::{
     container::ContainerId,
     db::InternDb,
+    define_src,
     file::HirFileId,
     hir_def::{
         alloc_idx_and_src,
@@ -18,7 +19,7 @@ use crate::{
         },
         stmt::{LowerStmt, Stmt, StmtId, StmtSrc},
     },
-    source_map::{SourceMap, define_src},
+    source_map::SourceMap,
 };
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]

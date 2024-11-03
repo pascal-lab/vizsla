@@ -9,6 +9,7 @@ use syntax::{
 use utils::get::Get;
 
 use crate::{
+    define_src,
     hir_def::{
         HirData, Ident, alloc_idx_and_src,
         expr::{
@@ -20,7 +21,7 @@ use crate::{
         module::LowerModuleCtx,
         ty::{NetType, lower_net_kind},
     },
-    source_map::{SourceMap, define_src},
+    source_map::SourceMap,
 };
 
 // module IDENT (port_list);

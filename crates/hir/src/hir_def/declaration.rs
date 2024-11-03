@@ -9,6 +9,7 @@ use super::expr::{
 };
 use crate::{
     db::InternDb,
+    define_src,
     hir_def::{
         HirData, alloc_idx_and_src,
         expr::{
@@ -21,7 +22,7 @@ use crate::{
             DriveStrength, NetKind, Strength, lower_drive_strength, lower_net_kind, lower_strength,
         },
     },
-    source_map::{SourceMap, define_src},
+    source_map::SourceMap,
 };
 
 define_enum_deriving_from! {

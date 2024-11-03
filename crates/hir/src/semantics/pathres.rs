@@ -62,14 +62,10 @@ impl SemanticsImpl<'_> {
         let entry = module_scope.get(&conn_name)?;
         let module = db.module(module_id);
 
-        match entry {
-            ModuleEntry::DeclId(decl_id)
-                if matches!(module.get(decl_id).parent, DeclaratorParent::AnsiPortId(_)) =>
-            {
-                Some(InModule::new(module_id, entry).into())
-            }
-            ModuleEntry::NonAnsiPortEntry(_) => Some(InModule::new(module_id, entry).into()),
-            _ => None,
+        if matches!(entry, ModuleEntry::AnsiPortEntry(_) | ModuleEntry::NonAnsiPortEntry(_)) {
+            Some(InModule::new(module_id, entry).into())
+        } else {
+            None
         }
     }
 }
@@ -78,12 +74,13 @@ impl SemanticsImpl<'_> {
 pub enum PathResolution {
     Module(ModuleId),
     Decl(InContainer<DeclId>),
-    Port {
+    NonAnsiPort {
         label: Option<NonAnsiPortId>,
         port_decl: Option<DeclId>,
         data_decl: Option<DeclId>,
         module: ModuleId,
     },
+    AnsiPort(InModule<DeclId>),
     Instance(InModule<InstanceId>),
     Stmt(InContainer<StmtId>),
     Block(BlockId),
@@ -107,8 +104,9 @@ impl From<InModule<ModuleEntry>> for PathResolution {
             InstanceId(idx) => Self::Instance(entry.with_value(idx)),
             StmtId(idx) => Self::Stmt(entry.with_value(idx).into()),
             NonAnsiPortEntry(scope::NonAnsiPortEntry { label, port_decl, data_decl }) => {
-                Self::Port { label, port_decl, data_decl, module: entry.cont_id }
+                Self::NonAnsiPort { label, port_decl, data_decl, module: entry.cont_id }
             }
+            AnsiPortEntry(scope::AnsiPortEntry(idx)) => Self::AnsiPort(entry.with_value(idx)),
             BlockId(block_id) => Self::Block(block_id),
         }
     }

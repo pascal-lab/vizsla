@@ -23,9 +23,10 @@ use super::{
 use crate::{
     container::{ContainerId, InFile},
     db::InternDb,
+    define_src,
     file::HirFileId,
     hir_def::{alloc_idx_and_src, lower_named_label_opt},
-    source_map::{SourceMap, define_src},
+    source_map::SourceMap,
 };
 
 #[derive(Debug, PartialEq, Eq, Clone)]

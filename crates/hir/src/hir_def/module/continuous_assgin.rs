@@ -4,6 +4,7 @@ use syntax::ast;
 
 use super::LowerModuleCtx;
 use crate::{
+    define_src,
     hir_def::{
         alloc_idx_and_src,
         expr::{
@@ -12,7 +13,6 @@ use crate::{
         },
         ty::{DriveStrength, lower_drive_strength},
     },
-    source_map::define_src,
 };
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]

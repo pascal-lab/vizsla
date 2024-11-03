@@ -9,8 +9,9 @@ use syntax::{
 use super::literal::{Literal, lower_literal};
 use crate::{
     db::InternDb,
+    define_src,
     hir_def::{Ident, alloc_idx_and_src, literal::lower_integer_vector, lower_ident_opt},
-    source_map::{SourceMap, define_src},
+    source_map::SourceMap,
 };
 
 pub mod data_ty;

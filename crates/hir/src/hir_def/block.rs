@@ -30,8 +30,9 @@ use super::{
 use crate::{
     container::{ContainerId, InFile},
     db::{HirDb, InternDb},
+    define_src,
     file::HirFileId,
-    source_map::{SourceMap, ToAstNode, define_src, impl_source_map_idx},
+    source_map::{SourceMap, ToAstNode, impl_source_map_idx},
 };
 
 define_hir_container_data! {

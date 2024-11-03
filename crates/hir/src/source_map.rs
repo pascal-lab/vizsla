@@ -87,7 +87,8 @@ pub trait ToAstNode<'a, Output: AstNode<'a>> {
     fn to_node(&self, tree: &'a syntax::SyntaxTree) -> Option<Output>;
 }
 
-pub(crate) macro define_src {
+#[macro_export]
+macro_rules! define_src {
     ($name:ident(ast::$ty:ident)) => {
         #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
         pub struct $name(pub syntax::ptr::SyntaxNodePtr);
@@ -115,7 +116,7 @@ pub(crate) macro define_src {
                 src.0
             }
         }
-    },
+    };
 
     ($name:ident($(ast::$ty:ident),*)$(,)?) => {
         #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
@@ -145,5 +146,5 @@ pub(crate) macro define_src {
                 }
             }
         )*
-    }
+    };
 }

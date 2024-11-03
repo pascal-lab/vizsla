@@ -6,6 +6,7 @@ use utils::define_enum_deriving_from;
 use super::{Expr, ExprId, ExprSrc, LowerExpr, data_ty::Dimension, impl_lower_expr};
 use crate::{
     db::InternDb,
+    define_src,
     hir_def::{
         HirData, Ident, alloc_idx_and_src,
         declaration::DeclarationId,
@@ -13,7 +14,7 @@ use crate::{
         module::port::{AnsiPortId, ParamPortId, PortDeclId},
         stmt::StmtId,
     },
-    source_map::{SourceMap, define_src},
+    source_map::SourceMap,
 };
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]

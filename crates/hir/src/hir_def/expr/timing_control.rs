@@ -3,11 +3,7 @@ use smallvec::SmallVec;
 use syntax::{TokenKind, ast};
 
 use super::{Expr, ExprId, ExprSrc, LowerExpr, impl_lower_expr};
-use crate::{
-    db::InternDb,
-    hir_def::alloc_idx_and_src,
-    source_map::{SourceMap, define_src},
-};
+use crate::{db::InternDb, define_src, hir_def::alloc_idx_and_src, source_map::SourceMap};
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum TimingControl {

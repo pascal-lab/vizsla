@@ -26,7 +26,8 @@ impl Definition {
         match res {
             PathResolution::Module(module_id) => smallvec![Definition::ModuleId(module_id)],
             PathResolution::Decl(decl_id) => smallvec![Definition::Decl(decl_id)],
-            PathResolution::Port { label, port_decl, data_decl, module } => {
+            PathResolution::AnsiPort(decl_id) => smallvec![Definition::Decl(decl_id.into())],
+            PathResolution::NonAnsiPort { label, port_decl, data_decl, module } => {
                 let mut defs = SmallVec::new();
                 let container = module.into();
                 if let Some(label) = label {
