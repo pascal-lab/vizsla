@@ -11,13 +11,22 @@ use hir::{
 use ide_db::root_db::RootDb;
 use smallvec::{SmallVec, smallvec};
 use syntax::{SyntaxTokenWithParent, TokenKind, ast, match_ast};
-use utils::define_enum_deriving_from;
+use utils::{define_enum_deriving_from, impl_from};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum DefinitionSource {
     ModuleId(ModuleId),
     BlockId(BlockId),
 
+    NonAnsiPort(InModule<NonAnsiPortId>),
+    Decl(InContainer<DeclId>),
+    Instance(InModule<InstanceId>),
+    Stmt(InContainer<StmtId>),
+}
+
+impl_from! { DefinitionSource =>
+    ModuleId,
+    BlockId,
     NonAnsiPort(InModule<NonAnsiPortId>),
     Decl(InContainer<DeclId>),
     Instance(InModule<InstanceId>),
@@ -45,27 +54,28 @@ impl IntoIterator for Definition {
 
 impl From<PathResolution> for Definition {
     fn from(path_res: PathResolution) -> Self {
-        let res = match path_res {
-            PathResolution::Module(module_id) => smallvec![DefinitionSource::ModuleId(module_id)],
-            PathResolution::Decl(decl_id) => smallvec![DefinitionSource::Decl(decl_id)],
-            PathResolution::AnsiPort(decl_id) => smallvec![DefinitionSource::Decl(decl_id.into())],
+        let mut res = smallvec![];
+        let mut add_source = |source| res.push(source);
+
+        match path_res {
+            PathResolution::Module(module_id) => add_source(module_id.into()),
+            PathResolution::Decl(decl_id) => add_source(decl_id.into()),
+            PathResolution::AnsiPort(decl_id) => add_source(DefinitionSource::Decl(decl_id.into())),
             PathResolution::NonAnsiPort { label, port_decl, data_decl, module } => {
-                let mut defs = SmallVec::new();
                 let container = module.into();
                 if let Some(label) = label {
-                    defs.push(DefinitionSource::NonAnsiPort(InModule::new(module, label)));
+                    add_source(InModule::new(module, label).into());
                 }
                 if let Some(port_decl) = port_decl {
-                    defs.push(DefinitionSource::Decl(InContainer::new(container, port_decl)));
+                    add_source(InContainer::new(container, port_decl).into());
                 }
                 if let Some(decl) = data_decl {
-                    defs.push(DefinitionSource::Decl(InContainer::new(container, decl)));
+                    add_source(InContainer::new(container, decl).into());
                 }
-                defs
             }
-            PathResolution::Instance(instance_id) => smallvec![DefinitionSource::Instance(instance_id)],
-            PathResolution::Stmt(stmt_id) => smallvec![DefinitionSource::Stmt(stmt_id)],
-            PathResolution::Block(blk_id) => smallvec![DefinitionSource::BlockId(blk_id)],
+            PathResolution::Instance(instance_id) => add_source(instance_id.into()),
+            PathResolution::Stmt(stmt_id) => add_source(stmt_id.into()),
+            PathResolution::Block(blk_id) => add_source(blk_id.into()),
         };
 
         Self(res)
