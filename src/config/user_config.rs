@@ -1,5 +1,8 @@
+use ide::references::ReferencesConfig;
 use serde::{Deserialize, Serialize};
 use utils::{json::get_field, paths::Utf8PathBuf};
+
+use super::Config;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -7,6 +10,13 @@ pub(crate) enum FilesWatcherDef {
     Client,
     Notify,
     Server,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+enum ScopeVisibility {
+    Public,
+    Private,
 }
 
 macro_rules! default_value {
@@ -55,6 +65,19 @@ config_data! {
         files_watcher: FilesWatcherDef = FilesWatcherDef::Client,
         /// Automatically refresh project info on toml changes
         workspace_auto_reload: bool = true,
+
+        /// If true, symbols within a scope (except for ports) are private to other scopes.
+        scope_visibility: ScopeVisibility = ScopeVisibility::Private,
+    }
+}
+
+impl Config {
+    pub(crate) fn references_config(&self) -> ReferencesConfig {
+        let scope_visibility = match self.user_config.scope_visibility {
+            ScopeVisibility::Public => ide::ScopeVisibility::Public,
+            ScopeVisibility::Private => ide::ScopeVisibility::Private,
+        };
+        ReferencesConfig { scope_visibility, search_scope: None }
     }
 }
 

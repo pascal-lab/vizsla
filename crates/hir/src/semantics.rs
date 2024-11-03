@@ -15,7 +15,7 @@ pub mod pathres;
 mod source_to_def;
 
 pub struct Semantics<'db, DB> {
-    db: &'db DB,
+    pub db: &'db DB,
     impl_: SemanticsImpl<'db>,
 }
 

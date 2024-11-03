@@ -1,6 +1,9 @@
+use base_db::intern::Lookup;
 use hir::{
-    container::{InContainer, InModule},
+    container::{ContainerId, InContainer, InModule},
+    db::HirDb,
     hir_def::{
+        Ident,
         block::BlockId,
         expr::declarator::DeclId,
         module::{ModuleId, instantiation::InstanceId, port::NonAnsiPortId},
@@ -11,7 +14,11 @@ use hir::{
 use ide_db::root_db::RootDb;
 use smallvec::{SmallVec, smallvec};
 use syntax::{SyntaxTokenWithParent, TokenKind, ast, match_ast};
-use utils::{define_enum_deriving_from, impl_from};
+use utils::{
+    define_enum_deriving_from,
+    get::{Get, GetRef},
+    impl_from,
+};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum DefinitionSource {
@@ -33,13 +40,55 @@ impl_from! { DefinitionSource =>
     Stmt(InContainer<StmtId>),
 }
 
+impl DefinitionSource {
+    #[inline]
+    pub fn name(&self, db: &dyn HirDb) -> Option<Ident> {
+        match *self {
+            DefinitionSource::ModuleId(module_id) => db.module(module_id).name.clone(),
+            DefinitionSource::BlockId(block_id) => db.block(block_id).name.clone(),
+            DefinitionSource::NonAnsiPort(InModule { value, cont_id: module_id }) => {
+                db.module(module_id).get(value).label.clone()
+            }
+            DefinitionSource::Decl(InContainer { value, cont_id }) => match cont_id {
+                ContainerId::HirFileId(file_id) => db.hir_file(file_id).get(value).name.clone(),
+                ContainerId::ModuleId(module_id) => db.module(module_id).get(value).name.clone(),
+                ContainerId::BlockId(block_id) => db.block(block_id).get(value).name.clone(),
+            },
+            DefinitionSource::Instance(InModule { value, cont_id: module_id }) => {
+                db.module(module_id).get(value).name.clone()
+            }
+            DefinitionSource::Stmt(InContainer { value, cont_id }) => match cont_id {
+                ContainerId::HirFileId(file_id) => db.hir_file(file_id).get(value).label.clone(),
+                ContainerId::ModuleId(module_id) => db.module(module_id).get(value).label.clone(),
+                ContainerId::BlockId(block_id) => db.block(block_id).get(value).label.clone(),
+            },
+        }
+    }
+
+    #[inline]
+    pub fn container(&self, db: &dyn HirDb) -> ContainerId {
+        match *self {
+            DefinitionSource::ModuleId(InContainer { cont_id, .. }) => cont_id.into(),
+            DefinitionSource::BlockId(block_id) => block_id.lookup(db).cont_id,
+            DefinitionSource::NonAnsiPort(InModule { cont_id, .. }) => cont_id.into(),
+            DefinitionSource::Decl(InContainer { cont_id, .. }) => cont_id,
+            DefinitionSource::Instance(InModule { cont_id, .. }) => cont_id.into(),
+            DefinitionSource::Stmt(InContainer { cont_id, .. }) => cont_id,
+        }
+    }
+}
+
 // Definition may have multiple sources, e.g. non-ansi port
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct Definition(SmallVec<[DefinitionSource; 3]>);
 
 impl Definition {
-    fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.0.is_empty()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &DefinitionSource> {
+        self.0.iter()
     }
 }
 
@@ -134,6 +183,29 @@ impl DefinitionClass {
             DefinitionClass::Definition(definition) => definition.into_iter().collect(),
             DefinitionClass::PortConnShorthand(PortConnShorthand { port, data }) => {
                 port.into_iter().chain(data).collect()
+            }
+        }
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        match self {
+            DefinitionClass::Definition(definition) => definition.is_empty(),
+            DefinitionClass::PortConnShorthand(port_conn) => {
+                port_conn.port.is_empty() && port_conn.data.is_empty()
+            }
+        }
+    }
+}
+
+impl IntoIterator for DefinitionClass {
+    type IntoIter = smallvec::IntoIter<[Definition; 2]>;
+    type Item = Definition;
+
+    fn into_iter(self) -> Self::IntoIter {
+        match self {
+            DefinitionClass::Definition(definition) => smallvec![definition].into_iter(),
+            DefinitionClass::PortConnShorthand(port_conn) => {
+                smallvec![port_conn.port, port_conn.data].into_iter()
             }
         }
     }

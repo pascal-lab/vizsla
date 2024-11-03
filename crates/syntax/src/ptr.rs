@@ -28,6 +28,11 @@ impl SyntaxNodePtr {
     pub fn kind(&self) -> SyntaxKind {
         self.kind
     }
+
+    #[inline]
+    pub fn range(&self) -> TextRange {
+        self.range
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]

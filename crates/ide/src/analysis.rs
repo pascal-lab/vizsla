@@ -11,7 +11,7 @@ use crate::{
     document_symbols::{self, DocumentSymbol},
     goto_definition,
     navigation_target::NavTarget,
-    references::{self, References},
+    references::{self, References, ReferencesConfig},
 };
 
 #[derive(Debug)]
@@ -51,7 +51,11 @@ impl Analysis {
         self.with_db(|db| document_highlight::document_highlight(db, position))
     }
 
-    pub fn references(&self, position: FilePosition) -> Cancellable<Option<Vec<References>>> {
-        self.with_db(|db| references::references(db, position))
+    pub fn references(
+        &self,
+        position: FilePosition,
+        config: ReferencesConfig,
+    ) -> Cancellable<Option<Vec<References>>> {
+        self.with_db(|db| references::references(db, position, config))
     }
 }

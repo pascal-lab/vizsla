@@ -3,9 +3,9 @@ use utils::define_enum_deriving_from;
 use vfs::FileId;
 
 use crate::{
-    db::InternDb,
+    db::{HirDb, InternDb},
     file::HirFileId,
-    hir_def::{block::BlockId, module::ModuleId},
+    hir_def::{Ident, block::BlockId, module::ModuleId},
 };
 
 define_enum_deriving_from! {
@@ -53,6 +53,14 @@ macro_rules! impl_container_id {
                     ContainerId::BlockId(block_id) => block_id.file_id(db),
                 }
             }
+
+            pub fn name(self, db: &dyn HirDb) -> Option<Ident> {
+                match self {
+                    ContainerId::HirFileId(file_id) => None,
+                    ContainerId::ModuleId(module_id) => module_id.name(db),
+                    ContainerId::BlockId(block_id) => block_id.name(db),
+                }
+            }
         }
     };
 }
@@ -67,17 +75,29 @@ impl HirFileId {
     pub fn file_id(self) -> FileId {
         self.0
     }
+
+    pub fn name(self, db: &dyn HirDb) -> Option<Ident> {
+        None
+    }
 }
 
 impl ModuleId {
     pub fn file_id(self) -> FileId {
         self.cont_id.0
     }
+
+    pub fn name(self, db: &dyn HirDb) -> Option<Ident> {
+        db.module(self).name.clone()
+    }
 }
 
 impl BlockId {
     pub fn file_id(self, db: &dyn InternDb) -> FileId {
         self.lookup(db).src.cont_id.0
+    }
+
+    pub fn name(self, db: &dyn HirDb) -> Option<Ident> {
+        db.block(self).name.clone()
     }
 }
 

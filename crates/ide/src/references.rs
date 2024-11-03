@@ -1,17 +1,27 @@
 use hir::semantics::Semantics;
 use ide_db::root_db::RootDb;
+use itertools::Itertools;
 use line_index::TextRange;
 use nohash_hasher::IntMap;
+use search::{ReferencesCtx, SearchScope};
+use smallvec::{SmallVec, smallvec};
 use span::FilePosition;
 use syntax::{
-    SyntaxNodeExt, SyntaxToken, SyntaxTokenWithParent, TokenKind,
+    SyntaxNode, SyntaxNodeExt, SyntaxToken, SyntaxTokenWithParent, TokenKind,
     ast::AstNode,
     has_text_range::HasTextRange,
     token::{TokenKindExt, pair_token},
 };
 use vfs::FileId;
 
-use crate::navigation_target::NavTarget;
+use crate::{
+    ScopeVisibility,
+    definitions::{Definition, DefinitionClass, PortConnShorthand},
+    goto_definition,
+    navigation_target::{NavTarget, ToNav},
+};
+
+mod search;
 
 bitflags::bitflags! {
     #[derive(Copy, Clone, Default, PartialEq, Eq, Hash, Debug)]
@@ -21,22 +31,41 @@ bitflags::bitflags! {
     }
 }
 
+impl ReferenceCategory {
+    pub fn from_ast(node: SyntaxNode) -> ReferenceCategory {
+        todo!()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ReferencesConfig {
+    pub scope_visibility: ScopeVisibility,
+    pub search_scope: Option<SearchScope>,
+}
+
 #[derive(Debug, Clone)]
 pub struct References {
-    pub def: Option<NavTarget>,
+    pub def: Option<Vec<NavTarget>>,
     pub refs: IntMap<FileId, Vec<(TextRange, ReferenceCategory)>>,
 }
 
 pub(crate) fn references(
     db: &RootDb,
     FilePosition { file_id, offset }: FilePosition,
+    config: ReferencesConfig,
 ) -> Option<Vec<References>> {
     let sema = Semantics::new(db);
     let file = sema.parse(file_id);
 
     let token = file.syntax().token_at_offset(offset).pick_bext_token(token_precedence)?;
 
-    handle_ctrl_flow_kw(&sema, token).or_else(|| None)
+    handle_ctrl_flow_kw(&sema, token).or_else(|| {
+        let def = match DefinitionClass::resolve(&sema, token)? {
+            DefinitionClass::Definition(def) => def,
+            DefinitionClass::PortConnShorthand(PortConnShorthand { data, .. }) => data,
+        };
+        Some(vec![search_refs(&sema, def, config)])
+    })
 }
 
 pub(crate) fn handle_ctrl_flow_kw(
@@ -61,6 +90,17 @@ pub(crate) fn handle_ctrl_flow_kw(
     }
 
     Some(vec![References { def: None, refs: IntMap::from_iter([(file_id.file_id(), refs)]) }])
+}
+
+fn search_refs<'a>(
+    sema: &'a Semantics<'a, RootDb>,
+    def: Definition,
+    config: ReferencesConfig,
+) -> References {
+    let ctx = ReferencesCtx::from_def(sema, &def, config.clone());
+    let refs = ctx.search();
+    let def = def.iter().map(|def| def.to_nav(sema.db)).collect();
+    References { def: Some(def), refs }
 }
 
 fn token_precedence(kind: TokenKind) -> usize {

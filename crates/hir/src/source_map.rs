@@ -2,10 +2,10 @@ use std::{fmt::Debug, hash::Hash};
 
 pub(crate) use la_arena::{ArenaMap, Idx};
 use rustc_hash::FxHashMap;
-use syntax::ast::AstNode;
+use syntax::{SyntaxKind, ast::AstNode};
 use triomphe::Arc;
 pub(crate) use utils::get::Get;
-use utils::get::GetRef;
+use utils::{get::GetRef, text_edit::TextRange};
 
 pub trait IsSrc: PartialEq + Eq + Hash + Copy + Clone + Debug {
     #[inline]
@@ -21,6 +21,10 @@ pub trait IsSrc: PartialEq + Eq + Hash + Copy + Clone + Debug {
         let idx = src_map.get(self);
         arena.get(idx)
     }
+
+    fn kind(&self) -> SyntaxKind;
+
+    fn range(&self) -> TextRange;
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -93,7 +97,15 @@ macro_rules! define_src {
         #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
         pub struct $name(pub syntax::ptr::SyntaxNodePtr);
 
-        impl $crate::source_map::IsSrc for $name {}
+        impl $crate::source_map::IsSrc for $name {
+            fn kind(&self) -> syntax::SyntaxKind {
+                self.0.kind()
+            }
+
+            fn range(&self) -> utils::text_edit::TextRange {
+                self.0.range()
+            }
+        }
 
         impl<'a> $crate::source_map::ToAstNode<'a, ast::$ty<'a>> for $name {
             fn to_node(&self, tree: &'a syntax::SyntaxTree) -> Option<ast::$ty<'a>> {
@@ -126,7 +138,23 @@ macro_rules! define_src {
             )*
         }
 
-        impl $crate::source_map::IsSrc for $name {}
+        impl $crate::source_map::IsSrc for $name {
+            fn kind(&self) -> syntax::SyntaxKind {
+                match self {
+                    $(
+                        $name::$ty(ptr) => ptr.kind(),
+                    )*
+                }
+            }
+
+            fn range(&self) -> utils::text_edit::TextRange {
+                match self {
+                    $(
+                        $name::$ty(ptr) => ptr.range(),
+                    )*
+                }
+            }
+        }
 
         $(
             impl<'a> $crate::source_map::ToAstNode<'a, ast::$ty<'a>> for $name {

@@ -16,6 +16,7 @@ pub enum TokenAtOffset<'a> {
 }
 
 impl<'a> TokenAtOffset<'a> {
+    #[inline]
     pub fn pick_bext_token(
         self,
         f: impl Fn(TokenKind) -> usize,

@@ -70,14 +70,15 @@ pub(crate) fn handle_references(
 ) -> anyhow::Result<Option<Vec<lsp_types::Location>>> {
     let position = from_proto::file_position(&snap, params.text_document_position)?;
     let line_info = snap.line_info(position.file_id)?;
-    let Some(refs) = snap.analysis.references(position)? else {
+    let config = snap.config.references_config();
+    let Some(refs) = snap.analysis.references(position, config)? else {
         return Ok(None);
     };
 
     let locations = refs
         .into_iter()
         .flat_map(|References { def, refs }| {
-            let decl = def.map(|nav| {
+            let decl = def.into_iter().flatten().map(|nav| {
                 let url = to_proto::url(&snap, nav.file_id);
                 to_proto::lsp_location(url, &line_info, nav.focus_or_full_range())
             });
@@ -92,7 +93,7 @@ pub(crate) fn handle_references(
             refs.chain(decl)
         })
         .unique()
-        .collect();
+        .collect_vec();
 
     Ok(Some(locations))
 }
