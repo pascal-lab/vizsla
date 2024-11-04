@@ -106,7 +106,7 @@ fn search_refs<'a>(
 
 fn token_precedence(kind: TokenKind) -> usize {
     match kind {
-        TokenKind::IDENTIFIER | TokenKind::SYSTEM_IDENTIFIER => 4,
+        _ if kind.name_like() => 4,
         _ if kind.is_pair_token() => 4,
         _ => 1,
     }

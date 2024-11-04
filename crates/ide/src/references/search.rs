@@ -15,7 +15,7 @@ use nohash_hasher::IntMap;
 use rustc_hash::FxHashMap;
 use syntax::{
     SyntaxNode, SyntaxNodeExt, SyntaxTokenWithParent, TokenKind, ast::AstNode,
-    has_text_range::HasTextRange,
+    has_text_range::HasTextRange, token::TokenKindExt,
 };
 use triomphe::Arc;
 use utils::get::Get;
@@ -24,7 +24,7 @@ use vfs::FileId;
 use super::{ReferenceCategory, ReferencesConfig};
 use crate::{
     ScopeVisibility,
-    definitions::{Definition, DefinitionClass, PortConnShorthand},
+    definitions::{Definition, DefinitionClass, DefinitionSource, PortConnShorthand},
 };
 
 /// A search scope is a set of files and ranges within those files that should
@@ -47,7 +47,15 @@ impl SearchScope {
         match scope_visibility {
             ScopeVisibility::Public => search_scope.unwrap_or_else(|| Self::all(db)),
             ScopeVisibility::Private => {
-                let cont_for_defs = def.iter().map(|src| src.container(db)).unique().collect_vec();
+                let cont_for_defs = def
+                    .iter()
+                    .map(|src| match src {
+                        DefinitionSource::NonAnsiPort(id) => id.cont_id.cont_id.into(),
+                        DefinitionSource::AnsiPort(id) => id.cont_id.cont_id.into(),
+                        _ => src.container(db),
+                    })
+                    .unique()
+                    .collect_vec();
                 let mut scope = Self::from_conts(db, cont_for_defs);
 
                 if let Some(search_scope) = search_scope {
@@ -138,10 +146,10 @@ impl<'a, 'b> ReferencesCtx<'a, 'b> {
     }
 
     pub(crate) fn search(&self) -> IntMap<FileId, Vec<(TextRange, ReferenceCategory)>> {
-        let sema = &self.sema;
-        let mut res: IntMap<_, Vec<_>> = IntMap::default();
+        let sema = self.sema;
+        let mut res = IntMap::default();
 
-        let Some(name) = self.def.iter().next().and_then(|def| def.name(sema.db)) else {
+        let Some(name) = self.def.pick().and_then(|def| def.name(sema.db)) else {
             return res;
         };
 
@@ -204,7 +212,7 @@ impl<'a, 'b> ReferencesCtx<'a, 'b> {
 
     fn filter_token(node: SyntaxNode, offset: TextSize) -> Option<SyntaxTokenWithParent> {
         node.token_at_offset(offset).pick_bext_token(|kind| match kind {
-            TokenKind::IDENTIFIER | TokenKind::SYSTEM_IDENTIFIER => 1,
+            _ if kind.name_like() => 1,
             _ => 0,
         })
     }
@@ -212,7 +220,9 @@ impl<'a, 'b> ReferencesCtx<'a, 'b> {
     fn filter_def(&self, found: DefinitionClass) -> bool {
         match found {
             DefinitionClass::Definition(def) => def == *self.def,
-            DefinitionClass::PortConnShorthand(PortConnShorthand { data, .. }) => data == *self.def,
+            DefinitionClass::PortConnShorthand(PortConnShorthand { data, port }) => {
+                data == *self.def || port == *self.def
+            }
         }
     }
 }

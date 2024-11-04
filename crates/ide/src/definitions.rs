@@ -13,7 +13,7 @@ use hir::{
 };
 use ide_db::root_db::RootDb;
 use smallvec::{SmallVec, smallvec};
-use syntax::{SyntaxTokenWithParent, TokenKind, ast, match_ast};
+use syntax::{SyntaxTokenWithParent, TokenKind, ast, match_ast, token::TokenKindExt};
 use utils::{define_enum_deriving_from, get::GetRef, impl_from};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -21,6 +21,7 @@ pub enum DefinitionSource {
     ModuleId(ModuleId),
     BlockId(BlockId),
 
+    AnsiPort(InModule<DeclId>),
     NonAnsiPort(InModule<NonAnsiPortId>),
     Decl(InContainer<DeclId>),
     Instance(InModule<InstanceId>),
@@ -30,6 +31,7 @@ pub enum DefinitionSource {
 impl_from! { DefinitionSource =>
     ModuleId,
     BlockId,
+    AnsiPort(InModule<DeclId>),
     NonAnsiPort(InModule<NonAnsiPortId>),
     Decl(InContainer<DeclId>),
     Instance(InModule<InstanceId>),
@@ -42,6 +44,9 @@ impl DefinitionSource {
         match *self {
             DefinitionSource::ModuleId(module_id) => db.module(module_id).name.clone(),
             DefinitionSource::BlockId(block_id) => db.block(block_id).name.clone(),
+            DefinitionSource::AnsiPort(InContainer { value, cont_id: module_id }) => {
+                db.module(module_id).get(value).name.clone()
+            }
             DefinitionSource::NonAnsiPort(InModule { value, cont_id: module_id }) => {
                 db.module(module_id).get(value).label.clone()
             }
@@ -66,6 +71,7 @@ impl DefinitionSource {
         match *self {
             DefinitionSource::ModuleId(InContainer { cont_id, .. }) => cont_id.into(),
             DefinitionSource::BlockId(block_id) => block_id.lookup(db).cont_id,
+            DefinitionSource::AnsiPort(InModule { cont_id, .. }) => cont_id.into(),
             DefinitionSource::NonAnsiPort(InModule { cont_id, .. }) => cont_id.into(),
             DefinitionSource::Decl(InContainer { cont_id, .. }) => cont_id,
             DefinitionSource::Instance(InModule { cont_id, .. }) => cont_id.into(),
@@ -79,12 +85,12 @@ impl DefinitionSource {
 pub struct Definition(SmallVec<[DefinitionSource; 3]>);
 
 impl Definition {
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
-
     pub fn iter(&self) -> impl Iterator<Item = &DefinitionSource> {
         self.0.iter()
+    }
+
+    pub fn pick(&self) -> Option<&DefinitionSource> {
+        self.0.get(0)
     }
 }
 
@@ -105,9 +111,9 @@ impl From<PathResolution> for Definition {
         match path_res {
             PathResolution::Module(module_id) => add_source(module_id.into()),
             PathResolution::Decl(decl_id) => add_source(decl_id.into()),
-            PathResolution::AnsiPort(decl_id) => add_source(DefinitionSource::Decl(decl_id.into())),
+            PathResolution::AnsiPort(decl_id) => add_source(decl_id.into()),
             PathResolution::NonAnsiPort { label, port_decl, data_decl, module } => {
-                let container = module.into();
+                let container: ContainerId = module.into();
                 if let Some(label) = label {
                     add_source(InModule::new(module, label).into());
                 }
@@ -146,7 +152,7 @@ impl DefinitionClass {
         sema: &Semantics<'_, RootDb>,
         tp @ SyntaxTokenWithParent { parent, tok }: SyntaxTokenWithParent,
     ) -> Option<Self> {
-        if !matches!(tok.kind(), TokenKind::IDENTIFIER | TokenKind::SYSTEM_IDENTIFIER) {
+        if !tok.kind().name_like() {
             return None;
         }
 
@@ -154,19 +160,19 @@ impl DefinitionClass {
             ast::MemberAccessExpression => unimplemented!(),
             ast::ScopedName => unimplemented!(),
             ast::NamedPortConnection[it] if it.name() == Some(tok) => {
-                let port = sema.resolve_port_conn_name(it).map(Definition::from).unwrap_or_default();
+                let port = sema.resolve_port_conn_name(it).map(Definition::from);
 
-                let data = if it.open_paren().is_none() && it.close_paren().is_none() {
-                    sema.resolve_ident_in_cont(tp).map(Definition::from).unwrap_or_default()
+                if it.open_paren().is_none() && it.close_paren().is_none() {
+                    let data = sema.resolve_ident_in_cont(tp).map(Definition::from);
+
+                    match (port, data) {
+                        (Some(port), Some(data)) => PortConnShorthand { port, data }.into(),
+                        (Some(it), None) | (None, Some(it)) => it.into(),
+                        (None, None) => return None,
+                    }
                 } else {
-                    Definition::default()
-                };
-
-                if port.is_empty() && data.is_empty() {
-                    return None;
+                    port?.into()
                 }
-
-                PortConnShorthand { port, data }.into()
             },
             _ => Definition::from(sema.resolve_ident_in_cont(tp)?).into(),
         };
@@ -179,15 +185,6 @@ impl DefinitionClass {
             DefinitionClass::Definition(definition) => definition.into_iter().collect(),
             DefinitionClass::PortConnShorthand(PortConnShorthand { port, data }) => {
                 port.into_iter().chain(data).collect()
-            }
-        }
-    }
-
-    pub(crate) fn is_empty(&self) -> bool {
-        match self {
-            DefinitionClass::Definition(definition) => definition.is_empty(),
-            DefinitionClass::PortConnShorthand(port_conn) => {
-                port_conn.port.is_empty() && port_conn.data.is_empty()
             }
         }
     }

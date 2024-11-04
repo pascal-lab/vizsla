@@ -47,6 +47,9 @@ impl ToNav for DefinitionSource {
         match self {
             DefinitionSource::ModuleId(module_id) => module_id.to_nav(db),
             DefinitionSource::BlockId(block_id) => block_id.to_nav(db),
+            DefinitionSource::AnsiPort(decl_id) => {
+                InContainer::<_, ContainerId>::from(*decl_id).to_nav(db)
+            }
             DefinitionSource::NonAnsiPort(nonansi_port_id) => nonansi_port_id.to_nav(db),
             DefinitionSource::Decl(decl_id) => decl_id.to_nav(db),
             DefinitionSource::Instance(instance_id) => instance_id.to_nav(db),

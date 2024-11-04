@@ -8,9 +8,11 @@ use crate::support;
 
 pub trait TokenKindExt {
     fn is_pair_token(&self) -> bool;
+    fn name_like(&self) -> bool;
 }
 
 impl TokenKindExt for TokenKind {
+    #[inline]
     fn is_pair_token(&self) -> bool {
         macro_rules! P {
         ($($tok:ident)|* $(|)?) => {
@@ -26,6 +28,11 @@ impl TokenKindExt for TokenKind {
             | interface | endinterface
             | task | endtask
         }
+    }
+
+    #[inline]
+    fn name_like(&self) -> bool {
+        matches!(*self, TokenKind::IDENTIFIER | TokenKind::SYSTEM_IDENTIFIER)
     }
 }
 
