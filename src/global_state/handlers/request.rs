@@ -1,5 +1,6 @@
 use ide::references::References;
 use itertools::Itertools;
+use lsp_types::{PrepareRenameResponse, RenameParams, WorkspaceEdit};
 use span::FileRange;
 
 use crate::{
@@ -92,10 +93,37 @@ pub(crate) fn handle_references(
                     .into_iter()
             });
 
-            refs.chain(decl)
+            decl.chain(refs)
         })
         .unique()
         .collect_vec();
 
     Ok(Some(locations))
+}
+
+pub(crate) fn handle_prepare_rename(
+    snap: GlobalStateSnapshot,
+    params: lsp_types::TextDocumentPositionParams,
+) -> anyhow::Result<Option<PrepareRenameResponse>> {
+    let position = from_proto::file_position(&snap, params)?;
+    let line_index = snap.line_info(position.file_id)?;
+
+    let text_range = snap.analysis.prepare_rename(position)?.map_err(to_proto::rename_error)?;
+    let range = to_proto::range(&line_index, text_range);
+    Ok(Some(PrepareRenameResponse::Range(range)))
+}
+
+pub(crate) fn handle_rename(
+    snap: GlobalStateSnapshot,
+    params: RenameParams,
+) -> anyhow::Result<Option<WorkspaceEdit>> {
+    let position = from_proto::file_position(&snap, params.text_document_position)?;
+    let config = snap.config.rename_config();
+    let change = snap
+        .analysis
+        .rename(position, config, &params.new_name)?
+        .map_err(to_proto::rename_error)?;
+
+    let workspace_edit = to_proto::workspace_edit(&snap, change)?;
+    Ok(Some(workspace_edit))
 }

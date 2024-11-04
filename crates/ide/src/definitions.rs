@@ -13,7 +13,7 @@ use hir::{
 };
 use ide_db::root_db::RootDb;
 use smallvec::{SmallVec, smallvec};
-use syntax::{SyntaxTokenWithParent, TokenKind, ast, match_ast, token::TokenKindExt};
+use syntax::{SyntaxTokenWithParent, ast, match_ast, token::TokenKindExt};
 use utils::{define_enum_deriving_from, get::GetRef, impl_from};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]

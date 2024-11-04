@@ -14,8 +14,8 @@ use memchr::memmem::Finder;
 use nohash_hasher::IntMap;
 use rustc_hash::FxHashMap;
 use syntax::{
-    SyntaxNode, SyntaxNodeExt, SyntaxTokenWithParent, TokenKind, ast::AstNode,
-    has_text_range::HasTextRange, token::TokenKindExt,
+    SyntaxNode, SyntaxNodeExt, SyntaxTokenWithParent, ast::AstNode, has_text_range::HasTextRange,
+    token::TokenKindExt,
 };
 use triomphe::Arc;
 use utils::get::Get;
@@ -135,6 +135,21 @@ pub(crate) struct ReferencesCtx<'a, 'b> {
     scope: SearchScope,
 }
 
+#[derive(Debug, Clone)]
+pub(crate) struct ReferenceToken<'a> {
+    pub token: SyntaxTokenWithParent<'a>,
+}
+
+impl ReferenceToken<'_> {
+    pub fn range(&self) -> TextRange {
+        self.token.text_range().unwrap()
+    }
+
+    pub fn category(&self) -> ReferenceCategory {
+        ReferenceCategory::from_tok(self.token)
+    }
+}
+
 impl<'a, 'b> ReferencesCtx<'a, 'b> {
     pub(crate) fn new(
         sema: &'a Semantics<'a, RootDb>,
@@ -145,16 +160,12 @@ impl<'a, 'b> ReferencesCtx<'a, 'b> {
         Self { sema, def, scope }
     }
 
-    pub(crate) fn search(&self) -> IntMap<FileId, Vec<(TextRange, ReferenceCategory)>> {
+    pub(crate) fn search(&self) -> IntMap<FileId, Vec<ReferenceToken>> {
         let sema = self.sema;
         let mut res = IntMap::default();
 
         let Some(name) = self.def.pick().and_then(|def| def.name(sema.db)) else {
             return res;
-        };
-
-        let mut add_ref = |file_id, range, category| {
-            res.entry(file_id).or_default().push((range, category));
         };
 
         let finder = &Finder::new(&name);
@@ -164,12 +175,8 @@ impl<'a, 'b> ReferencesCtx<'a, 'b> {
             let file = LazyCell::new(|| sema.parse(file_id));
             Self::match_text(&text, finder, range)
                 .filter_map(|offset| Self::filter_token(file.syntax(), offset))
-                .filter(|tp| {
-                    DefinitionClass::resolve(sema, *tp).is_some_and(|def| self.filter_def(def))
-                })
-                .for_each(|tp| {
-                    add_ref(file_id, tp.text_range().unwrap(), ReferenceCategory::empty())
-                });
+                .filter(|tp| self.classify_and_filter(sema, tp))
+                .for_each(|token| res.entry(file_id).or_default().push(ReferenceToken { token }));
         }
 
         res
@@ -217,8 +224,13 @@ impl<'a, 'b> ReferencesCtx<'a, 'b> {
         })
     }
 
-    fn filter_def(&self, found: DefinitionClass) -> bool {
-        match found {
+    fn classify_and_filter(&self, sema: &'a Semantics<'a, RootDb>, tp: &SyntaxTokenWithParent<'a>) -> bool {
+        let Some(def) = DefinitionClass::resolve(sema, *tp) else {
+            return false;
+        };
+
+        // TODO: We should also filter out tokens of definitions.
+        match def {
             DefinitionClass::Definition(def) => def == *self.def,
             DefinitionClass::PortConnShorthand(PortConnShorthand { data, port }) => {
                 data == *self.def || port == *self.def

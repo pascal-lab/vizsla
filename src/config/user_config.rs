@@ -1,10 +1,12 @@
-use ide::{document_highlight::DocumentHighlightConfig, references::ReferencesConfig};
+use ide::{
+    document_highlight::DocumentHighlightConfig, references::ReferencesConfig, rename::RenameConfig,
+};
 use serde::{Deserialize, Serialize};
 use utils::{json::get_field, paths::Utf8PathBuf};
 
 use super::Config;
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum FilesWatcherDef {
     Client,
@@ -12,11 +14,20 @@ pub(crate) enum FilesWatcherDef {
     Server,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum ScopeVisibility {
     Public,
     Private,
+}
+
+impl Into<ide::ScopeVisibility> for ScopeVisibility {
+    fn into(self) -> ide::ScopeVisibility {
+        match self {
+            ScopeVisibility::Public => ide::ScopeVisibility::Public,
+            ScopeVisibility::Private => ide::ScopeVisibility::Private,
+        }
+    }
 }
 
 macro_rules! default_value {
@@ -73,19 +84,18 @@ config_data! {
 
 impl Config {
     pub(crate) fn references_config(&self) -> ReferencesConfig {
-        let scope_visibility = match self.user_config.scope_visibility {
-            ScopeVisibility::Public => ide::ScopeVisibility::Public,
-            ScopeVisibility::Private => ide::ScopeVisibility::Private,
-        };
-        ReferencesConfig { scope_visibility, search_scope: None }
+        let scope_visibility = self.user_config.scope_visibility.into();
+        ReferencesConfig::new(scope_visibility, None)
     }
 
     pub(crate) fn document_highlight_config(&self) -> DocumentHighlightConfig {
-        let scope_visibility = match self.user_config.scope_visibility {
-            ScopeVisibility::Public => ide::ScopeVisibility::Public,
-            ScopeVisibility::Private => ide::ScopeVisibility::Private,
-        };
+        let scope_visibility = self.user_config.scope_visibility.into();
         DocumentHighlightConfig { scope_visibility }
+    }
+
+    pub(crate) fn rename_config(&self) -> RenameConfig {
+        let scope_visibility = self.user_config.scope_visibility.into();
+        RenameConfig { scope_visibility }
     }
 }
 

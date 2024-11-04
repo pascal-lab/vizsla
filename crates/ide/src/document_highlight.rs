@@ -25,12 +25,6 @@ pub struct DocumentHighlight {
     pub category: ReferenceCategory,
 }
 
-impl DocumentHighlight {
-    pub fn new(range: TextRange) -> Self {
-        Self { range, category: ReferenceCategory::empty() }
-    }
-}
-
 pub(crate) fn document_highlight(
     db: &RootDb,
     FilePosition { file_id, offset }: FilePosition,
@@ -78,17 +72,14 @@ fn highlight_refs<'a>(
     def: Definition,
     DocumentHighlightConfig { scope_visibility }: DocumentHighlightConfig,
 ) -> Option<Vec<DocumentHighlight>> {
-    let config = ReferencesConfig {
-        scope_visibility,
-        search_scope: Some(SearchScope::single_file(file_id)),
-    };
+    let config = ReferencesConfig::new(scope_visibility, Some(SearchScope::single_file(file_id)));
 
     let ctx = ReferencesCtx::new(sema, &def, config);
     let refs = ctx
         .search()
         .remove(&file_id)?
         .into_iter()
-        .map(|(range, category)| DocumentHighlight { range, category })
+        .map(|tok| DocumentHighlight { range: tok.range(), category: tok.category() })
         .collect();
 
     Some(refs)

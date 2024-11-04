@@ -1,12 +1,19 @@
 use base_db::{Cancelled, salsa};
 use ide_db::{line_index_db::LineIndexDb, root_db::RootDb};
-use line_index::LineIndex;
+use line_index::{LineIndex, TextRange};
 use span::{FilePosition, RangeInfo};
 use triomphe::Arc;
 use vfs::FileId;
 
 use crate::{
-    document_highlight::{self, DocumentHighlight, DocumentHighlightConfig}, document_symbols::{self, DocumentSymbol}, goto_definition, navigation_target::NavTarget, references::{self, References, ReferencesConfig}, Cancellable
+    Cancellable,
+    document_highlight::{self, DocumentHighlight, DocumentHighlightConfig},
+    document_symbols::{self, DocumentSymbol},
+    goto_definition,
+    navigation_target::NavTarget,
+    references::{self, References, ReferencesConfig},
+    rename::{self, RenameConfig, RenameResult},
+    source_change::SourceChange,
 };
 
 #[derive(Debug)]
@@ -53,5 +60,18 @@ impl Analysis {
         config: ReferencesConfig,
     ) -> Cancellable<Option<Vec<References>>> {
         self.with_db(|db| references::references(db, position, config))
+    }
+
+    pub fn prepare_rename(&self, position: FilePosition) -> Cancellable<RenameResult<TextRange>> {
+        self.with_db(|db| rename::prepare_rename(db, position))
+    }
+
+    pub fn rename(
+        &self,
+        position: FilePosition,
+        config: RenameConfig,
+        new_name: &str,
+    ) -> Cancellable<RenameResult<SourceChange>> {
+        self.with_db(|db| rename::rename(db, position, config, new_name))
     }
 }

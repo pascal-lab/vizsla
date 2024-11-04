@@ -52,4 +52,9 @@ impl GlobalStateSnapshot {
         let path = path.as_abs_path().unwrap();
         to_proto::url_from_abs_path(path)
     }
+
+    pub(crate) fn url_file_version(&self, url: &Url) -> Option<i32> {
+        let path = from_proto::vfs_path(url).ok()?;
+        Some(self.mem_docs.get(&path)?.version)
+    }
 }

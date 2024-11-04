@@ -182,6 +182,8 @@ impl GlobalState {
             .on::<DocumentSymbolRequest>(handle_document_symbol)
             .on::<DocumentHighlightRequest>(handle_document_highlight)
             .on::<References>(handle_references)
+            .on::<PrepareRenameRequest>(handle_prepare_rename)
+            .on::<Rename>(handle_rename)
             .finish();
     }
 

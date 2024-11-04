@@ -185,9 +185,6 @@ impl TextEditBuilder {
 
     fn change(&mut self, change: TextEditItem) {
         self.changes.push(change);
-        if self.changes.len() <= 16 {
-            assert!(sort_and_check_disjoint(&mut self.changes));
-        }
     }
 }
 

@@ -41,7 +41,7 @@ macro impl_arena_idx {
 pub type Ident = SmolStr;
 
 #[inline]
-pub(crate) fn lower_ident(ident: Option<SyntaxToken>) -> Option<Ident> {
+pub fn lower_ident(ident: Option<SyntaxToken>) -> Option<Ident> {
     Some(ident?.value_text().to_smolstr())
 }
 

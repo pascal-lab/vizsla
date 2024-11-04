@@ -17,7 +17,6 @@ use super::{
         impl_lower_expr,
         timing_control::{EventExpr, EventExprId, EventExprSrc, impl_lower_event_expr},
     },
-    impl_arena_idx, lower_ident,
     module::{LocalModuleId, ModuleInfo, ModuleSrc},
     proc::{LowerProc, LowerProcCtx, Proc, ProcId, ProcSrc},
     stmt::{Stmt, StmtId, StmtSrc, impl_lower_stmt},
@@ -25,6 +24,7 @@ use super::{
 use crate::{
     db::{HirDb, InternDb},
     file::HirFileId,
+    hir_def::{impl_arena_idx, lower_ident_opt},
     source_map::{SourceMap, impl_source_map_idx},
 };
 
@@ -99,7 +99,7 @@ impl LowerFileCtx<'_> {
             use ast::Member::*;
             let idx = match member {
                 ModuleDeclaration(decl) => {
-                    let name = lower_ident(decl.header().name());
+                    let name = lower_ident_opt(decl.header().name());
 
                     alloc_idx_and_src! {
                         ModuleInfo { name } => self.file.modules,

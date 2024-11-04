@@ -1,19 +1,21 @@
 use ide::{
     Cancellable, SymbolKind, document_highlight::DocumentHighlight, navigation_target::NavTarget,
-    references::ReferenceCategory,
+    references::ReferenceCategory, rename::RenameError, source_change::SourceChange,
 };
 use itertools::Itertools;
 use line_index::{TextRange, TextSize};
 use span::FileRange;
 use utils::{
-    lines::{LineInfo, PositionEncoding},
+    lines::{LineEnding, LineInfo, PositionEncoding},
     paths::{
         AbsPath,
         camino::{Utf8Component, Utf8Prefix},
     },
+    text_edit::TextEditItem,
 };
 use vfs::FileId;
 
+use super::lsp_error::LspError;
 use crate::global_state::snapshot::GlobalStateSnapshot;
 
 pub(crate) fn goto_definition_response(
@@ -213,4 +215,49 @@ pub(crate) fn position(
             lsp_types::Position::new(line_col.line, line_col.col)
         }
     }
+}
+
+pub(crate) fn rename_error(err: RenameError) -> LspError {
+    LspError::new(lsp_server::ErrorCode::InvalidParams as i32, err.to_string())
+}
+
+pub(crate) fn workspace_edit(
+    snap: &GlobalStateSnapshot,
+    source_change: SourceChange,
+) -> Cancellable<lsp_types::WorkspaceEdit> {
+    let mut document_changes = Vec::new();
+
+    for (file_id, edit) in source_change.text_edits {
+        let text_document = optional_versioned_text_document_identifier(snap, file_id);
+        let line_info = snap.line_info(file_id)?;
+        let edits =
+            edit.into_iter().map(|it| lsp_types::OneOf::Left(text_edit(&line_info, it))).collect();
+        document_changes.push(lsp_types::TextDocumentEdit { text_document, edits });
+    }
+
+    let workspace_edit = lsp_types::WorkspaceEdit {
+        changes: None,
+        document_changes: Some(lsp_types::DocumentChanges::Edits(document_changes)),
+        change_annotations: None,
+    };
+
+    Ok(workspace_edit)
+}
+
+pub(crate) fn optional_versioned_text_document_identifier(
+    snap: &GlobalStateSnapshot,
+    file_id: FileId,
+) -> lsp_types::OptionalVersionedTextDocumentIdentifier {
+    let url = url(snap, file_id);
+    let version = snap.url_file_version(&url);
+    lsp_types::OptionalVersionedTextDocumentIdentifier { uri: url, version }
+}
+
+pub(crate) fn text_edit(line_info: &LineInfo, item: TextEditItem) -> lsp_types::TextEdit {
+    let range = self::range(line_info, item.del);
+    let new_text = match line_info.ending {
+        LineEnding::Unix => item.ins,
+        LineEnding::Dos => item.ins.replace('\n', "\r\n"),
+    };
+    lsp_types::TextEdit { range, new_text }
 }

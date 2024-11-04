@@ -35,7 +35,8 @@ impl ReferenceCategory {
     ) -> ReferenceCategory {
         let mut res = ReferenceCategory::empty();
 
-        todo!()
+        // TODO:
+        res
     }
 }
 
@@ -43,6 +44,12 @@ impl ReferenceCategory {
 pub struct ReferencesConfig {
     pub scope_visibility: ScopeVisibility,
     pub search_scope: Option<SearchScope>,
+}
+
+impl ReferencesConfig {
+    pub fn new(scope_visibility: ScopeVisibility, search_scope: Option<SearchScope>) -> Self {
+        Self { scope_visibility, search_scope }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -99,7 +106,14 @@ fn search_refs<'a>(
     def: Definition,
     config: ReferencesConfig,
 ) -> References {
-    let refs = ReferencesCtx::new(sema, &def, config).search();
+    let refs = ReferencesCtx::new(sema, &def, config)
+        .search()
+        .into_iter()
+        .map(|(file_id, tokens)| {
+            let res = tokens.into_iter().map(|token| (token.range(), token.category())).collect();
+            (file_id, res)
+        })
+        .collect();
     let def = def.iter().map(|def| def.to_nav(sema.db)).collect_vec().into();
     References { def, refs }
 }

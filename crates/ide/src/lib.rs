@@ -11,11 +11,13 @@ pub mod analysis;
 pub mod analysis_host;
 pub mod definitions;
 pub mod navigation_target;
+pub mod source_change;
 
 pub mod document_highlight;
 pub mod document_symbols;
 pub mod goto_definition;
 pub mod references;
+pub mod rename;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum SymbolKind {
