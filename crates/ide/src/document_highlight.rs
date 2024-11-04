@@ -52,6 +52,7 @@ pub(crate) fn document_highlight(
 
 fn token_precedence(kind: TokenKind) -> usize {
     match kind {
+        _ if kind.name_like() => 4,
         _ if kind.is_pair_token() => 4,
         _ => 1,
     }
