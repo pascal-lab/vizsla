@@ -1,10 +1,9 @@
-use std::{cell::LazyCell, cmp};
+use std::cell::LazyCell;
 
 use base_db::{intern::Lookup, salsa::Database, source_db::SourceDb};
 use hir::{
-    container::{ContainerId, InContainer, InFile},
+    container::{ContainerId, InFile},
     db::HirDb,
-    hir_def::block::BlockLoc,
     semantics::Semantics,
     source_map::IsSrc,
 };
@@ -14,7 +13,6 @@ use line_index::{TextRange, TextSize};
 use memchr::memmem::Finder;
 use nohash_hasher::IntMap;
 use rustc_hash::FxHashMap;
-use smallvec::SmallVec;
 use syntax::{
     SyntaxNode, SyntaxNodeExt, SyntaxTokenWithParent, TokenKind, ast::AstNode,
     has_text_range::HasTextRange,
@@ -23,10 +21,10 @@ use triomphe::Arc;
 use utils::get::Get;
 use vfs::FileId;
 
-use super::{ReferenceCategory, References, ReferencesConfig};
+use super::{ReferenceCategory, ReferencesConfig};
 use crate::{
     ScopeVisibility,
-    definitions::{Definition, DefinitionClass, DefinitionSource, PortConnShorthand},
+    definitions::{Definition, DefinitionClass, PortConnShorthand},
 };
 
 /// A search scope is a set of files and ranges within those files that should
@@ -49,8 +47,7 @@ impl SearchScope {
         match scope_visibility {
             ScopeVisibility::Public => search_scope.unwrap_or_else(|| Self::all(db)),
             ScopeVisibility::Private => {
-                let cont_for_defs =
-                    def.iter().map(|source| source.container(db)).unique().collect_vec();
+                let cont_for_defs = def.iter().map(|src| src.container(db)).unique().collect_vec();
                 let mut scope = Self::from_conts(db, cont_for_defs);
 
                 if let Some(search_scope) = search_scope {
@@ -107,23 +104,18 @@ impl SearchScope {
             std::mem::swap(&mut self, &mut other)
         }
 
-        let mut to_remove = Vec::new();
-
-        for (file_id, range) in self.0.iter_mut() {
+        self.0.retain(|file_id, range| {
             if let Some(other_range) = other.0.get(file_id) {
                 match (&range, &other_range) {
                     (Some(r), Some(other)) => *range = r.intersect(*other),
                     (None, Some(other)) => *range = Some(*other),
                     (Some(_), None) | (None, None) => {}
                 };
+                true
             } else {
-                to_remove.push(*file_id);
+                false
             }
-        }
-
-        for file_id in to_remove {
-            self.0.remove(&file_id);
-        }
+        });
 
         self
     }
@@ -136,7 +128,7 @@ pub(crate) struct ReferencesCtx<'a, 'b> {
 }
 
 impl<'a, 'b> ReferencesCtx<'a, 'b> {
-    pub(crate) fn from_def(
+    pub(crate) fn new(
         sema: &'a Semantics<'a, RootDb>,
         def: &'b Definition,
         cfg: ReferencesConfig,
@@ -146,14 +138,15 @@ impl<'a, 'b> ReferencesCtx<'a, 'b> {
     }
 
     pub(crate) fn search(&self) -> IntMap<FileId, Vec<(TextRange, ReferenceCategory)>> {
+        let sema = &self.sema;
         let mut res: IntMap<_, Vec<_>> = IntMap::default();
-        let mut add_ref = |file_id, range, category| {
-            res.entry(file_id).or_default().push((range, category));
+
+        let Some(name) = self.def.iter().next().and_then(|def| def.name(sema.db)) else {
+            return res;
         };
 
-        let sema = &self.sema;
-        let Some(name) = self.def.iter().next().and_then(|def| def.name(sema.db)) else {
-            return IntMap::default();
+        let mut add_ref = |file_id, range, category| {
+            res.entry(file_id).or_default().push((range, category));
         };
 
         let finder = &Finder::new(&name);
@@ -162,7 +155,7 @@ impl<'a, 'b> ReferencesCtx<'a, 'b> {
 
             let file = LazyCell::new(|| sema.parse(file_id));
             Self::match_text(&text, finder, range)
-                .filter_map(|offset| Self::find_token(file.syntax(), offset))
+                .filter_map(|offset| Self::filter_token(file.syntax(), offset))
                 .filter(|tp| {
                     DefinitionClass::resolve(sema, *tp).is_some_and(|def| self.filter_def(def))
                 })
@@ -190,7 +183,7 @@ impl<'a, 'b> ReferencesCtx<'a, 'b> {
         search_range: TextRange,
     ) -> impl Iterator<Item = TextSize> + 'c {
         finder.find_iter(text.as_bytes()).filter_map(move |idx| {
-            let offset: TextSize = idx.try_into().unwrap();
+            let offset = TextSize::from(idx as u32);
             if !search_range.contains_inclusive(offset) {
                 return None;
             }
@@ -209,7 +202,7 @@ impl<'a, 'b> ReferencesCtx<'a, 'b> {
         })
     }
 
-    fn find_token(node: SyntaxNode, offset: TextSize) -> Option<SyntaxTokenWithParent> {
+    fn filter_token(node: SyntaxNode, offset: TextSize) -> Option<SyntaxTokenWithParent> {
         node.token_at_offset(offset).pick_bext_token(|kind| match kind {
             TokenKind::IDENTIFIER | TokenKind::SYSTEM_IDENTIFIER => 1,
             _ => 0,

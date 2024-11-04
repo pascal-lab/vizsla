@@ -8,12 +8,16 @@ use vfs::FileId;
 use crate::{
     ScopeVisibility,
     definitions::{Definition, DefinitionClass, PortConnShorthand},
-    navigation_target::ToNav,
     references::{
         self, ReferenceCategory, ReferencesConfig,
         search::{ReferencesCtx, SearchScope},
     },
 };
+
+#[derive(Debug, Clone)]
+pub struct DocumentHighlightConfig {
+    pub scope_visibility: ScopeVisibility,
+}
 
 #[derive(Debug, Clone)]
 pub struct DocumentHighlight {
@@ -30,6 +34,7 @@ impl DocumentHighlight {
 pub(crate) fn document_highlight(
     db: &RootDb,
     FilePosition { file_id, offset }: FilePosition,
+    config: DocumentHighlightConfig,
 ) -> Option<Vec<DocumentHighlight>> {
     let sema = Semantics::new(db);
     let file = sema.parse(file_id);
@@ -41,7 +46,7 @@ pub(crate) fn document_highlight(
             DefinitionClass::Definition(def) => def,
             DefinitionClass::PortConnShorthand(PortConnShorthand { data, .. }) => data,
         };
-        highlight_refs(&sema, file_id, def)
+        highlight_refs(&sema, file_id, def, config)
     })
 }
 
@@ -70,12 +75,14 @@ fn highlight_refs<'a>(
     sema: &'a Semantics<'a, RootDb>,
     file_id: FileId,
     def: Definition,
+    DocumentHighlightConfig { scope_visibility }: DocumentHighlightConfig,
 ) -> Option<Vec<DocumentHighlight>> {
     let config = ReferencesConfig {
-        scope_visibility: ScopeVisibility::Public,
+        scope_visibility,
         search_scope: Some(SearchScope::single_file(file_id)),
     };
-    let ctx = ReferencesCtx::from_def(sema, &def, config);
+
+    let ctx = ReferencesCtx::new(sema, &def, config);
     let refs = ctx
         .search()
         .remove(&file_id)?

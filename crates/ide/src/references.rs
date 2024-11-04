@@ -4,10 +4,9 @@ use itertools::Itertools;
 use line_index::TextRange;
 use nohash_hasher::IntMap;
 use search::{ReferencesCtx, SearchScope};
-use smallvec::{SmallVec, smallvec};
 use span::FilePosition;
 use syntax::{
-    SyntaxNode, SyntaxNodeExt, SyntaxToken, SyntaxTokenWithParent, TokenKind,
+    SyntaxNodeExt, SyntaxToken, SyntaxTokenWithParent, TokenKind,
     ast::AstNode,
     has_text_range::HasTextRange,
     token::{TokenKindExt, pair_token},
@@ -17,7 +16,6 @@ use vfs::FileId;
 use crate::{
     ScopeVisibility,
     definitions::{Definition, DefinitionClass, PortConnShorthand},
-    goto_definition,
     navigation_target::{NavTarget, ToNav},
 };
 
@@ -32,7 +30,11 @@ bitflags::bitflags! {
 }
 
 impl ReferenceCategory {
-    pub fn from_ast(node: SyntaxNode) -> ReferenceCategory {
+    pub fn from_tok(
+        SyntaxTokenWithParent { parent, tok }: SyntaxTokenWithParent,
+    ) -> ReferenceCategory {
+        let mut res = ReferenceCategory::empty();
+
         todo!()
     }
 }
@@ -97,10 +99,9 @@ fn search_refs<'a>(
     def: Definition,
     config: ReferencesConfig,
 ) -> References {
-    let ctx = ReferencesCtx::from_def(sema, &def, config);
-    let refs = ctx.search();
-    let def = def.iter().map(|def| def.to_nav(sema.db)).collect();
-    References { def: Some(def), refs }
+    let refs = ReferencesCtx::new(sema, &def, config).search();
+    let def = def.iter().map(|def| def.to_nav(sema.db)).collect_vec().into();
+    References { def, refs }
 }
 
 fn token_precedence(kind: TokenKind) -> usize {

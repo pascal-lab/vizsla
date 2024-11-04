@@ -6,12 +6,7 @@ use triomphe::Arc;
 use vfs::FileId;
 
 use crate::{
-    Cancellable,
-    document_highlight::{self, DocumentHighlight},
-    document_symbols::{self, DocumentSymbol},
-    goto_definition,
-    navigation_target::NavTarget,
-    references::{self, References, ReferencesConfig},
+    document_highlight::{self, DocumentHighlight, DocumentHighlightConfig}, document_symbols::{self, DocumentSymbol}, goto_definition, navigation_target::NavTarget, references::{self, References, ReferencesConfig}, Cancellable
 };
 
 #[derive(Debug)]
@@ -47,8 +42,9 @@ impl Analysis {
     pub fn document_highlight(
         &self,
         position: FilePosition,
+        config: DocumentHighlightConfig,
     ) -> Cancellable<Option<Vec<DocumentHighlight>>> {
-        self.with_db(|db| document_highlight::document_highlight(db, position))
+        self.with_db(|db| document_highlight::document_highlight(db, position, config))
     }
 
     pub fn references(

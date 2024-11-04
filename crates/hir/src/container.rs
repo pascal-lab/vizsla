@@ -56,9 +56,17 @@ macro_rules! impl_container_id {
 
             pub fn name(self, db: &dyn HirDb) -> Option<Ident> {
                 match self {
-                    ContainerId::HirFileId(file_id) => None,
+                    ContainerId::HirFileId(_) => None,
                     ContainerId::ModuleId(module_id) => module_id.name(db),
                     ContainerId::BlockId(block_id) => block_id.name(db),
+                }
+            }
+
+            pub fn container(self, db: &dyn HirDb) -> Option<ContainerId> {
+                match self {
+                    ContainerId::HirFileId(_) => None,
+                    ContainerId::ModuleId(module_id) => module_id.container(),
+                    ContainerId::BlockId(block_id) => block_id.container(db),
                 }
             }
         }
@@ -76,7 +84,11 @@ impl HirFileId {
         self.0
     }
 
-    pub fn name(self, db: &dyn HirDb) -> Option<Ident> {
+    pub fn name(self) -> Option<Ident> {
+        None
+    }
+
+    pub fn container(self) -> Option<ContainerId> {
         None
     }
 }
@@ -89,6 +101,10 @@ impl ModuleId {
     pub fn name(self, db: &dyn HirDb) -> Option<Ident> {
         db.module(self).name.clone()
     }
+
+    pub fn container(self) -> Option<ContainerId> {
+        Some(self.cont_id.into())
+    }
 }
 
 impl BlockId {
@@ -98,6 +114,10 @@ impl BlockId {
 
     pub fn name(self, db: &dyn HirDb) -> Option<Ident> {
         db.block(self).name.clone()
+    }
+
+    pub fn container(self, db: &dyn HirDb) -> Option<ContainerId> {
+        Some(self.lookup(db).cont_id.into())
     }
 }
 

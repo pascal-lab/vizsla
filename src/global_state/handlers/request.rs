@@ -53,7 +53,8 @@ pub(crate) fn handle_document_highlight(
 ) -> anyhow::Result<Option<Vec<lsp_types::DocumentHighlight>>> {
     let position = from_proto::file_position(&snap, params.text_document_position_params)?;
     let line_info = snap.line_info(position.file_id)?;
-    let Some(highlights) = snap.analysis.document_highlight(position)? else {
+    let config = snap.config.document_highlight_config();
+    let Some(highlights) = snap.analysis.document_highlight(position, config)? else {
         return Ok(None);
     };
 
@@ -80,16 +81,17 @@ pub(crate) fn handle_references(
         .flat_map(|References { def, refs }| {
             let decl = def.into_iter().flatten().map(|nav| {
                 let url = to_proto::url(&snap, nav.file_id);
-                to_proto::lsp_location(url, &line_info, nav.focus_or_full_range())
+                to_proto::location(url, &line_info, nav.focus_or_full_range())
             });
 
             let refs = refs.into_iter().flat_map(|(file_id, refs)| {
                 let url = to_proto::url(&snap, file_id);
                 refs.into_iter()
-                    .map(|(range, _)| to_proto::lsp_location(url.clone(), &line_info, range))
+                    .map(|(range, _)| to_proto::location(url.clone(), &line_info, range))
                     .collect_vec()
                     .into_iter()
             });
+
             refs.chain(decl)
         })
         .unique()

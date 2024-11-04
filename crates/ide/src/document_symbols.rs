@@ -180,17 +180,12 @@ fn collect_block_items(
     let cont_name = cont_name.as_ref();
 
     for node in decl.items().children() {
-        let node = node.syntax();
-        match_ast! { node in
-            ast::Statement[it] => {
-                let hir = StmtSrc::from(it).hir(&block, &src_map);
-                let sym = build(hir.label.clone(), it, cont_name.cloned(), None);
-                children.push(sym);
-            },
+        match_ast! { node.syntax(),
+            ast::Statement[it] => build_stmt(db, res, it, cont_name, &block, &src_map),
             ast::DataDeclaration[it] => {
                 build_decls(children, it.declarators(), cont_name, &block, &src_map);
             },
-            _ => unimplemented!("{:?}", node.kind()),
+            _ => unimplemented!("{:?}", node.syntax().kind()),
         }
     }
 
@@ -200,7 +195,6 @@ fn collect_block_items(
     res.push(block_sym);
 }
 
-#[inline]
 fn build_stmt<'a, Arn, SrcMap>(
     db: &RootDb,
     res: &mut Vec<DocumentSymbol>,

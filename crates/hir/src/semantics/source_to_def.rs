@@ -70,7 +70,7 @@ impl Source2DefCtx<'_> {
     }
 
     fn container_to_def(&mut self, file_id: HirFileId, node: SyntaxNode) -> Option<ContainerId> {
-        let cont_id = match_ast! { node in
+        let cont_id = match_ast! { node,
             ast::ModuleDeclaration[module] => {
                 let src = module.into();
                 self.module_to_def(InFile::new(file_id, src))?.into()

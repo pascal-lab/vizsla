@@ -32,7 +32,7 @@ pub enum SymbolKind {
 
 impl SymbolKind {
     pub fn from_node(node: SyntaxNode) -> SymbolKind {
-        match_ast! { node in
+        match_ast! { node,
             ast::ModuleHeader[it] => {
                 use ast::ModuleHeader::*;
                 match it {

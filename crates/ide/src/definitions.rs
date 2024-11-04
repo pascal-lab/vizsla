@@ -14,11 +14,7 @@ use hir::{
 use ide_db::root_db::RootDb;
 use smallvec::{SmallVec, smallvec};
 use syntax::{SyntaxTokenWithParent, TokenKind, ast, match_ast};
-use utils::{
-    define_enum_deriving_from,
-    get::{Get, GetRef},
-    impl_from,
-};
+use utils::{define_enum_deriving_from, get::GetRef, impl_from};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum DefinitionSource {
@@ -154,7 +150,7 @@ impl DefinitionClass {
             return None;
         }
 
-        let res = match_ast! { parent in
+        let res = match_ast! { parent,
             ast::MemberAccessExpression => unimplemented!(),
             ast::ScopedName => unimplemented!(),
             ast::NamedPortConnection[it] if it.name() == Some(tok) => {

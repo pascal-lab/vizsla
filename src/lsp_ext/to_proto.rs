@@ -24,7 +24,9 @@ pub(crate) fn goto_definition_response(
     let res = if snap.config.location_link() {
         let links = targets
             .into_iter()
-            .unique_by(|nav| (nav.file_id, nav.full_range, nav.focus_range))
+            .unique_by(|NavTarget { file_id, full_range, focus_range, .. }| {
+                (*file_id, *full_range, *focus_range)
+            })
             .map(|nav| location_link(snap, src, nav))
             .collect::<Cancellable<Vec<_>>>()?;
         links.into()
@@ -33,7 +35,11 @@ pub(crate) fn goto_definition_response(
             .into_iter()
             .map(|nav| FileRange { file_id: nav.file_id, range: nav.focus_or_full_range() })
             .unique()
-            .map(|range| location(snap, range))
+            .map(|FileRange { file_id, range }| {
+                let url = url(snap, file_id);
+                let line_info = snap.line_info(file_id)?;
+                Ok(location(url, &line_info, range))
+            })
             .collect::<Cancellable<Vec<_>>>()?;
         locations.into()
     };
@@ -54,8 +60,8 @@ pub(crate) fn document_symbol(
         kind: symbol_kind(symbol.kind),
         tags: None,
         deprecated: None,
-        range: lsp_range(line_info, symbol.full_range),
-        selection_range: lsp_range(line_info, symbol.focus_range),
+        range: self::range(line_info, symbol.full_range),
+        selection_range: self::range(line_info, symbol.focus_range),
         children,
     }
 }
@@ -71,7 +77,7 @@ pub(crate) fn document_symbol_information(
         kind: symbol_kind(symbol.kind),
         tags: None,
         deprecated: None,
-        location: lsp_types::Location::new(url.clone(), lsp_range(line_info, symbol.focus_range)),
+        location: lsp_types::Location::new(url.clone(), self::range(line_info, symbol.focus_range)),
         container_name: symbol.container_name,
     });
 
@@ -94,7 +100,7 @@ pub(crate) fn document_highlight(
         None
     };
 
-    lsp_types::DocumentHighlight { range: lsp_range(line_info, range), kind }
+    lsp_types::DocumentHighlight { range: self::range(line_info, range), kind }
 }
 
 fn symbol_kind(symbol_kind: SymbolKind) -> lsp_types::SymbolKind {
@@ -112,25 +118,17 @@ fn symbol_kind(symbol_kind: SymbolKind) -> lsp_types::SymbolKind {
     }
 }
 
-fn location(
-    snap: &GlobalStateSnapshot,
-    FileRange { file_id, range }: FileRange,
-) -> Cancellable<lsp_types::Location> {
-    let url = url(snap, file_id);
-    let line_info = snap.line_info(file_id)?;
-    let range = lsp_range(&line_info, range);
-    let loc = lsp_types::Location::new(url, range);
-    Ok(loc)
-}
-
 fn location_link(
     snap: &GlobalStateSnapshot,
     src: Option<FileRange>,
     target: NavTarget,
 ) -> Cancellable<lsp_types::LocationLink> {
-    let origin_selection_range = src.and_then(|FileRange { file_id, range }| {
-        Some(lsp_range(&snap.line_info(file_id).ok()?, range))
-    });
+    let origin_selection_range = try {
+        let FileRange { file_id, range } = src?;
+        let line_info = snap.line_info(file_id).ok()?;
+        self::range(&line_info, range)
+    };
+
     let (target_uri, target_range, target_selection_range) = location_info(snap, target)?;
     let res = lsp_types::LocationLink {
         origin_selection_range,
@@ -148,9 +146,9 @@ fn location_info(
     let line_info = snap.line_info(file_id)?;
 
     let target_uri = url(snap, file_id);
-    let target_range = lsp_range(&line_info, full_range);
+    let target_range = self::range(&line_info, full_range);
     let target_selection_range =
-        focus_range.map(|it| lsp_range(&line_info, it)).unwrap_or(target_range);
+        focus_range.map(|it| self::range(&line_info, it)).unwrap_or(target_range);
     Ok((target_uri, target_range, target_selection_range))
 }
 
@@ -188,18 +186,18 @@ pub(crate) fn url_from_abs_path(path: &AbsPath) -> lsp_types::Url {
     lsp_types::Url::parse(&url).unwrap()
 }
 
-pub(crate) fn lsp_range(line_info: &LineInfo, range: TextRange) -> lsp_types::Range {
+pub(crate) fn range(line_info: &LineInfo, range: TextRange) -> lsp_types::Range {
     let start = position(line_info, range.start());
     let end = position(line_info, range.end());
     lsp_types::Range::new(start, end)
 }
 
-pub(crate) fn lsp_location(
+pub(crate) fn location(
     url: lsp_types::Url,
     line_info: &LineInfo,
     range: TextRange,
 ) -> lsp_types::Location {
-    let range = lsp_range(line_info, range);
+    let range = self::range(line_info, range);
     lsp_types::Location::new(url, range)
 }
 

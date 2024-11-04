@@ -159,11 +159,10 @@ impl LowerBlockCtx<'_> {
             .items()
             .children()
             .map(|node| {
-                let node = node.syntax();
-                match_ast! { node in
+                match_ast! { node.syntax(),
                     ast::Statement[it] => self.stmt_ctx().lower_stmt(it).into(),
                     ast::DataDeclaration[it] => self.declaration_ctx().lower_data_decl(it).into(),
-                    _ => unimplemented!("{:?}", node.kind()),
+                    _ => unimplemented!("{:?}", node.syntax().kind()),
                 }
             })
             .collect();

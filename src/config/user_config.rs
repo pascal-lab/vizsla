@@ -1,4 +1,4 @@
-use ide::references::ReferencesConfig;
+use ide::{document_highlight::DocumentHighlightConfig, references::ReferencesConfig};
 use serde::{Deserialize, Serialize};
 use utils::{json::get_field, paths::Utf8PathBuf};
 
@@ -14,7 +14,7 @@ pub(crate) enum FilesWatcherDef {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-enum ScopeVisibility {
+pub(crate) enum ScopeVisibility {
     Public,
     Private,
 }
@@ -78,6 +78,14 @@ impl Config {
             ScopeVisibility::Private => ide::ScopeVisibility::Private,
         };
         ReferencesConfig { scope_visibility, search_scope: None }
+    }
+
+    pub(crate) fn document_highlight_config(&self) -> DocumentHighlightConfig {
+        let scope_visibility = match self.user_config.scope_visibility {
+            ScopeVisibility::Public => ide::ScopeVisibility::Public,
+            ScopeVisibility::Private => ide::ScopeVisibility::Private,
+        };
+        DocumentHighlightConfig { scope_visibility }
     }
 }
 
