@@ -3,8 +3,17 @@ use ide_db::root_db::RootDb;
 use line_index::TextRange;
 use span::FilePosition;
 use syntax::{SyntaxNodeExt, SyntaxTokenWithParent, TokenKind, ast::AstNode, token::TokenKindExt};
+use vfs::FileId;
 
-use crate::references::{self, ReferenceCategory};
+use crate::{
+    ScopeVisibility,
+    definitions::{Definition, DefinitionClass, PortConnShorthand},
+    navigation_target::ToNav,
+    references::{
+        self, ReferenceCategory, ReferencesConfig,
+        search::{ReferencesCtx, SearchScope},
+    },
+};
 
 #[derive(Debug, Clone)]
 pub struct DocumentHighlight {
@@ -27,7 +36,13 @@ pub(crate) fn document_highlight(
 
     let token = file.syntax().token_at_offset(offset).pick_bext_token(token_precedence)?;
 
-    handle_ctrl_flow_kw(&sema, token)
+    handle_ctrl_flow_kw(&sema, token).or_else(|| {
+        let def = match DefinitionClass::resolve(&sema, token)? {
+            DefinitionClass::Definition(def) => def,
+            DefinitionClass::PortConnShorthand(PortConnShorthand { data, .. }) => data,
+        };
+        highlight_refs(&sema, file_id, def)
+    })
 }
 
 fn token_precedence(kind: TokenKind) -> usize {
@@ -49,4 +64,24 @@ fn handle_ctrl_flow_kw(
         .map(|(range, category)| DocumentHighlight { range, category })
         .collect();
     Some(highlights)
+}
+
+fn highlight_refs<'a>(
+    sema: &'a Semantics<'a, RootDb>,
+    file_id: FileId,
+    def: Definition,
+) -> Option<Vec<DocumentHighlight>> {
+    let config = ReferencesConfig {
+        scope_visibility: ScopeVisibility::Public,
+        search_scope: Some(SearchScope::single_file(file_id)),
+    };
+    let ctx = ReferencesCtx::from_def(sema, &def, config);
+    let refs = ctx
+        .search()
+        .remove(&file_id)?
+        .into_iter()
+        .map(|(range, category)| DocumentHighlight { range, category })
+        .collect();
+
+    Some(refs)
 }

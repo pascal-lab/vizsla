@@ -21,7 +21,7 @@ use crate::{
     navigation_target::{NavTarget, ToNav},
 };
 
-mod search;
+pub(crate) mod search;
 
 bitflags::bitflags! {
     #[derive(Copy, Clone, Default, PartialEq, Eq, Hash, Debug)]
@@ -97,7 +97,7 @@ fn search_refs<'a>(
     def: Definition,
     config: ReferencesConfig,
 ) -> References {
-    let ctx = ReferencesCtx::from_def(sema, &def, config.clone());
+    let ctx = ReferencesCtx::from_def(sema, &def, config);
     let refs = ctx.search();
     let def = def.iter().map(|def| def.to_nav(sema.db)).collect();
     References { def: Some(def), refs }

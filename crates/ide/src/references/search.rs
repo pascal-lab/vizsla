@@ -35,7 +35,13 @@ use crate::{
 pub struct SearchScope(FxHashMap<FileId, Option<TextRange>>);
 
 impl SearchScope {
-    pub(crate) fn new(
+    pub(crate) fn single_file(file_id: FileId) -> Self {
+        let mut res = FxHashMap::default();
+        res.insert(file_id, None);
+        SearchScope(res)
+    }
+
+    fn new(
         db: &RootDb,
         def: &Definition,
         ReferencesConfig { scope_visibility, search_scope }: ReferencesConfig,
@@ -96,7 +102,7 @@ impl SearchScope {
         SearchScope(res)
     }
 
-    pub fn intersect(mut self, mut other: SearchScope) -> SearchScope {
+    fn intersect(mut self, mut other: SearchScope) -> SearchScope {
         if self.0.len() > other.0.len() {
             std::mem::swap(&mut self, &mut other)
         }
