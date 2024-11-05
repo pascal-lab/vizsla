@@ -1,6 +1,6 @@
 use base_db::intern::Lookup;
 use hir::{
-    container::{ContainerId, InContainer, InModule},
+    container::{ContainerId, InContainer, InFile, InModule},
     db::HirDb,
     hir_def::{
         Ident,
@@ -41,7 +41,7 @@ impl DefinitionSource {
         match *self {
             DefinitionSource::ModuleId(module_id) => db.module(module_id).name.clone(),
             DefinitionSource::BlockId(block_id) => db.block(block_id).name.clone(),
-            DefinitionSource::NonAnsiPort(InModule { value, cont_id: module_id }) => {
+            DefinitionSource::NonAnsiPort(InModule { value, module_id }) => {
                 db.module(module_id).get(value).label.clone()
             }
             DefinitionSource::Decl(InContainer { value, cont_id }) => match cont_id {
@@ -49,7 +49,7 @@ impl DefinitionSource {
                 ContainerId::ModuleId(module_id) => db.module(module_id).get(value).name.clone(),
                 ContainerId::BlockId(block_id) => db.block(block_id).get(value).name.clone(),
             },
-            DefinitionSource::Instance(InModule { value, cont_id: module_id }) => {
+            DefinitionSource::Instance(InModule { value, module_id }) => {
                 db.module(module_id).get(value).name.clone()
             }
             DefinitionSource::Stmt(InContainer { value, cont_id }) => match cont_id {
@@ -62,11 +62,11 @@ impl DefinitionSource {
 
     pub fn container(&self, db: &dyn HirDb) -> ContainerId {
         match *self {
-            DefinitionSource::ModuleId(InContainer { cont_id, .. }) => cont_id.into(),
+            DefinitionSource::ModuleId(InFile { file_id, .. }) => file_id.into(),
             DefinitionSource::BlockId(block_id) => block_id.lookup(db).cont_id,
-            DefinitionSource::NonAnsiPort(InModule { cont_id, .. }) => cont_id.into(),
+            DefinitionSource::NonAnsiPort(InModule { module_id, .. }) => module_id.into(),
             DefinitionSource::Decl(InContainer { cont_id, .. }) => cont_id,
-            DefinitionSource::Instance(InModule { cont_id, .. }) => cont_id.into(),
+            DefinitionSource::Instance(InModule { module_id, .. }) => module_id.into(),
             DefinitionSource::Stmt(InContainer { cont_id, .. }) => cont_id,
         }
     }
@@ -126,7 +126,7 @@ impl Definition {
             PathResolution::Stmt(stmt_id) => stmt_id.into(),
             PathResolution::Block(blk_id) => blk_id.into(),
             PathResolution::AnsiPort(decl_id) => {
-                InContainer::new(decl_id.cont_id.into(), decl_id.value).into()
+                InContainer::new(decl_id.module_id.into(), decl_id.value).into()
             }
             PathResolution::NonAnsiPort { label, port_decl, data_decl, module } => {
                 let container: ContainerId = module.into();

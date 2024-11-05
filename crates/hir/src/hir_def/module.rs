@@ -185,7 +185,7 @@ impl LowerModuleCtx<'_> {
 
 pub(crate) fn module_with_source_map_query(
     db: &dyn HirDb,
-    module_id @ InFile { value: local_module_id, cont_id: file_id }: ModuleId,
+    module_id @ InFile { value: local_module_id, file_id }: ModuleId,
 ) -> (Arc<Module>, Arc<ModuleSourceMap>) {
     let (file, file_source_map) = db.hir_file_with_source_map(file_id);
     let tree = db.parse(file_id);

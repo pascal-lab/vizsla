@@ -21,7 +21,7 @@ impl HasSource for ModuleId {
     type AstPtr = ModuleSrc;
 
     fn source(&self, db: &dyn HirDb) -> Option<InFile<ModuleSrc>> {
-        let InFile { cont_id: file_id, value } = *self;
+        let InFile { file_id, value } = *self;
         let (_, file_source_map) = db.hir_file_with_source_map(file_id);
         file_source_map.get_opt(value).map(|it| self.with_value(it))
     }

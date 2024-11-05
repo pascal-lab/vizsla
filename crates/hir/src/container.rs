@@ -34,13 +34,27 @@ impl<T, C> InContainer<T, C> {
 }
 
 macro_rules! impl_container_id {
-    ($($name:ident<$id:ty>),*) => {
+    ($($name:ident[$id:ident : $ty:ty]),* $(,)?) => {
         $(
-            pub type $name<T> = InContainer<T, $id>;
+            #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+            pub struct $name<T> {
+                pub value: T,
+                pub $id: $ty,
+            }
+
+            impl<T> $name<T> {
+                pub fn new($id: $ty, value: T) -> Self {
+                    Self { value, $id }
+                }
+
+                pub fn with_value<U>(self, value: U) -> $name<U> {
+                    $name::<U>::new(self.$id, value)
+                }
+            }
 
             impl<T> From<$name<T>> for InContainer<T, ContainerId> {
                 fn from(item: $name<T>) -> InContainer<T, ContainerId> {
-                    InContainer::new(item.cont_id.into(), item.value)
+                    InContainer::new(item.$id.into(), item.value)
                 }
             }
         )*
@@ -74,9 +88,9 @@ macro_rules! impl_container_id {
 }
 
 impl_container_id! {
-    InFile<HirFileId>,
-    InModule<ModuleId>,
-    InBlock<BlockId>
+    InFile[file_id: HirFileId],
+    InModule[module_id: ModuleId],
+    InBlock[block_id: BlockId],
 }
 
 impl HirFileId {
@@ -95,7 +109,7 @@ impl HirFileId {
 
 impl ModuleId {
     pub fn file_id(self) -> FileId {
-        self.cont_id.0
+        self.file_id.0
     }
 
     pub fn name(self, db: &dyn HirDb) -> Option<Ident> {
@@ -103,13 +117,13 @@ impl ModuleId {
     }
 
     pub fn container(self) -> Option<ContainerId> {
-        Some(self.cont_id.into())
+        Some(self.file_id.into())
     }
 }
 
 impl BlockId {
     pub fn file_id(self, db: &dyn InternDb) -> FileId {
-        self.lookup(db).src.cont_id.0
+        self.lookup(db).src.file_id.0
     }
 
     pub fn name(self, db: &dyn HirDb) -> Option<Ident> {
@@ -140,7 +154,7 @@ impl Iterator for ContainerParent<'_> {
         let next = self.cont_id;
         self.cont_id = match self.cont_id? {
             ContainerId::HirFileId(_) => None,
-            ContainerId::ModuleId(module_id) => Some(module_id.cont_id.into()),
+            ContainerId::ModuleId(module_id) => Some(module_id.file_id.into()),
             ContainerId::BlockId(block_id) => Some(block_id.lookup(self.db).cont_id),
         };
         next

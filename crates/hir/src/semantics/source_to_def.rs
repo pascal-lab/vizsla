@@ -6,7 +6,7 @@ use syntax::{
 use utils::get::{Get, GetRef};
 
 use crate::{
-    container::{ContainerId, InContainer, InFile},
+    container::{ContainerId, InFile},
     db::HirDb,
     file::HirFileId,
     hir_def::{
@@ -23,7 +23,7 @@ pub(super) struct Source2DefCtx<'a> {
 impl Source2DefCtx<'_> {
     pub(super) fn module_to_def(
         &mut self,
-        InFile { cont_id: file_id, value: src }: InFile<ModuleSrc>,
+        InFile { file_id, value: src }: InFile<ModuleSrc>,
     ) -> Option<ModuleId> {
         let (_, file_source_map) = self.db.hir_file_with_source_map(file_id);
         Some(ModuleId::new(file_id, file_source_map.get(src)))
@@ -31,7 +31,7 @@ impl Source2DefCtx<'_> {
 
     pub(super) fn block_to_def(
         &mut self,
-        InFile { cont_id: file_id, value: block_src }: InFile<BlockSrc>,
+        InFile { file_id, value: block_src }: InFile<BlockSrc>,
     ) -> Option<BlockId> {
         let tree = self.db.parse(file_id);
         let node = block_src.to_node(&tree)?;
@@ -88,7 +88,7 @@ impl Source2DefCtx<'_> {
 
     pub(super) fn find_container(
         &mut self,
-        InContainer { value: src, cont_id: file_id }: InFile<SyntaxNode>,
+        InFile { value: src, file_id }: InFile<SyntaxNode>,
     ) -> ContainerId {
         SyntaxAncestors::start_from(src)
             .skip(1) // skip the node itself

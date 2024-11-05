@@ -173,7 +173,7 @@ pub(crate) fn block_with_source_map_query(
     db: &dyn HirDb,
     block_id: BlockId,
 ) -> (Arc<Block>, Arc<BlockSourceMap>) {
-    let InFile { cont_id: file_id, value: block_src } = block_id.lookup(db).src;
+    let InFile { file_id, value: block_src } = block_id.lookup(db).src;
     let tree = db.parse(file_id);
 
     let mut block = Block::default();

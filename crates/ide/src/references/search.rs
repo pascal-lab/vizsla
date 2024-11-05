@@ -48,7 +48,7 @@ impl SearchScope {
             ScopeVisibility::Private => {
                 let cont_for_def = if def.is_port() {
                     match def.container(db) {
-                        ContainerId::ModuleId(in_module) => in_module.cont_id.into(),
+                        ContainerId::ModuleId(InFile { file_id, .. }) => file_id.into(),
                         _ => unreachable!(),
                     }
                 } else {
@@ -79,7 +79,7 @@ impl SearchScope {
     fn from_conts(db: &RootDb, cont: ContainerId) -> Self {
         match cont {
             ContainerId::HirFileId(_) => Self::all(db),
-            ContainerId::ModuleId(InFile { value: local_module_id, cont_id: file_id }) => {
+            ContainerId::ModuleId(InFile { value: local_module_id, file_id }) => {
                 let (_, file_src_map) = db.hir_file_with_source_map(file_id);
                 let range = file_src_map.get(local_module_id).range();
                 Self::single_range(file_id.file_id(), range)

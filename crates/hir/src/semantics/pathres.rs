@@ -107,7 +107,7 @@ impl From<InModule<ModuleEntry>> for PathResolution {
             InstanceId(idx) => Self::Instance(entry.with_value(idx)),
             StmtId(idx) => Self::Stmt(entry.with_value(idx).into()),
             NonAnsiPortEntry(scope::NonAnsiPortEntry { label, port_decl, data_decl }) => {
-                Self::NonAnsiPort { label, port_decl, data_decl, module: entry.cont_id }
+                Self::NonAnsiPort { label, port_decl, data_decl, module: entry.module_id }
             }
             AnsiPortEntry(scope::AnsiPortEntry(idx)) => Self::AnsiPort(entry.with_value(idx)),
             BlockId(block_id) => Self::Block(block_id),

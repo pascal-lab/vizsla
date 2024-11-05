@@ -57,7 +57,7 @@ impl ToNav for DefinitionSource {
 
 impl ToNav for ModuleId {
     fn to_nav(&self, db: &RootDb) -> NavTarget {
-        let InFile { value: local_module_id, cont_id: file_id } = *self;
+        let InFile { value: local_module_id, file_id } = *self;
         let tree = db.parse(file_id);
         let (_, file_src_map) = db.hir_file_with_source_map(file_id);
         let decl_node = file_src_map.get(local_module_id).to_node(&tree).unwrap();
@@ -69,7 +69,7 @@ impl ToNav for ModuleId {
 
 impl ToNav for BlockId {
     fn to_nav(&self, db: &RootDb) -> NavTarget {
-        let BlockLoc { cont_id, src: InFile { value: src, cont_id: file_id } } = self.lookup(db);
+        let BlockLoc { cont_id, src: InFile { value: src, file_id } } = self.lookup(db);
         let tree = db.parse(file_id);
         let block_node = src.to_node(&tree).unwrap();
 
@@ -82,11 +82,11 @@ impl ToNav for BlockId {
 
 impl ToNav for InModule<NonAnsiPortId> {
     fn to_nav(&self, db: &RootDb) -> NavTarget {
-        let InModule { value: port_id, cont_id: module_id } = *self;
+        let InModule { value: port_id, module_id } = *self;
 
         let (module, module_src_map) = db.module_with_source_map(module_id);
 
-        let file_id = module_id.cont_id;
+        let file_id = module_id.file_id;
         let tree = db.parse(file_id);
         let port_node = module_src_map.get(port_id).to_node(&tree).unwrap();
 
@@ -126,7 +126,7 @@ impl ToNav for InContainer<DeclId> {
 
 impl ToNav for InModule<InstanceId> {
     fn to_nav(&self, db: &RootDb) -> NavTarget {
-        let InModule { value: instance_id, cont_id: module_id } = *self;
+        let InModule { value: instance_id, module_id } = *self;
         let file_id = module_id.file_id();
         let tree = db.parse_src(file_id);
 
@@ -169,7 +169,7 @@ impl ToNav for InContainer<StmtId> {
 
 impl ToNav for InFile<SyntaxTokenWithParent<'_>> {
     fn to_nav(&self, db: &RootDb) -> NavTarget {
-        let InFile { value: SyntaxTokenWithParent { parent, tok }, cont_id: file_id } = *self;
+        let InFile { value: SyntaxTokenWithParent { parent, tok }, file_id } = *self;
         NavTarget {
             file_id: file_id.file_id(),
             full_range: parent.text_range().unwrap(),
