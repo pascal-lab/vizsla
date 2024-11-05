@@ -130,8 +130,8 @@ impl Index<PortRefId> for Ports {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct NonAnsiPort {
-    pub label: Option<Ident>,
-    pub refs: Option<IdxRange<PortRef>>,
+    pub label: Option<Ident>,            // outside
+    pub refs: Option<IdxRange<PortRef>>, // inside
 }
 
 pub type NonAnsiPortId = Idx<NonAnsiPort>;
@@ -338,16 +338,15 @@ impl LowerModuleCtx<'_> {
                     };
                 };
 
-                match exprs {
-                    Some(PortConcatenation(concat)) => {
+                match exprs? {
+                    PortConcatenation(concat) => {
                         concat.references().children().for_each(lower_port_ref);
                         Some(IdxRange::new(start..refs.nxt_idx()))
                     }
-                    Some(PortReference(port_ref)) => {
+                    PortReference(port_ref) => {
                         lower_port_ref(port_ref);
                         Some(IdxRange::new(start..refs.nxt_idx()))
                     }
-                    None => None,
                 }
             };
 

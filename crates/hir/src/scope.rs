@@ -150,6 +150,10 @@ impl ModuleScope {
                 } else {
                     entry.data_decl = Some(decl_id);
                 }
+            } else if matches!(decl.parent, DeclaratorParent::PortDeclId(_)) {
+                let entry =
+                    NonAnsiPortEntry { port_decl: Some(decl_id), ..Default::default() }.into();
+                scope.insert(name, entry);
             } else if matches!(decl.parent, DeclaratorParent::AnsiPortId(_)) {
                 scope.insert(name, AnsiPortEntry(decl_id).into());
             } else {
