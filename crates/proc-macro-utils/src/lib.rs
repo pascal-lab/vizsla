@@ -153,42 +153,35 @@ pub fn define_hir_container_data(input: TokenStream) -> TokenStream {
         }
     });
 
-    if !fields.iter().any(|field| match field {
-        Either::Left(HirPropField { name, .. }) => *name == "items",
-        _ => false,
-    }) {
+    if !fields
+        .iter()
+        .any(|field| field.as_ref().left().map(|field| field.name == "items").unwrap_or(false))
+    {
         panic!("missing 'items' field");
     }
 
-    let cont_data_names = fields.iter().filter_map(|field| match field {
-        Either::Right(HirDataField { data_name, .. }) => Some(data_name.clone()),
-        _ => None,
-    });
+    let cont_data_names =
+        fields.iter().filter_map(|field| Some(field.as_ref().right()?.data_name.clone()));
 
     let impl_arena = fields
         .iter()
-        .filter_map(|field| match field {
-            Either::Left(_) => None,
-            Either::Right(HirDataField { data_name, data_ty, idx_access, .. }) => {
-                match idx_access {
-                    Some(access) => {
-                        let res = access.iter().map(
-                            move |HirDataFieldAccess { data_ty, delegate, data_id_ty, .. }| {
-                                if *delegate {
-                                    quote! { #data_name[#data_id_ty => #data_ty], }
-                                } else {
-                                    quote! { #data_name[#data_ty], }
-                                }
-                            },
-                        );
-                        Some(itertools::Either::Left(res))
+        .filter_map(|field| field.as_ref().right())
+        .map(|HirDataField { data_name, data_ty, idx_access, .. }| {
+            let Some(access) = idx_access else {
+                return Either::Right(iter::once(quote! { #data_name[#data_ty], }));
+            };
+
+            let res = access.iter().map(
+                move |HirDataFieldAccess { data_ty, delegate, data_id_ty, .. }| {
+                    if *delegate {
+                        quote! { #data_name[#data_id_ty => #data_ty], }
+                    } else {
+                        quote! { #data_name[#data_ty], }
                     }
-                    None => {
-                        let res = quote! { #data_name[#data_ty], };
-                        Some(itertools::Either::Right(iter::once(res)))
-                    }
-                }
-            }
+                },
+            );
+
+            Either::Left(res)
         })
         .flatten();
 
@@ -210,43 +203,32 @@ pub fn define_hir_container_data(input: TokenStream) -> TokenStream {
         }
     };
 
-    // Generate the fields for the source map struct
-    let src_fields = fields.iter().filter_map(|field| match field {
-        Either::Left(_) => None,
-        Either::Right(HirDataField { src_name, data_id_ty, data_ty, src_ty, .. }) => {
+    let src_fields = fields.iter().filter_map(|field| field.as_ref().right()).map(
+        |HirDataField { src_name, data_id_ty, data_ty, src_ty, .. }| {
             if data_id_ty.is_some() {
-                Some(quote! { #vis #src_name: SourceMap<#src_ty, #data_ty> })
+                quote! { #vis #src_name: SourceMap<#src_ty, #data_ty> }
             } else {
-                Some(quote! { #vis #src_name: #src_ty })
+                quote! { #vis #src_name: #src_ty }
             }
-        }
-    });
+        },
+    );
 
-    let cont_src_names = fields.iter().filter_map(|field| match field {
-        Either::Right(HirDataField { src_name, .. }) => Some(src_name.clone()),
-        _ => None,
-    });
+    let cont_src_names = fields
+        .iter()
+        .filter_map(|field| field.as_ref().right())
+        .map(|field| field.src_name.clone());
 
     let impl_source_map = fields
         .iter()
-        .filter_map(|field| match field {
-            Either::Left(_) => None,
-            Either::Right(HirDataField { src_name, src_ty, idx_access, data_id_ty, .. }) => {
-                match idx_access {
-                    Some(access) => {
-                        let res = access.iter().map(
-                            move |HirDataFieldAccess { data_id_ty, src_ty, .. }| {
-                                quote! { #src_name[#src_ty, #data_id_ty], }
-                            },
-                        );
-                        Some(itertools::Either::Left(res))
-                    }
-                    None => {
-                        let res = quote! { #src_name[#src_ty, #data_id_ty], };
-                        Some(itertools::Either::Right(iter::once(res)))
-                    }
-                }
-            }
+        .filter_map(|field| field.as_ref().right())
+        .map(|HirDataField { src_name, src_ty, idx_access, data_id_ty, .. }| match idx_access {
+            Some(access) => access
+                .iter()
+                .map(move |HirDataFieldAccess { data_id_ty, src_ty, .. }| {
+                    quote! { #src_name[#src_ty, #data_id_ty], }
+                })
+                .collect::<Vec<_>>(),
+            None => vec![quote! { #src_name[#src_ty, #data_id_ty], }],
         })
         .flatten();
 
