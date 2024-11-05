@@ -1,5 +1,5 @@
 use syntax::{
-    SyntaxTokenWithParent,
+    SyntaxNode, SyntaxTokenWithParent,
     ast::{self, AstNode},
 };
 
@@ -25,7 +25,7 @@ impl SemanticsImpl<'_> {
         let file_id = self.find_file(parent);
         let ident = lower_ident_opt(Some(tok))?;
         self.with_ctx(|ctx| {
-            let container = ctx.find_container(InFile::new(file_id, parent))?;
+            let container = ctx.find_container(InFile::new(file_id, parent));
 
             ContainerParent::start_from(db, container).find_map(|id| match id {
                 ContainerId::HirFileId(_) => {
@@ -65,6 +65,10 @@ impl SemanticsImpl<'_> {
         } else {
             None
         }
+    }
+
+    pub fn find_container(&self, node: InFile<SyntaxNode>) -> ContainerId {
+        self.with_ctx(|ctx| ctx.find_container(node))
     }
 }
 

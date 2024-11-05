@@ -74,8 +74,7 @@ fn highlight_refs<'a>(
 ) -> Option<Vec<DocumentHighlight>> {
     let config = ReferencesConfig::new(scope_visibility, Some(SearchScope::single_file(file_id)));
 
-    let ctx = ReferencesCtx::new(sema, &def, config);
-    let refs = ctx
+    let refs = ReferencesCtx::new(sema, &def, config)
         .search()
         .remove(&file_id)?
         .into_iter()

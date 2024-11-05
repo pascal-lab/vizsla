@@ -46,7 +46,7 @@ impl Source2DefCtx<'_> {
         block_src: BlockSrc,
     ) -> Option<BlockId> {
         let node = block.syntax();
-        let container = self.find_container(InFile::new(file_id, node))?;
+        let container = self.find_container(InFile::new(file_id, node));
 
         let block_id = match container {
             ContainerId::HirFileId(file_id) => {
@@ -86,12 +86,13 @@ impl Source2DefCtx<'_> {
         Some(cont_id)
     }
 
-    pub(crate) fn find_container(
+    pub(super) fn find_container(
         &mut self,
         InContainer { value: src, cont_id: file_id }: InFile<SyntaxNode>,
-    ) -> Option<ContainerId> {
+    ) -> ContainerId {
         SyntaxAncestors::start_from(src)
             .skip(1) // skip the node itself
             .find_map(|node| self.container_to_def(file_id, node))
+            .unwrap_or(file_id.into())
     }
 }

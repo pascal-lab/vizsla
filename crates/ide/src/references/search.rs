@@ -144,7 +144,7 @@ impl<'a, 'b> ReferencesCtx<'a, 'b> {
         Self { sema, def, scope }
     }
 
-    pub(crate) fn search(&self) -> IntMap<FileId, Vec<ReferenceToken>> {
+    pub(crate) fn search(&self) -> IntMap<FileId, Vec<ReferenceToken<'a>>> {
         let sema = self.sema;
         let mut res: IntMap<_, Vec<_>> = IntMap::default();
 
