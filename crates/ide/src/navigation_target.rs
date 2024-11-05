@@ -13,7 +13,7 @@ use hir::{
 use ide_db::root_db::RootDb;
 use line_index::TextRange;
 use smol_str::SmolStr;
-use syntax::{has_name::HasName, has_text_range::HasTextRange};
+use syntax::{SyntaxTokenWithParent, has_name::HasName, has_text_range::HasTextRange};
 use utils::get::{Get, GetRef};
 use vfs::FileId;
 
@@ -164,6 +164,21 @@ impl ToNav for InContainer<StmtId> {
         let container_name = cont_id.container(db).and_then(|cont| cont.name(db));
 
         build_nav_target(file_id, stmt_node, name, container_name)
+    }
+}
+
+impl ToNav for InFile<SyntaxTokenWithParent<'_>> {
+    fn to_nav(&self, db: &RootDb) -> NavTarget {
+        let InFile { value: SyntaxTokenWithParent { parent, tok }, cont_id: file_id } = *self;
+        NavTarget {
+            file_id: file_id.file_id(),
+            full_range: parent.text_range().unwrap(),
+            focus_range: tok.text_range(),
+            name: None,
+            kind: Some(SymbolKind::from_node(parent)),
+            container_name: None,
+            description: None,
+        }
     }
 }
 
