@@ -7,7 +7,7 @@ use vfs::FileId;
 
 use crate::{
     ScopeVisibility,
-    definitions::{Definition, DefinitionClass, PortConnShorthand},
+    definitions::{Definition, DefinitionClass},
     references::{
         self, ReferenceCategory, ReferencesConfig,
         search::{ReferencesCtx, SearchScope},
@@ -38,7 +38,7 @@ pub(crate) fn document_highlight(
     handle_ctrl_flow_kw(&sema, token).or_else(|| {
         let def = match DefinitionClass::resolve(&sema, token)? {
             DefinitionClass::Definition(def) => def,
-            DefinitionClass::PortConnShorthand(PortConnShorthand { data, .. }) => data,
+            DefinitionClass::PortConnShorthand { data, .. } => data,
         };
         highlight_refs(&sema, file_id, def, config)
     })

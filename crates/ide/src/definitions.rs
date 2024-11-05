@@ -14,14 +14,13 @@ use hir::{
 use ide_db::root_db::RootDb;
 use smallvec::{SmallVec, smallvec};
 use syntax::{SyntaxTokenWithParent, ast, match_ast, token::TokenKindExt};
-use utils::{define_enum_deriving_from, get::GetRef, impl_from};
+use utils::{get::GetRef, impl_from};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum DefinitionSource {
     ModuleId(ModuleId),
     BlockId(BlockId),
 
-    AnsiPort(InModule<DeclId>),
     NonAnsiPort(InModule<NonAnsiPortId>),
     Decl(InContainer<DeclId>),
     Instance(InModule<InstanceId>),
@@ -31,7 +30,6 @@ pub enum DefinitionSource {
 impl_from! { DefinitionSource =>
     ModuleId,
     BlockId,
-    AnsiPort(InModule<DeclId>),
     NonAnsiPort(InModule<NonAnsiPortId>),
     Decl(InContainer<DeclId>),
     Instance(InModule<InstanceId>),
@@ -39,14 +37,10 @@ impl_from! { DefinitionSource =>
 }
 
 impl DefinitionSource {
-    #[inline]
     pub fn name(&self, db: &dyn HirDb) -> Option<Ident> {
         match *self {
             DefinitionSource::ModuleId(module_id) => db.module(module_id).name.clone(),
             DefinitionSource::BlockId(block_id) => db.block(block_id).name.clone(),
-            DefinitionSource::AnsiPort(InContainer { value, cont_id: module_id }) => {
-                db.module(module_id).get(value).name.clone()
-            }
             DefinitionSource::NonAnsiPort(InModule { value, cont_id: module_id }) => {
                 db.module(module_id).get(value).label.clone()
             }
@@ -66,12 +60,10 @@ impl DefinitionSource {
         }
     }
 
-    #[inline]
     pub fn container(&self, db: &dyn HirDb) -> ContainerId {
         match *self {
             DefinitionSource::ModuleId(InContainer { cont_id, .. }) => cont_id.into(),
             DefinitionSource::BlockId(block_id) => block_id.lookup(db).cont_id,
-            DefinitionSource::AnsiPort(InModule { cont_id, .. }) => cont_id.into(),
             DefinitionSource::NonAnsiPort(InModule { cont_id, .. }) => cont_id.into(),
             DefinitionSource::Decl(InContainer { cont_id, .. }) => cont_id,
             DefinitionSource::Instance(InModule { cont_id, .. }) => cont_id.into(),
@@ -81,37 +73,21 @@ impl DefinitionSource {
 }
 
 // Definition may have multiple sources, e.g. non-ansi port
-#[derive(Default, Debug, Clone, PartialEq, Eq)]
-pub struct Definition(SmallVec<[DefinitionSource; 3]>);
-
-impl Definition {
-    pub fn iter(&self) -> impl Iterator<Item = &DefinitionSource> {
-        self.0.iter()
-    }
-
-    pub fn pick(&self) -> Option<&DefinitionSource> {
-        self.0.get(0)
-    }
-}
-
-impl IntoIterator for Definition {
-    type IntoIter = smallvec::IntoIter<[DefinitionSource; 3]>;
-    type Item = DefinitionSource;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
-    }
-}
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Definition(PathResolution);
 
 impl From<PathResolution> for Definition {
-    fn from(path_res: PathResolution) -> Self {
+    fn from(res: PathResolution) -> Self {
+        Self(res)
+    }
+}
+
+impl Definition {
+    pub fn sources(&self) -> SmallVec<[DefinitionSource; 3]> {
         let mut res = smallvec![];
         let mut add_source = |source| res.push(source);
 
-        match path_res {
-            PathResolution::Module(module_id) => add_source(module_id.into()),
-            PathResolution::Decl(decl_id) => add_source(decl_id.into()),
-            PathResolution::AnsiPort(decl_id) => add_source(decl_id.into()),
+        match self.0 {
             PathResolution::NonAnsiPort { label, port_decl, data_decl, module } => {
                 let container: ContainerId = module.into();
                 if let Some(label) = label {
@@ -124,27 +100,60 @@ impl From<PathResolution> for Definition {
                     add_source(InContainer::new(container, decl).into());
                 }
             }
-            PathResolution::Instance(instance_id) => add_source(instance_id.into()),
-            PathResolution::Stmt(stmt_id) => add_source(stmt_id.into()),
-            PathResolution::Block(blk_id) => add_source(blk_id.into()),
+            _ => add_source(self.pick()),
         };
 
-        Self(res)
+        res
     }
-}
 
-define_enum_deriving_from! {
-    #[derive(Debug, Clone, PartialEq, Eq)]
-    pub enum DefinitionClass {
-        Definition,
-        PortConnShorthand,
+    pub fn is_port(&self) -> bool {
+        matches!(self.0, PathResolution::AnsiPort(_) | PathResolution::NonAnsiPort { .. })
+    }
+
+    pub fn name(&self, db: &dyn HirDb) -> Option<Ident> {
+        self.pick().name(db)
+    }
+
+    pub fn container(&self, db: &dyn HirDb) -> ContainerId {
+        self.pick().container(db)
+    }
+
+    fn pick(&self) -> DefinitionSource {
+        match self.0 {
+            PathResolution::Module(module_id) => module_id.into(),
+            PathResolution::Decl(decl_id) => decl_id.into(),
+            PathResolution::Instance(instance_id) => instance_id.into(),
+            PathResolution::Stmt(stmt_id) => stmt_id.into(),
+            PathResolution::Block(blk_id) => blk_id.into(),
+            PathResolution::AnsiPort(decl_id) => {
+                InContainer::new(decl_id.cont_id.into(), decl_id.value).into()
+            }
+            PathResolution::NonAnsiPort { label, port_decl, data_decl, module } => {
+                let container: ContainerId = module.into();
+                if let Some(label) = label {
+                    InModule::new(module, label).into()
+                } else if let Some(port_decl) = port_decl {
+                    InContainer::new(container, port_decl).into()
+                } else if let Some(decl) = data_decl {
+                    InContainer::new(container, decl).into()
+                } else {
+                    unreachable!(
+                        "NonAnsiPort should have at least one of label, port_decl, data_decl"
+                    )
+                }
+            }
+        }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PortConnShorthand {
-    pub port: Definition,
-    pub data: Definition,
+pub enum DefinitionClass {
+    Definition(Definition),
+    PortConnShorthand { port: Definition, data: Definition },
+}
+
+impl_from! { DefinitionClass =>
+    Definition,
 }
 
 impl DefinitionClass {
@@ -166,7 +175,7 @@ impl DefinitionClass {
                     let data = sema.resolve_ident_in_cont(tp).map(Definition::from);
 
                     match (port, data) {
-                        (Some(port), Some(data)) => PortConnShorthand { port, data }.into(),
+                        (Some(port), Some(data)) => Self::PortConnShorthand { port, data },
                         (Some(it), None) | (None, Some(it)) => it.into(),
                         (None, None) => return None,
                     }
@@ -182,23 +191,9 @@ impl DefinitionClass {
 
     pub(crate) fn sources(self) -> SmallVec<[DefinitionSource; 6]> {
         match self {
-            DefinitionClass::Definition(definition) => definition.into_iter().collect(),
-            DefinitionClass::PortConnShorthand(PortConnShorthand { port, data }) => {
-                port.into_iter().chain(data).collect()
-            }
-        }
-    }
-}
-
-impl IntoIterator for DefinitionClass {
-    type IntoIter = smallvec::IntoIter<[Definition; 2]>;
-    type Item = Definition;
-
-    fn into_iter(self) -> Self::IntoIter {
-        match self {
-            DefinitionClass::Definition(definition) => smallvec![definition].into_iter(),
-            DefinitionClass::PortConnShorthand(port_conn) => {
-                smallvec![port_conn.port, port_conn.data].into_iter()
+            DefinitionClass::Definition(definition) => definition.sources().into_iter().collect(),
+            DefinitionClass::PortConnShorthand { port, data } => {
+                port.sources().into_iter().chain(data.sources()).collect()
             }
         }
     }

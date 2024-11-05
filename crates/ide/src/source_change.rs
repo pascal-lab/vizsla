@@ -9,6 +9,6 @@ pub struct SourceChange {
 
 impl Extend<(FileId, TextEdit)> for SourceChange {
     fn extend<T: IntoIterator<Item = (FileId, TextEdit)>>(&mut self, iter: T) {
-        self.text_edits.extend(iter.into_iter());
+        self.text_edits.extend(iter);
     }
 }

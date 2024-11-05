@@ -15,7 +15,7 @@ use utils::text_edit::TextEdit;
 
 use crate::{
     ScopeVisibility,
-    definitions::{DefinitionClass, PortConnShorthand},
+    definitions::DefinitionClass,
     navigation_target::ToNav,
     references::{
         ReferencesConfig,
@@ -34,9 +34,9 @@ pub struct RenameConfig {
 #[derive(Error, Debug)]
 pub enum RenameError {
     #[error("No references found at position")]
-    NoReferencesFound,
+    NoRefFound,
     #[error("No definitions found for the token")]
-    NoDefinitionsFound,
+    NoDefFound,
 }
 
 pub(crate) fn prepare_rename(
@@ -46,8 +46,8 @@ pub(crate) fn prepare_rename(
     let sema = Semantics::new(db);
     let file = sema.parse(file_id);
     let token = pick_token(file.syntax(), offset)?;
-    let text_range = token.text_range().ok_or(RenameError::NoReferencesFound)?;
-    DefinitionClass::resolve(&sema, token).ok_or(RenameError::NoDefinitionsFound)?;
+    let text_range = token.text_range().ok_or(RenameError::NoRefFound)?;
+    DefinitionClass::resolve(&sema, token).ok_or(RenameError::NoDefFound)?;
     Ok(text_range)
 }
 
@@ -60,11 +60,10 @@ pub(crate) fn rename(
     let sema = Semantics::new(db);
     let file = sema.parse(file_id);
     let token = pick_token(file.syntax(), offset)?;
-    let def_class =
-        DefinitionClass::resolve(&sema, token).ok_or(RenameError::NoDefinitionsFound)?;
+    let def_class = DefinitionClass::resolve(&sema, token).ok_or(RenameError::NoDefFound)?;
     let def = match &def_class {
         DefinitionClass::Definition(def) => def,
-        DefinitionClass::PortConnShorthand(PortConnShorthand { data, .. }) => data,
+        DefinitionClass::PortConnShorthand { data, .. } => data,
     };
 
     let old_name = lower_ident(Some(token.tok)).unwrap();
@@ -108,7 +107,7 @@ pub(crate) fn rename(
             (file_id, text_edit.finish())
         }));
 
-    let def_edits = def.iter().map(|def| {
+    let def_edits = def.sources().into_iter().map(|def| {
         let mut text_edit = TextEdit::builder();
         // TODO: optimization??
         let nav = def.to_nav(db);
@@ -124,5 +123,5 @@ pub(crate) fn rename(
 fn pick_token(node: SyntaxNode, offset: TextSize) -> RenameResult<SyntaxTokenWithParent> {
     node.token_at_offset(offset)
         .pick_bext_token(|kind| kind.name_like().into())
-        .ok_or(RenameError::NoReferencesFound)
+        .ok_or(RenameError::NoRefFound)
 }

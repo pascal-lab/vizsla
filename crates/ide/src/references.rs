@@ -15,7 +15,7 @@ use vfs::FileId;
 
 use crate::{
     ScopeVisibility,
-    definitions::{Definition, DefinitionClass, PortConnShorthand},
+    definitions::{Definition, DefinitionClass},
     navigation_target::{NavTarget, ToNav},
 };
 
@@ -33,10 +33,8 @@ impl ReferenceCategory {
     pub fn from_tok(
         SyntaxTokenWithParent { parent, tok }: SyntaxTokenWithParent,
     ) -> ReferenceCategory {
-        let mut res = ReferenceCategory::empty();
-
         // TODO:
-        res
+        ReferenceCategory::empty()
     }
 }
 
@@ -71,7 +69,7 @@ pub(crate) fn references(
     handle_ctrl_flow_kw(&sema, token).or_else(|| {
         let def = match DefinitionClass::resolve(&sema, token)? {
             DefinitionClass::Definition(def) => def,
-            DefinitionClass::PortConnShorthand(PortConnShorthand { data, .. }) => data,
+            DefinitionClass::PortConnShorthand { data, .. } => data,
         };
         Some(vec![search_refs(&sema, def, config)])
     })
@@ -114,7 +112,7 @@ fn search_refs<'a>(
             (file_id, res)
         })
         .collect();
-    let def = def.iter().map(|def| def.to_nav(sema.db)).collect_vec().into();
+    let def = def.sources().into_iter().map(|def| def.to_nav(sema.db)).collect_vec().into();
     References { def, refs }
 }
 

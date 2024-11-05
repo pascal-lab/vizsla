@@ -117,7 +117,7 @@ impl BlockId {
     }
 
     pub fn container(self, db: &dyn HirDb) -> Option<ContainerId> {
-        Some(self.lookup(db).cont_id.into())
+        Some(self.lookup(db).cont_id)
     }
 }
 

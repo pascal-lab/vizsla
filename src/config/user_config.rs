@@ -21,9 +21,9 @@ pub(crate) enum ScopeVisibility {
     Private,
 }
 
-impl Into<ide::ScopeVisibility> for ScopeVisibility {
-    fn into(self) -> ide::ScopeVisibility {
-        match self {
+impl From<ScopeVisibility> for ide::ScopeVisibility {
+    fn from(val: ScopeVisibility) -> Self {
+        match val {
             ScopeVisibility::Public => ide::ScopeVisibility::Public,
             ScopeVisibility::Private => ide::ScopeVisibility::Private,
         }

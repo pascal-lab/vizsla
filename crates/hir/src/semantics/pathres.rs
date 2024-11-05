@@ -73,6 +73,7 @@ pub enum PathResolution {
     Module(ModuleId),
     Decl(InContainer<DeclId>),
     NonAnsiPort {
+        // There won't be a situation where all fields are None.
         label: Option<NonAnsiPortId>,
         port_decl: Option<DeclId>,
         data_decl: Option<DeclId>,

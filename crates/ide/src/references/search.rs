@@ -8,7 +8,6 @@ use hir::{
     source_map::IsSrc,
 };
 use ide_db::root_db::RootDb;
-use itertools::Itertools;
 use line_index::{TextRange, TextSize};
 use memchr::memmem::Finder;
 use nohash_hasher::IntMap;
@@ -24,7 +23,7 @@ use vfs::FileId;
 use super::{ReferenceCategory, ReferencesConfig};
 use crate::{
     ScopeVisibility,
-    definitions::{Definition, DefinitionClass, DefinitionSource, PortConnShorthand},
+    definitions::{Definition, DefinitionClass},
 };
 
 /// A search scope is a set of files and ranges within those files that should
@@ -47,16 +46,15 @@ impl SearchScope {
         match scope_visibility {
             ScopeVisibility::Public => search_scope.unwrap_or_else(|| Self::all(db)),
             ScopeVisibility::Private => {
-                let cont_for_defs = def
-                    .iter()
-                    .map(|src| match src {
-                        DefinitionSource::NonAnsiPort(id) => id.cont_id.cont_id.into(),
-                        DefinitionSource::AnsiPort(id) => id.cont_id.cont_id.into(),
-                        _ => src.container(db),
-                    })
-                    .unique()
-                    .collect_vec();
-                let mut scope = Self::from_conts(db, cont_for_defs);
+                let cont_for_def = if def.is_port() {
+                    match def.container(db) {
+                        ContainerId::ModuleId(in_module) => in_module.cont_id.into(),
+                        _ => unreachable!(),
+                    }
+                } else {
+                    def.container(db)
+                };
+                let mut scope = Self::from_conts(db, cont_for_def);
 
                 if let Some(search_scope) = search_scope {
                     scope = scope.intersect(search_scope);
@@ -72,39 +70,25 @@ impl SearchScope {
         SearchScope(res)
     }
 
-    fn from_conts(db: &RootDb, cont: Vec<ContainerId>) -> Self {
+    fn single_range(file_id: FileId, range: TextRange) -> Self {
         let mut res = FxHashMap::default();
+        res.insert(file_id, Some(range));
+        SearchScope(res)
+    }
 
-        let mut union_or_insert = |file_id, new_range: TextRange| {
-            use std::collections::hash_map::Entry::*;
-            match res.entry(file_id) {
-                Occupied(mut e) => {
-                    if let Some(old_range) = e.get_mut() {
-                        *old_range = new_range.cover(*old_range);
-                    }
-                }
-                Vacant(e) => {
-                    e.insert(Some(new_range));
-                }
+    fn from_conts(db: &RootDb, cont: ContainerId) -> Self {
+        match cont {
+            ContainerId::HirFileId(_) => Self::all(db),
+            ContainerId::ModuleId(InFile { value: local_module_id, cont_id: file_id }) => {
+                let (_, file_src_map) = db.hir_file_with_source_map(file_id);
+                let range = file_src_map.get(local_module_id).range();
+                Self::single_range(file_id.file_id(), range)
             }
-        };
-
-        for cont_id in cont {
-            match cont_id {
-                ContainerId::HirFileId(_) => return Self::all(db),
-                ContainerId::ModuleId(InFile { value: local_module_id, cont_id: file_id }) => {
-                    let (_, file_src_map) = db.hir_file_with_source_map(file_id);
-                    let range = file_src_map.get(local_module_id).range();
-                    union_or_insert(file_id.file_id(), range);
-                }
-                ContainerId::BlockId(block_id) => {
-                    let range = block_id.lookup(db).src.value.range();
-                    union_or_insert(block_id.file_id(db), range);
-                }
+            ContainerId::BlockId(block_id) => {
+                let range = block_id.lookup(db).src.value.range();
+                Self::single_range(block_id.file_id(db), range)
             }
         }
-
-        SearchScope(res)
     }
 
     fn intersect(mut self, mut other: SearchScope) -> SearchScope {
@@ -156,18 +140,15 @@ impl<'a, 'b> ReferencesCtx<'a, 'b> {
         def: &'b Definition,
         cfg: ReferencesConfig,
     ) -> Self {
-        let scope = SearchScope::new(sema.db, &def, cfg);
+        let scope = SearchScope::new(sema.db, def, cfg);
         Self { sema, def, scope }
     }
 
     pub(crate) fn search(&self) -> IntMap<FileId, Vec<ReferenceToken>> {
         let sema = self.sema;
-        let mut res = IntMap::default();
+        let mut res: IntMap<_, Vec<_>> = IntMap::default();
 
-        let Some(name) = self.def.pick().and_then(|def| def.name(sema.db)) else {
-            return res;
-        };
-
+        let name = self.def.name(sema.db).unwrap();
         let finder = &Finder::new(&name);
         for (text, file_id, range) in self.scope_files() {
             self.sema.db.unwind_if_cancelled();
@@ -224,7 +205,11 @@ impl<'a, 'b> ReferencesCtx<'a, 'b> {
         })
     }
 
-    fn classify_and_filter(&self, sema: &'a Semantics<'a, RootDb>, tp: &SyntaxTokenWithParent<'a>) -> bool {
+    fn classify_and_filter(
+        &self,
+        sema: &'a Semantics<'a, RootDb>,
+        tp: &SyntaxTokenWithParent<'a>,
+    ) -> bool {
         let Some(def) = DefinitionClass::resolve(sema, *tp) else {
             return false;
         };
@@ -232,7 +217,7 @@ impl<'a, 'b> ReferencesCtx<'a, 'b> {
         // TODO: We should also filter out tokens of definitions.
         match def {
             DefinitionClass::Definition(def) => def == *self.def,
-            DefinitionClass::PortConnShorthand(PortConnShorthand { data, port }) => {
+            DefinitionClass::PortConnShorthand { data, port } => {
                 data == *self.def || port == *self.def
             }
         }
