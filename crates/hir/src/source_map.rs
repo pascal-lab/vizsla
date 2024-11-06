@@ -48,42 +48,22 @@ impl<Src: IsSrc, Hir> SourceMap<Src, Hir> {
 impl<Src: IsSrc, Hir> Get<Src> for SourceMap<Src, Hir> {
     type Output = Idx<Hir>;
 
-    fn get_opt(&self, src: Src) -> Option<Self::Output> {
-        self.src2hir.get(&src).copied()
+    fn get(&self, src: Src) -> Self::Output {
+        *self.src2hir.get(&src).unwrap()
     }
 }
 
 impl<Src: IsSrc, Hir> Get<Idx<Hir>> for SourceMap<Src, Hir> {
     type Output = Src;
 
-    fn get_opt(&self, idx: Idx<Hir>) -> Option<Self::Output> {
-        self.hir2src.get(idx).copied()
+    fn get(&self, idx: Idx<Hir>) -> Self::Output {
+        *self.hir2src.get(idx).unwrap()
     }
 }
 
 impl<Src: IsSrc, Hir> Default for SourceMap<Src, Hir> {
     fn default() -> Self {
         SourceMap { src2hir: FxHashMap::default(), hir2src: ArenaMap::default() }
-    }
-}
-
-pub(crate) macro impl_source_map_idx {
-    ($datas:ident => $($fld:ident[$src:ty, $hir_id:ty]),+ $(,)? ) => {
-        $(
-            impl $crate::source_map::Get<$src> for $datas {
-                type Output = $hir_id;
-                fn get_opt(&self, src: $src) -> Option<Self::Output> {
-                    self.$fld.get_opt(src)
-                }
-            }
-
-            impl $crate::source_map::Get<$hir_id> for $datas {
-                type Output = $src;
-                fn get_opt(&self, idx: $hir_id) -> Option<Self::Output> {
-                    self.$fld.get_opt(idx)
-                }
-            }
-        )+
     }
 }
 

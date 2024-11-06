@@ -1,11 +1,25 @@
 use base_db::intern::Lookup;
+use proc_macro_utils::impl_container;
+use smol_str::SmolStr;
+use triomphe::Arc;
 use utils::define_enum_deriving_from;
 use vfs::FileId;
 
 use crate::{
     db::{HirDb, InternDb},
     file::HirFileId,
-    hir_def::{Ident, block::BlockId, module::ModuleId},
+    hir_def::{
+        block::{Block, BlockId, BlockInfo, BlockSourceMap, BlockSrc, LocalBlockId},
+        declaration::{Declaration, DeclarationId, DeclarationSrc},
+        expr::{
+            Expr, ExprId, ExprSrc,
+            declarator::{DeclId, Declarator, DeclaratorSrc},
+            timing_control::{EventExpr, EventExprId, EventExprSrc},
+        },
+        file::{FileSourceMap, HirFile},
+        module::{Module, ModuleId, ModuleSourceMap},
+        stmt::{Stmt, StmtId, StmtSrc},
+    },
 };
 
 define_enum_deriving_from! {
@@ -33,7 +47,7 @@ impl<T, C> InContainer<T, C> {
     }
 }
 
-macro_rules! impl_container_id {
+macro_rules! define_container_id {
     ($($name:ident[$id:ident : $ty:ty]),* $(,)?) => {
         $(
             #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
@@ -58,80 +72,113 @@ macro_rules! impl_container_id {
                 }
             }
         )*
-
-        impl ContainerId {
-            pub fn file_id(self, db: &dyn InternDb) -> FileId {
-                match self {
-                    ContainerId::HirFileId(file_id) => file_id.file_id(),
-                    ContainerId::ModuleId(module_id) => module_id.file_id(),
-                    ContainerId::BlockId(block_id) => block_id.file_id(db),
-                }
-            }
-
-            pub fn name(self, db: &dyn HirDb) -> Option<Ident> {
-                match self {
-                    ContainerId::HirFileId(_) => None,
-                    ContainerId::ModuleId(module_id) => module_id.name(db),
-                    ContainerId::BlockId(block_id) => block_id.name(db),
-                }
-            }
-
-            pub fn container(self, db: &dyn HirDb) -> Option<ContainerId> {
-                match self {
-                    ContainerId::HirFileId(_) => None,
-                    ContainerId::ModuleId(module_id) => module_id.container(),
-                    ContainerId::BlockId(block_id) => block_id.container(db),
-                }
-            }
-        }
     };
 }
 
-impl_container_id! {
+define_container_id! {
     InFile[file_id: HirFileId],
     InModule[module_id: ModuleId],
     InBlock[block_id: BlockId],
 }
 
+impl ContainerId {
+    pub fn file_id(self, db: &dyn InternDb) -> FileId {
+        match self {
+            ContainerId::HirFileId(file_id) => file_id.file_id(),
+            ContainerId::ModuleId(module_id) => module_id.file_id(),
+            ContainerId::BlockId(block_id) => block_id.file_id(db),
+        }
+    }
+
+    pub fn to_container(self, db: &dyn HirDb) -> Container {
+        match self {
+            ContainerId::HirFileId(file_id) => file_id.to_container(db).into(),
+            ContainerId::ModuleId(module_id) => module_id.to_container(db).into(),
+            ContainerId::BlockId(block_id) => block_id.to_container(db).into(),
+        }
+    }
+
+    pub fn to_container_src_map(self, db: &dyn HirDb) -> ContainerSrcMap {
+        match self {
+            ContainerId::HirFileId(file_id) => file_id.to_container_src_map(db).into(),
+            ContainerId::ModuleId(module_id) => module_id.to_container_src_map(db).into(),
+            ContainerId::BlockId(block_id) => block_id.to_container_src_map(db).into(),
+        }
+    }
+}
+
 impl HirFileId {
-    pub fn file_id(self) -> FileId {
+    pub fn file_id(&self) -> FileId {
         self.0
     }
 
-    pub fn name(self) -> Option<Ident> {
-        None
+    #[inline]
+    pub fn to_container(&self, db: &dyn HirDb) -> Arc<HirFile> {
+        db.hir_file(*self)
     }
 
-    pub fn container(self) -> Option<ContainerId> {
-        None
+    #[inline]
+    pub fn to_container_src_map(&self, db: &dyn HirDb) -> Arc<FileSourceMap> {
+        db.hir_file_with_source_map(*self).1
     }
 }
 
 impl ModuleId {
-    pub fn file_id(self) -> FileId {
+    pub fn file_id(&self) -> FileId {
         self.file_id.0
     }
 
-    pub fn name(self, db: &dyn HirDb) -> Option<Ident> {
-        db.module(self).name.clone()
+    #[inline]
+    pub fn to_container(&self, db: &dyn HirDb) -> Arc<Module> {
+        db.module(*self)
     }
 
-    pub fn container(self) -> Option<ContainerId> {
-        Some(self.file_id.into())
+    #[inline]
+    pub fn to_container_src_map(&self, db: &dyn HirDb) -> Arc<ModuleSourceMap> {
+        db.module_with_source_map(*self).1
     }
 }
 
 impl BlockId {
-    pub fn file_id(self, db: &dyn InternDb) -> FileId {
+    pub fn file_id(&self, db: &dyn InternDb) -> FileId {
         self.lookup(db).src.file_id.0
     }
 
-    pub fn name(self, db: &dyn HirDb) -> Option<Ident> {
-        db.block(self).name.clone()
+    #[inline]
+    pub fn to_container(&self, db: &dyn HirDb) -> Arc<Block> {
+        db.block(*self)
     }
 
-    pub fn container(self, db: &dyn HirDb) -> Option<ContainerId> {
-        Some(self.lookup(db).cont_id)
+    #[inline]
+    pub fn to_container_src_map(&self, db: &dyn HirDb) -> Arc<BlockSourceMap> {
+        db.block_with_source_map(*self).1
+    }
+}
+
+impl_container! {
+    #[derive(Debug, PartialEq, Eq, Clone)]
+    pub enum {
+        HirFile | FileSourceMap,
+        Module | ModuleSourceMap,
+        Block | BlockSourceMap,
+    } => {
+        Declaration[DeclarationId | DeclarationSrc],
+        Expr[ExprId | ExprSrc],
+        EventExpr[EventExprId | EventExprSrc],
+        Declarator[DeclId | DeclaratorSrc],
+        Stmt[StmtId | StmtSrc],
+        BlockInfo[LocalBlockId | BlockSrc],
+    }
+}
+
+impl Container {
+    #[inline]
+    pub fn name(&self) -> Option<&SmolStr> {
+        match self {
+            Container::HirFile(_) => None,
+            Container::Module(module) => module.name.as_ref(),
+            Container::Block(block) => block.name.as_ref(),
+        }
     }
 }
 

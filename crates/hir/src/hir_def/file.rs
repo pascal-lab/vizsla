@@ -1,5 +1,5 @@
 use la_arena::Arena;
-use proc_macro_utils::define_hir_container_data;
+use proc_macro_utils::define_container;
 use smallvec::SmallVec;
 use syntax::ast::{self, AstNode};
 use triomphe::Arc;
@@ -24,24 +24,25 @@ use super::{
 use crate::{
     db::{HirDb, InternDb},
     file::HirFileId,
-    hir_def::{impl_arena_idx, lower_ident_opt},
-    source_map::{SourceMap, impl_source_map_idx},
+    hir_def::lower_ident_opt,
+    source_map::SourceMap,
 };
 
-define_hir_container_data! {
+define_container! {
     #[derive(Default, Debug, PartialEq, Eq, Clone)]
     pub struct HirFile | FileSourceMap {
         items: SmallVec<[FileItem; 3]>,
 
         modules | module_srcs: ModuleInfo[LocalModuleId | ModuleSrc],
         procs | proc_srcs: Proc[ProcId | ProcSrc],
+
         declarations | declaration_srcs: Declaration[DeclarationId | DeclarationSrc],
         exprs | expr_srcs: Expr[ExprId | ExprSrc],
         event_exprs | event_expr_srcs: EventExpr[EventExprId | EventExprSrc],
         decls | decl_srcs: Declarator[DeclId | DeclaratorSrc],
         stmts | stmt_srcs: Stmt[StmtId | StmtSrc] => {
             Stmt[StmtId | StmtSrc],
-            BlockInfo[LocalBlockId => BlockSrc],
+            BlockInfo[LocalBlockId | BlockSrc],
         },
     }
 }

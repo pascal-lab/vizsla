@@ -31,5 +31,13 @@ macro_rules! define_enum_deriving_from {
         $crate::impl_from! { $name =>
             $($variant,)*
         }
-    }
+    };
+
+    (#[$attr:meta] $vis:vis enum $name:ident { $($variant:ident($ty:ty)),* $(,)? }) => {
+        #[$attr]
+        $vis enum $name { $($variant($ty)),* }
+        $crate::impl_from! { $name =>
+            $($variant($ty),)*
+        }
+    };
 }

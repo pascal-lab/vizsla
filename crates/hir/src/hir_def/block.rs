@@ -1,6 +1,6 @@
 use base_db::intern::Lookup;
 use la_arena::Arena;
-use proc_macro_utils::define_hir_container_data;
+use proc_macro_utils::define_container;
 use smallvec::SmallVec;
 use syntax::{
     TokenKind,
@@ -24,7 +24,7 @@ use super::{
         impl_lower_expr,
         timing_control::{EventExpr, EventExprId, EventExprSrc, impl_lower_event_expr},
     },
-    impl_arena_idx, lower_ident_opt,
+    lower_ident_opt,
     stmt::{LowerStmt, Stmt, StmtId, StmtKind, StmtSrc, impl_lower_stmt},
 };
 use crate::{
@@ -32,10 +32,10 @@ use crate::{
     db::{HirDb, InternDb},
     define_src,
     file::HirFileId,
-    source_map::{SourceMap, ToAstNode, impl_source_map_idx},
+    source_map::{SourceMap, ToAstNode},
 };
 
-define_hir_container_data! {
+define_container! {
     #[derive(Default, Debug, PartialEq, Eq, Clone)]
     pub struct Block | BlockSourceMap {
         name: Option<Ident>,
@@ -43,13 +43,13 @@ define_hir_container_data! {
         items: SmallVec<[BlockItem; 2]>,
 
         declarations | declaration_srcs: Declaration[DeclarationId | DeclarationSrc],
-        stmts | stmt_srcs: Stmt[StmtId | StmtSrc] => {
-            Stmt[StmtId | StmtSrc],
-            BlockInfo[LocalBlockId => BlockSrc],
-        },
         exprs | expr_srcs: Expr[ExprId | ExprSrc],
         event_exprs | event_expr_srcs: EventExpr[EventExprId | EventExprSrc],
         decls | decl_srcs: Declarator[DeclId | DeclaratorSrc],
+        stmts | stmt_srcs: Stmt[StmtId | StmtSrc] => {
+            Stmt[StmtId | StmtSrc],
+            BlockInfo[LocalBlockId | BlockSrc],
+        },
     }
 }
 
@@ -78,30 +78,30 @@ impl From<BlockSrc> for StmtSrc {
 impl Get<LocalBlockId> for SourceMap<StmtSrc, Stmt> {
     type Output = BlockSrc;
 
-    fn get_opt(&self, block_id: LocalBlockId) -> Option<Self::Output> {
+    fn get(&self, block_id: LocalBlockId) -> Self::Output {
         let stmt_id = block_id.0;
-        Some(BlockSrc(self.get(stmt_id).into()))
+        BlockSrc(self.get(stmt_id).into())
     }
 }
 
 impl Get<BlockSrc> for SourceMap<StmtSrc, Stmt> {
     type Output = LocalBlockId;
 
-    fn get_opt(&self, block_src: BlockSrc) -> Option<Self::Output> {
+    fn get(&self, block_src: BlockSrc) -> Self::Output {
         let src: StmtSrc = block_src.into();
-        Some(LocalBlockId(self.get(src)))
+        LocalBlockId(self.get(src))
     }
 }
 
 impl GetRef<LocalBlockId> for Arena<Stmt> {
     type Output = BlockInfo;
 
-    fn get_opt(&self, block_id: LocalBlockId) -> Option<&Self::Output> {
+    fn get(&self, block_id: LocalBlockId) -> &Self::Output {
         let stmt_id = block_id.0;
         let Stmt { kind: StmtKind::Block(block_info), .. } = &self[stmt_id] else {
             unreachable!();
         };
-        Some(block_info)
+        block_info
     }
 }
 

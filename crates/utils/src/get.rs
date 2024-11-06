@@ -1,17 +1,21 @@
+use la_arena::{Arena, Idx};
+
 pub trait Get<A> {
     type Output;
-    fn get(&self, a: A) -> Self::Output {
-        self.get_opt(a).unwrap()
-    }
-    fn get_opt(&self, a: A) -> Option<Self::Output>;
+
+    fn get(&self, a: A) -> Self::Output;
 }
 
 pub trait GetRef<A> {
     type Output;
 
-    fn get(&self, a: A) -> &Self::Output {
-        self.get_opt(a).unwrap()
-    }
+    fn get(&self, a: A) -> &Self::Output;
+}
 
-    fn get_opt(&self, a: A) -> Option<&Self::Output>;
+impl<T> GetRef<Idx<T>> for Arena<T> {
+    type Output = T;
+
+    fn get(&self, id: Idx<T>) -> &Self::Output {
+        &self[id]
+    }
 }

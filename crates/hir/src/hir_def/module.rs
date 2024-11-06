@@ -9,7 +9,7 @@ use port::{
     ParamPortId, ParamPortSrc, PortDecl, PortDeclId, PortDeclSrc, PortRef, PortRefId, PortRefSrc,
     PortSrcs, Ports,
 };
-use proc_macro_utils::define_hir_container_data;
+use proc_macro_utils::define_container;
 use syntax::ast::{self, AstNode, PortList};
 use triomphe::Arc;
 use utils::{
@@ -29,7 +29,6 @@ use super::{
         impl_lower_expr,
         timing_control::{EventExpr, EventExprId, EventExprSrc, impl_lower_event_expr},
     },
-    impl_arena_idx,
     proc::{LowerProc, LowerProcCtx, Proc, ProcId, ProcSrc},
     stmt::{Stmt, StmtId, StmtSrc, impl_lower_stmt},
     ty::NetKind,
@@ -39,14 +38,14 @@ use crate::{
     db::{HirDb, InternDb},
     define_src,
     file::HirFileId,
-    source_map::{SourceMap, ToAstNode, impl_source_map_idx},
+    source_map::{SourceMap, ToAstNode},
 };
 
 pub mod continuous_assgin;
 pub mod instantiation;
 pub mod port;
 
-define_hir_container_data! {
+define_container! {
     #[derive(Default, Debug, PartialEq, Eq, Clone)]
     pub struct Module | ModuleSourceMap {
         name: Option<Ident>,
@@ -75,7 +74,7 @@ define_hir_container_data! {
         decls | decl_srcs: Declarator[DeclId | DeclaratorSrc],
         stmts | stmt_srcs: Stmt[StmtId | StmtSrc] => {
             Stmt[StmtId | StmtSrc],
-            BlockInfo[LocalBlockId => BlockSrc],
+            BlockInfo[LocalBlockId | BlockSrc],
         }
     }
 }
