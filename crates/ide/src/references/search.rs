@@ -3,7 +3,6 @@ use std::cell::LazyCell;
 use base_db::{intern::Lookup, salsa::Database, source_db::SourceDb};
 use hir::{
     container::{ContainerId, InFile},
-    db::HirDb,
     semantics::Semantics,
     source_map::IsSrc,
 };
@@ -12,6 +11,8 @@ use line_index::{TextRange, TextSize};
 use memchr::memmem::Finder;
 use nohash_hasher::IntMap;
 use rustc_hash::FxHashMap;
+use smallvec::SmallVec;
+use smol_str::SmolStr;
 use syntax::{
     SyntaxNode, SyntaxNodeExt, SyntaxTokenWithParent, ast::AstNode, has_text_range::HasTextRange,
     token::TokenKindExt,
@@ -33,8 +34,7 @@ pub struct SearchScope(FxHashMap<FileId, Option<TextRange>>);
 
 impl SearchScope {
     pub(crate) fn single_file(file_id: FileId) -> Self {
-        let mut res = FxHashMap::default();
-        res.insert(file_id, None);
+        let res = FxHashMap::from_iter([(file_id, None)]);
         SearchScope(res)
     }
 
@@ -46,15 +46,14 @@ impl SearchScope {
         match scope_visibility {
             ScopeVisibility::Public => search_scope.unwrap_or_else(|| Self::all(db)),
             ScopeVisibility::Private => {
-                let cont_for_def = if def.is_port() {
-                    match def.container(db) {
-                        ContainerId::ModuleId(InFile { file_id, .. }) => file_id.into(),
-                        _ => unreachable!(),
+                let container_id = match def.container_id(db) {
+                    ContainerId::ModuleId(InFile { file_id, .. }) if def.is_port() => {
+                        file_id.into()
                     }
-                } else {
-                    def.container(db)
+                    cont @ _ => cont,
                 };
-                let mut scope = Self::from_conts(db, cont_for_def);
+
+                let mut scope = Self::from_conts(db, container_id);
 
                 if let Some(search_scope) = search_scope {
                     scope = scope.intersect(search_scope);
@@ -71,8 +70,7 @@ impl SearchScope {
     }
 
     fn single_range(file_id: FileId, range: TextRange) -> Self {
-        let mut res = FxHashMap::default();
-        res.insert(file_id, Some(range));
+        let res = FxHashMap::from_iter([(file_id, Some(range))]);
         SearchScope(res)
     }
 
@@ -80,8 +78,7 @@ impl SearchScope {
         match cont {
             ContainerId::HirFileId(_) => Self::all(db),
             ContainerId::ModuleId(InFile { value: local_module_id, file_id }) => {
-                let (_, file_src_map) = db.hir_file_with_source_map(file_id);
-                let range = file_src_map.get(local_module_id).range();
+                let range = file_id.to_container_src_map(db).get(local_module_id).range();
                 Self::single_range(file_id.file_id(), range)
             }
             ContainerId::BlockId(block_id) => {
@@ -97,16 +94,17 @@ impl SearchScope {
         }
 
         self.0.retain(|file_id, range| {
-            if let Some(other_range) = other.0.get(file_id) {
-                match (&range, &other_range) {
-                    (Some(r), Some(other)) => *range = r.intersect(*other),
-                    (None, Some(other)) => *range = Some(*other),
-                    (Some(_), None) | (None, None) => {}
-                };
-                true
-            } else {
-                false
-            }
+            let Some(other_range) = other.0.get(file_id) else {
+                return false;
+            };
+
+            match (&range, &other_range) {
+                (Some(r), Some(other)) => *range = r.intersect(*other),
+                (None, Some(other)) => *range = Some(*other),
+                (Some(_), None) | (None, None) => {}
+            };
+
+            true
         });
 
         self
@@ -148,14 +146,25 @@ impl<'a, 'b> ReferencesCtx<'a, 'b> {
         let sema = self.sema;
         let mut res: IntMap<_, Vec<_>> = IntMap::default();
 
-        let name = self.def.name(sema.db).unwrap();
-        let finder = &Finder::new(&name);
+        let names = self
+            .def
+            .origins()
+            .into_iter()
+            .map(|def| def.name(sema.db))
+            .collect::<SmallVec<[_; 6]>>();
+        let name = &names[0].value.0;
+
+        debug_assert! {
+            !names.is_empty() && names.iter().all(|InFile { value: (namei, _), .. }| namei == name)
+        };
+
+        let finder = &Finder::new(name);
         for (text, file_id, range) in self.scope_files() {
             self.sema.db.unwind_if_cancelled();
 
-            let file = LazyCell::new(|| sema.parse(file_id));
+            let root = LazyCell::new(|| sema.parse(file_id).syntax());
             Self::match_text(&text, finder, range)
-                .filter_map(|offset| Self::filter_token(file.syntax(), offset))
+                .filter_map(|offset| Self::filter_token(*root, file_id, &names, offset))
                 .filter(|tp| self.classify_and_filter(sema, tp))
                 .for_each(|token| res.entry(file_id).or_default().push(ReferenceToken { token }));
         }
@@ -164,10 +173,8 @@ impl<'a, 'b> ReferencesCtx<'a, 'b> {
     }
 
     fn scope_files(&self) -> impl Iterator<Item = (Arc<str>, FileId, TextRange)> + '_ {
-        let db = self.sema.db;
-
         self.scope.0.iter().map(|(file_id, range)| {
-            let text = db.file_text(*file_id);
+            let text = self.sema.db.file_text(*file_id);
             let range = range.unwrap_or_else(|| TextRange::up_to(TextSize::of(&*text)));
             (text, *file_id, range)
         })
@@ -198,11 +205,22 @@ impl<'a, 'b> ReferencesCtx<'a, 'b> {
         })
     }
 
-    fn filter_token(node: SyntaxNode, offset: TextSize) -> Option<SyntaxTokenWithParent> {
-        node.token_at_offset(offset).pick_bext_token(|kind| match kind {
-            _ if kind.name_like() => 1,
-            _ => 0,
-        })
+    fn filter_token(
+        node: SyntaxNode<'a>,
+        file_id: FileId,
+        names: &[InFile<(SmolStr, TextRange)>],
+        offset: TextSize,
+    ) -> Option<SyntaxTokenWithParent<'a>> {
+        let tok = node.token_at_offset(offset).find(|tok| tok.kind().name_like())?;
+
+        // filter out definitions
+        if names.iter().any(|InFile { value: (_, range), file_id: name_file_id }| {
+            &tok.text_range().unwrap() == range && *name_file_id == file_id.into()
+        }) {
+            None
+        } else {
+            Some(tok)
+        }
     }
 
     fn classify_and_filter(
@@ -214,7 +232,6 @@ impl<'a, 'b> ReferencesCtx<'a, 'b> {
             return false;
         };
 
-        // TODO: We should also filter out tokens of definitions.
         match def {
             DefinitionClass::Definition(def) => def == *self.def,
             DefinitionClass::PortConnShorthand { data, port } => {

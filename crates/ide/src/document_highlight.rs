@@ -1,4 +1,4 @@
-use hir::semantics::Semantics;
+use hir::{hir_def::lower_ident, semantics::Semantics};
 use ide_db::root_db::RootDb;
 use line_index::TextRange;
 use span::FilePosition;
@@ -73,7 +73,6 @@ fn highlight_refs<'a>(
     DocumentHighlightConfig { scope_visibility }: DocumentHighlightConfig,
 ) -> Option<Vec<DocumentHighlight>> {
     let config = ReferencesConfig::new(scope_visibility, Some(SearchScope::single_file(file_id)));
-
     let refs = ReferencesCtx::new(sema, &def, config)
         .search()
         .remove(&file_id)?

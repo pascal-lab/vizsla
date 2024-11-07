@@ -71,28 +71,24 @@ pub(crate) fn rename(
     let ref_edits = ReferencesCtx::new(&sema, &def, ReferencesConfig::new(scope_visibility, None))
         .search()
         .into_iter()
-        .map(|(file_id, toks)| {
-            edits_from_references(&sema, file_id, toks, &def, &old_name, new_name)
-        });
-    source_changes.extend(ref_edits);
+        .map(|file_toks| edits_from_refs(&sema, file_toks, &def, &old_name, new_name))
+        .for_each(|(file_id, edit)| source_changes.insert_text_edit(file_id, edit));
 
-    let def_edits = def.sources().into_iter().map(|def| {
+    let def_edits = def.origins().into_iter().for_each(|def| {
         let mut text_edit = TextEdit::builder();
-        // TODO: optimization??
-        let nav = def.to_nav(db);
-        text_edit.replace(nav.focus_range.unwrap(), new_name.to_owned());
-        (nav.file_id, text_edit.finish())
+
+        let InFile { value: (_, focus_range), file_id } = def.name(db);
+        text_edit.replace(focus_range, new_name.to_owned());
+
+        source_changes.insert_text_edit(file_id.file_id(), text_edit.finish());
     });
 
-    // TODO:
-    // source_changes.extend(def_edits);
     Ok(source_changes)
 }
 
-fn edits_from_references(
+fn edits_from_refs(
     sema: &Semantics<'_, RootDb>,
-    file_id: FileId,
-    toks: Vec<ReferenceToken<'_>>,
+    (file_id, toks): (FileId, Vec<ReferenceToken<'_>>),
     def: &Definition,
     old_name: &str,
     new_name: &str,
@@ -116,7 +112,7 @@ fn edits_from_references(
                     }
                     (None, None) => {
                         let ref_container = sema.find_container(InFile::new(file_id.into(), it.syntax()));
-                        if def.container(sema.db) == ref_container {
+                        if def.container_id(sema.db) == ref_container {
                             // .old => .old(new)
                             text_edit.replace(range, format!("{old_name}({new_name})"));
                         } else {
@@ -128,14 +124,11 @@ fn edits_from_references(
                 }
             },
             ast::IdentifierName => {
-                let port_conn = SyntaxAncestors::start_from(parent).nth(3).and_then(ast::NamedPortConnection::cast);
-                let data_range = port_conn.and_then(|it| conn_data_range(it));
-                let port_name = port_conn.and_then(|it| lower_ident(it.name()));
-
-                if data_range.is_some_and(|data_range| data_range == range)
-                && port_name.is_some_and(|port_name| port_name == new_name) {
+                if let Some(node) = SyntaxAncestors::start_from(parent).nth(3)
+                && let Some(port_conn) = ast::NamedPortConnection::cast(node)
+                && let Some(data_range) = conn_data_range(port_conn).filter(|r| *r == range)
+                && let Some(port_name) = lower_ident(port_conn.name()).filter(|n| n == new_name) {
                     // .new(data) => .new
-                    let port_conn = port_conn.unwrap();
                     let start = port_conn.name().unwrap().text_range().unwrap().start();
                     let end = if let Some(cp) = port_conn.close_paren() {
                         cp.text_range().unwrap().end()
@@ -143,7 +136,6 @@ fn edits_from_references(
                         range.end()
                     };
                     text_edit.replace(TextRange::new(start, end), new_name.to_owned());
-
                 } else {
                     text_edit.replace(range, new_name.to_owned());
                 }

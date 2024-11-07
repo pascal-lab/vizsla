@@ -64,7 +64,7 @@ pub trait HirDb: InternDb {
 }
 
 fn parse(db: &dyn HirDb, file_id: HirFileId) -> SyntaxTree {
-    db.parse_src(file_id.0)
+    db.parse_src(file_id.file_id())
 }
 
 fn hir_file(db: &dyn HirDb, file_id: HirFileId) -> Arc<HirFile> {

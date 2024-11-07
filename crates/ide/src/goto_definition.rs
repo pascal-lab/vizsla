@@ -24,7 +24,7 @@ pub(crate) fn goto_definition(
 
     let navs = handle_ctrl_flow_kw(&sema, token).or_else(|| {
         DefinitionClass::resolve(&sema, token)?
-            .sources()
+            .origins()
             .into_iter()
             .unique()
             .map(|def| def.to_nav(db))

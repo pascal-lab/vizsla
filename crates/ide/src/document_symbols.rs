@@ -1,13 +1,10 @@
 use hir::{
-    db::HirDb,
-    file::HirFileId,
-    hir_def::{
+    db::HirDb, file::HirFileId, hir_def::{
         block::{BlockId, BlockInfo, BlockSrc, LocalBlockId},
         expr::declarator::{DeclId, Declarator, DeclaratorSrc},
-        module::{ModuleId, ModuleSrc, instantiation::InstanceSrc},
+        module::{instantiation::InstanceSrc, ModuleId, ModuleSrc},
         stmt::{Stmt, StmtId, StmtSrc},
-    },
-    source_map::IsSrc,
+    }, semantics::Semantics, source_map::IsSrc
 };
 use ide_db::root_db::RootDb;
 use line_index::TextRange;
@@ -39,15 +36,13 @@ pub struct DocumentSymbol {
 
 // TODO: add ty info in detail
 pub(crate) fn document_symbols(db: &RootDb, file_id: FileId) -> Vec<DocumentSymbol> {
-    let mut res = Vec::default();
+    let sema = Semantics::new(db);
+    let root = sema.parse(file_id);
 
     let file_id = HirFileId(file_id);
-    let tree = db.parse(file_id);
-    let Some(root) = tree.root().and_then(ast::CompilationUnit::cast) else {
-        return res;
-    };
-
     let (file, src_map) = db.hir_file_with_source_map(file_id);
+
+    let mut res = Vec::default();
 
     // We iterate over the syntax tree, to avoid converting SyntaxNodePtr to AST
     // node, which is expensive.

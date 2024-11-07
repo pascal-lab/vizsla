@@ -32,18 +32,22 @@ define_enum_deriving_from! {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
-pub struct InContainer<T, C = ContainerId> {
+pub struct InContainer<T> {
     pub value: T,
-    pub cont_id: C,
+    pub cont_id: ContainerId,
 }
 
-impl<T, C> InContainer<T, C> {
-    pub fn new(cont_id: C, value: T) -> InContainer<T, C> {
+impl<T> InContainer<T> {
+    pub fn new(cont_id: ContainerId, value: T) -> InContainer<T> {
         InContainer { value, cont_id }
     }
 
-    pub fn with_value<U>(self, value: U) -> InContainer<U, C> {
-        InContainer::<U, C>::new(self.cont_id, value)
+    pub fn with_value<U>(self, value: U) -> InContainer<U> {
+        InContainer::<U>::new(self.cont_id, value)
+    }
+
+    pub fn map<U>(self, f: impl FnOnce(T) -> U) -> InContainer<U> {
+        InContainer::new(self.cont_id, f(self.value))
     }
 }
 
@@ -64,10 +68,14 @@ macro_rules! define_container_id {
                 pub fn with_value<U>(self, value: U) -> $name<U> {
                     $name::<U>::new(self.$id, value)
                 }
+
+                pub fn map<U>(self, f: impl FnOnce(T) -> U) -> $name<U> {
+                    $name::new(self.$id, f(self.value))
+                }
             }
 
-            impl<T> From<$name<T>> for InContainer<T, ContainerId> {
-                fn from(item: $name<T>) -> InContainer<T, ContainerId> {
+            impl<T> From<$name<T>> for InContainer<T> {
+                fn from(item: $name<T>) -> InContainer<T> {
                     InContainer::new(item.$id.into(), item.value)
                 }
             }
@@ -125,7 +133,7 @@ impl HirFileId {
 
 impl ModuleId {
     pub fn file_id(&self) -> FileId {
-        self.file_id.0
+        self.file_id.file_id()
     }
 
     #[inline]
@@ -141,7 +149,7 @@ impl ModuleId {
 
 impl BlockId {
     pub fn file_id(&self, db: &dyn InternDb) -> FileId {
-        self.lookup(db).src.file_id.0
+        self.lookup(db).src.file_id.file_id()
     }
 
     #[inline]
@@ -179,6 +187,18 @@ impl Container {
             Container::Module(module) => module.name.as_ref(),
             Container::Block(block) => block.name.as_ref(),
         }
+    }
+}
+
+impl AsRef<Container> for Container {
+    fn as_ref(&self) -> &Container {
+        self
+    }
+}
+
+impl AsRef<ContainerSrcMap> for ContainerSrcMap {
+    fn as_ref(&self) -> &ContainerSrcMap {
+        &self
     }
 }
 

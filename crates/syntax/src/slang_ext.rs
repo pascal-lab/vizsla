@@ -35,6 +35,32 @@ impl<'a> TokenAtOffset<'a> {
     }
 }
 
+impl<'a> Iterator for TokenAtOffset<'a> {
+    type Item = SyntaxTokenWithParent<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match std::mem::replace(self, TokenAtOffset::None) {
+            TokenAtOffset::None => None,
+            TokenAtOffset::Single(tok) => {
+                *self = TokenAtOffset::None;
+                Some(tok)
+            }
+            TokenAtOffset::Between(left, right) => {
+                *self = TokenAtOffset::Single(right);
+                Some(left)
+            }
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        match self {
+            TokenAtOffset::None => (0, Some(0)),
+            TokenAtOffset::Single(_) => (1, Some(1)),
+            TokenAtOffset::Between(_, _) => (2, Some(2)),
+        }
+    }
+}
+
 pub trait SyntaxNodeExt<'a> {
     fn elem_at_range(&self, range: TextRange) -> Option<SyntaxElement<'a>>;
     fn token_at_offset(&self, offset: TextSize) -> TokenAtOffset<'a>;

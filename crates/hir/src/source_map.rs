@@ -11,15 +11,15 @@ pub trait IsSrc: PartialEq + Eq + Hash + Copy + Clone + Debug {
     #[inline]
     fn hir<'a, Hir, HirIdx, Arn, SrcMap>(
         self,
-        arena: &'a Arc<Arn>,
-        src_map: &'a Arc<SrcMap>,
+        arena: &'a impl AsRef<Arn>,
+        src_map: &'a impl AsRef<SrcMap>,
     ) -> &'a Hir
     where
-        Arn: GetRef<HirIdx, Output = Hir>,
-        SrcMap: Get<Self, Output = HirIdx>,
+        Arn: GetRef<HirIdx, Output = Hir> + 'a,
+        SrcMap: Get<Self, Output = HirIdx> + 'a,
     {
-        let idx = src_map.get(self);
-        arena.get(idx)
+        let idx = src_map.as_ref().get(self);
+        arena.as_ref().get(idx)
     }
 
     fn kind(&self) -> SyntaxKind;

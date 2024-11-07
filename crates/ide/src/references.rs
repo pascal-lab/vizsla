@@ -1,4 +1,4 @@
-use hir::semantics::Semantics;
+use hir::{hir_def::lower_ident, semantics::Semantics};
 use ide_db::root_db::RootDb;
 use itertools::Itertools;
 use line_index::TextRange;
@@ -112,7 +112,7 @@ fn search_refs<'a>(
             (file_id, res)
         })
         .collect();
-    let def = def.sources().into_iter().map(|def| def.to_nav(sema.db)).collect_vec().into();
+    let def = def.origins().into_iter().map(|def| def.to_nav(sema.db)).collect_vec().into();
     References { def, refs }
 }
 
