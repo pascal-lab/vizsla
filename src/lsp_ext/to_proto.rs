@@ -37,11 +37,7 @@ pub(crate) fn goto_definition_response(
             .into_iter()
             .map(|nav| FileRange { file_id: nav.file_id, range: nav.focus_or_full_range() })
             .unique()
-            .map(|FileRange { file_id, range }| {
-                let url = url(snap, file_id);
-                let line_info = snap.line_info(file_id)?;
-                Ok(location(url, &line_info, range))
-            })
+            .map(|file_range| Ok(location(snap, file_range)))
             .collect::<Cancellable<Vec<_>>>()?;
         locations.into()
     };
@@ -195,11 +191,12 @@ pub(crate) fn range(line_info: &LineInfo, range: TextRange) -> lsp_types::Range 
 }
 
 pub(crate) fn location(
-    url: lsp_types::Url,
-    line_info: &LineInfo,
-    range: TextRange,
+    snap: &GlobalStateSnapshot,
+    FileRange { file_id, range }: FileRange,
 ) -> lsp_types::Location {
-    let range = self::range(line_info, range);
+    let url = url(snap, file_id);
+    let line_info = snap.line_info(file_id).unwrap();
+    let range = self::range(&line_info, range);
     lsp_types::Location::new(url, range)
 }
 

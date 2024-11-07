@@ -81,14 +81,15 @@ pub(crate) fn handle_references(
         .into_iter()
         .flat_map(|References { def, refs }| {
             let decl = def.into_iter().flatten().map(|nav| {
-                let url = to_proto::url(&snap, nav.file_id);
-                to_proto::location(url, &line_info, nav.focus_or_full_range())
+                to_proto::location(&snap, FileRange {
+                    file_id: nav.file_id,
+                    range: nav.focus_or_full_range(),
+                })
             });
 
             let refs = refs.into_iter().flat_map(|(file_id, refs)| {
-                let url = to_proto::url(&snap, file_id);
                 refs.into_iter()
-                    .map(|(range, _)| to_proto::location(url.clone(), &line_info, range))
+                    .map(|(range, _)| to_proto::location(&snap, FileRange { file_id, range }))
                     .collect_vec()
                     .into_iter()
             });
