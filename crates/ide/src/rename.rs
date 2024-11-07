@@ -127,9 +127,9 @@ fn edits_from_refs(
                 if let Some(node) = SyntaxAncestors::start_from(parent).nth(3)
                 && let Some(port_conn) = ast::NamedPortConnection::cast(node)
                 && let Some(data_range) = conn_data_range(port_conn).filter(|r| *r == range)
-                && let Some(port_name) = lower_ident(port_conn.name()).filter(|n| n == new_name) {
+                && let Some(port_name) = port_conn.name().filter(|n| lower_ident(Some(*n)).unwrap() == new_name) {
                     // .new(data) => .new
-                    let start = port_conn.name().unwrap().text_range().unwrap().start();
+                    let start = port_name.text_range().unwrap().start();
                     let end = if let Some(cp) = port_conn.close_paren() {
                         cp.text_range().unwrap().end()
                     }else {

@@ -52,11 +52,11 @@ pub(crate) fn document_symbols(db: &RootDb, file_id: FileId) -> Vec<DocumentSymb
             ModuleDeclaration(decl) => {
                 let src = ModuleSrc::from(decl);
                 let module_id = ModuleId::new(file_id, src_map.get(src));
-                collect_module_items(db, module_id, decl, &mut res);
+                collect_module_items(&sema, module_id, decl, &mut res);
             }
             ProceduralBlock(proc) => {
                 let stmt = proc.statement();
-                build_stmt(db, &mut res, stmt, None, &file, &src_map);
+                build_stmt(&sema, &mut res, stmt, None, &file, &src_map);
             }
             DataDeclaration(data_decl) => {
                 build_decls(&mut res, data_decl.declarators(), None, &file, &src_map);
@@ -72,11 +72,12 @@ pub(crate) fn document_symbols(db: &RootDb, file_id: FileId) -> Vec<DocumentSymb
 }
 
 fn collect_module_items(
-    db: &RootDb,
+    sema: &Semantics<RootDb>,
     module_id: ModuleId,
     decl: ast::ModuleDeclaration,
     res: &mut Vec<DocumentSymbol>,
 ) {
+    let db = sema.db;
     let (module, src_map) = db.module_with_source_map(module_id);
     let header = decl.header();
     let mut module_sym = build(module.name.clone(), decl, None, None);
@@ -144,7 +145,7 @@ fn collect_module_items(
             FunctionDeclaration(_fn_decl) => todo!(),
             ProceduralBlock(proc) => {
                 let stmt = proc.statement();
-                build_stmt(db, children, stmt, cont_name, &module, &src_map);
+                build_stmt(sema, children, stmt, cont_name, &module, &src_map);
             }
             // Ports
             PortDeclaration(port) => {
@@ -161,12 +162,13 @@ fn collect_module_items(
 }
 
 fn collect_block_items(
-    db: &RootDb,
+    sema: &Semantics<RootDb>,
     block_id: BlockId,
     decl: ast::BlockStatement,
     cont_name: Option<String>,
     res: &mut Vec<DocumentSymbol>,
 ) {
+    let db = sema.db;
     let (block, src_map) = db.block_with_source_map(block_id);
     let mut block_sym = build(block.name.clone(), decl, cont_name, None);
 
@@ -176,7 +178,7 @@ fn collect_block_items(
 
     for node in decl.items().children() {
         match_ast! { node.syntax(),
-            ast::Statement[it] => build_stmt(db, res, it, cont_name, &block, &src_map),
+            ast::Statement[it] => build_stmt(sema, res, it, cont_name, &block, &src_map),
             ast::DataDeclaration[it] => {
                 build_decls(children, it.declarators(), cont_name, &block, &src_map);
             },
@@ -191,7 +193,7 @@ fn collect_block_items(
 }
 
 fn build_stmt<'a, Arn, SrcMap>(
-    db: &RootDb,
+    sema: &Semantics<RootDb>,
     res: &mut Vec<DocumentSymbol>,
     stmt: ast::Statement<'a>,
     container_name: Option<&String>,
@@ -201,6 +203,7 @@ fn build_stmt<'a, Arn, SrcMap>(
     Arn: GetRef<StmtId, Output = Stmt> + GetRef<LocalBlockId, Output = BlockInfo>,
     SrcMap: Get<StmtSrc, Output = StmtId> + Get<BlockSrc, Output = LocalBlockId>,
 {
+    let db = sema.db;
     if stmt.name().is_some() {
         let hir = StmtSrc::from(stmt).hir(arena, src_map);
         let sym = build(hir.label.clone(), stmt, container_name.cloned(), None);
@@ -210,19 +213,19 @@ fn build_stmt<'a, Arn, SrcMap>(
     use ast::Statement::*;
     match stmt {
         TimingControlStatement(stmt) => {
-            build_stmt(db, res, stmt.statement(), container_name, arena, src_map);
+            build_stmt(sema, res, stmt.statement(), container_name, arena, src_map);
         }
 
         WaitStatement(stmt) => {
-            build_stmt(db, res, stmt.statement(), container_name, arena, src_map);
+            build_stmt(sema, res, stmt.statement(), container_name, arena, src_map);
         }
 
         ConditionalStatement(stmt) => {
-            build_stmt(db, res, stmt.statement(), container_name, arena, src_map);
+            build_stmt(sema, res, stmt.statement(), container_name, arena, src_map);
             if let Some(stmt) =
                 stmt.else_clause().and_then(|clause| ast::Statement::cast(clause.clause().syntax()))
             {
-                build_stmt(db, res, stmt, container_name, arena, src_map);
+                build_stmt(sema, res, stmt, container_name, arena, src_map);
             }
         }
         CaseStatement(stmt) => {
@@ -231,12 +234,12 @@ fn build_stmt<'a, Arn, SrcMap>(
                 match item {
                     StandardCaseItem(item) => {
                         if let Some(stmt) = ast::Statement::cast(item.clause().syntax()) {
-                            build_stmt(db, res, stmt, container_name, arena, src_map);
+                            build_stmt(sema, res, stmt, container_name, arena, src_map);
                         }
                     }
                     DefaultCaseItem(item) => {
                         if let Some(stmt) = ast::Statement::cast(item.clause().syntax()) {
-                            build_stmt(db, res, stmt, container_name, arena, src_map);
+                            build_stmt(sema, res, stmt, container_name, arena, src_map);
                         }
                     }
                     PatternCaseItem(_) => unimplemented!(),
@@ -245,21 +248,21 @@ fn build_stmt<'a, Arn, SrcMap>(
         }
 
         DoWhileStatement(stmt) => {
-            build_stmt(db, res, stmt.statement(), container_name, arena, src_map);
+            build_stmt(sema, res, stmt.statement(), container_name, arena, src_map);
         }
         ForeverStatement(stmt) => {
-            build_stmt(db, res, stmt.statement(), container_name, arena, src_map);
+            build_stmt(sema, res, stmt.statement(), container_name, arena, src_map);
         }
         LoopStatement(stmt) => {
-            build_stmt(db, res, stmt.statement(), container_name, arena, src_map);
+            build_stmt(sema, res, stmt.statement(), container_name, arena, src_map);
         }
         ForLoopStatement(stmt) => {
-            build_stmt(db, res, stmt.statement(), container_name, arena, src_map);
+            build_stmt(sema, res, stmt.statement(), container_name, arena, src_map);
         }
 
         BlockStatement(stmt) => {
             let hir = BlockSrc::from(stmt).hir(arena, src_map);
-            collect_block_items(db, hir.block_id, stmt, container_name.cloned(), res);
+            collect_block_items(sema, hir.block_id, stmt, container_name.cloned(), res);
         }
 
         ProceduralAssignStatement(_)
