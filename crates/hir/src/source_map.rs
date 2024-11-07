@@ -1,10 +1,9 @@
 use std::{fmt::Debug, hash::Hash};
 
 pub(crate) use la_arena::{ArenaMap, Idx};
+pub(crate) use utils::get::Get;
 use rustc_hash::FxHashMap;
 use syntax::{SyntaxKind, ast::AstNode};
-use triomphe::Arc;
-pub(crate) use utils::get::Get;
 use utils::{get::GetRef, text_edit::TextRange};
 
 pub trait IsSrc: PartialEq + Eq + Hash + Copy + Clone + Debug {

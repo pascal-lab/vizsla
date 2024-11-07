@@ -17,7 +17,6 @@ use vfs::FileId;
 use crate::{
     ScopeVisibility,
     definitions::{Definition, DefinitionClass},
-    navigation_target::ToNav,
     references::{
         ReferencesConfig,
         search::{ReferenceToken, ReferencesCtx},
@@ -68,13 +67,13 @@ pub(crate) fn rename(
 
     let old_name = lower_ident(Some(token.tok)).unwrap();
     let mut source_changes = SourceChange::default();
-    let ref_edits = ReferencesCtx::new(&sema, &def, ReferencesConfig::new(scope_visibility, None))
+    ReferencesCtx::new(&sema, &def, ReferencesConfig::new(scope_visibility, None))
         .search()
         .into_iter()
         .map(|file_toks| edits_from_refs(&sema, file_toks, &def, &old_name, new_name))
         .for_each(|(file_id, edit)| source_changes.insert_text_edit(file_id, edit));
 
-    let def_edits = def.origins().into_iter().for_each(|def| {
+    def.origins().into_iter().for_each(|def| {
         let mut text_edit = TextEdit::builder();
 
         let InFile { value: (_, focus_range), file_id } = def.name(db);

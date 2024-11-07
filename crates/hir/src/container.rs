@@ -198,7 +198,7 @@ impl AsRef<Container> for Container {
 
 impl AsRef<ContainerSrcMap> for ContainerSrcMap {
     fn as_ref(&self) -> &ContainerSrcMap {
-        &self
+        self
     }
 }
 

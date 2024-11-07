@@ -3,7 +3,6 @@ use hir::{
     container::{ContainerId, InContainer, InFile, InModule},
     db::HirDb,
     hir_def::{
-        Ident,
         block::{BlockId, BlockLoc},
         expr::declarator::DeclId,
         module::{ModuleId, instantiation::InstanceId, port::NonAnsiPortId},

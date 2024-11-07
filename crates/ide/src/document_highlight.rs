@@ -1,4 +1,4 @@
-use hir::{hir_def::lower_ident, semantics::Semantics};
+use hir::semantics::Semantics;
 use ide_db::root_db::RootDb;
 use line_index::TextRange;
 use span::FilePosition;

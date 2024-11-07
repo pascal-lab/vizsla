@@ -1,6 +1,6 @@
 use base_db::{intern::Lookup, source_db::SourceDb};
 use hir::{
-    container::{ContainerId, InContainer, InFile, InModule},
+    container::{InContainer, InFile, InModule},
     db::HirDb,
     hir_def::{
         block::{BlockId, BlockLoc},

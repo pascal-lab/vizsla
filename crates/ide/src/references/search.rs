@@ -50,7 +50,7 @@ impl SearchScope {
                     ContainerId::ModuleId(InFile { file_id, .. }) if def.is_port() => {
                         file_id.into()
                     }
-                    cont @ _ => cont,
+                    cont => cont,
                 };
 
                 let mut scope = Self::from_conts(db, container_id);
