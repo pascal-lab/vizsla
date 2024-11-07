@@ -46,12 +46,16 @@ impl SyntaxTokenPtr {
         SyntaxTokenPtr { kind: token.kind(), range: token.text_range().unwrap() }
     }
 
-    pub fn to_token<'a>(&self, tree: &'a SyntaxTree) -> Option<SyntaxToken<'a>> {
-        tree.root()?.elem_at_range(self.range)?.as_token()
+    pub fn to_token<'a>(&self, tree: &'a SyntaxTree) -> Option<SyntaxTokenWithParent<'a>> {
+        tree.root()?.elem_at_range(self.range)?.as_tok_with_parent()
     }
 
     pub fn kind(&self) -> TokenKind {
         self.kind
+    }
+
+    pub fn range(&self) -> TextRange {
+        self.range
     }
 }
 
@@ -78,9 +82,7 @@ impl SyntaxElementPtr {
         match self {
             SyntaxElementPtr::Node(node) => node.to_node(tree).map(SyntaxElement::from_node),
             SyntaxElementPtr::Token { parent, tok } => {
-                let parent = parent.to_node(tree)?;
-                let tok = tok.to_token(tree)?;
-                Some(SyntaxElement::from_token(SyntaxTokenWithParent { parent, tok }))
+                Some(SyntaxElement::from_token(tok.to_token(tree)?))
             }
         }
     }

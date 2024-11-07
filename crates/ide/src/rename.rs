@@ -71,12 +71,15 @@ pub(crate) fn rename(
         .search()
         .into_iter()
         .map(|file_toks| edits_from_refs(&sema, file_toks, &def, &old_name, new_name))
-        .for_each(|(file_id, edit)| source_changes.insert_text_edit(file_id, edit));
+        .for_each(|(file_id, edit)| {
+            dbg!(file_id, &edit);
+            source_changes.insert_text_edit(file_id, edit)
+        });
 
     def.origins().into_iter().for_each(|def| {
         let mut text_edit = TextEdit::builder();
 
-        let InFile { value: (_, focus_range), file_id } = def.name(db);
+        let InFile { value: focus_range, file_id } = def.name_range(db);
         text_edit.replace(focus_range, new_name.to_owned());
 
         source_changes.insert_text_edit(file_id.file_id(), text_edit.finish());
@@ -125,7 +128,7 @@ fn edits_from_refs(
             ast::IdentifierName => {
                 if let Some(node) = SyntaxAncestors::start_from(parent).nth(3)
                 && let Some(port_conn) = ast::NamedPortConnection::cast(node)
-                && let Some(data_range) = conn_data_range(port_conn).filter(|r| *r == range)
+                && conn_data_range(port_conn).is_some_and(|r| r == range)
                 && let Some(port_name) = port_conn.name().filter(|n| lower_ident(Some(*n)).unwrap() == new_name) {
                     // .new(data) => .new
                     let start = port_name.text_range().unwrap().start();

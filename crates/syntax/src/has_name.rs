@@ -18,7 +18,7 @@ impl<'a> HasName<'a> for ModuleDeclaration<'a> {
 
 impl<'a> HasName<'a> for BlockStatement<'a> {
     fn name(&self) -> Option<SyntaxToken<'a>> {
-        self.label()?.name()
+        self.block_name()?.name()
     }
 }
 

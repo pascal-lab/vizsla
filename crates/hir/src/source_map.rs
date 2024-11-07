@@ -1,9 +1,9 @@
 use std::{fmt::Debug, hash::Hash};
 
 pub(crate) use la_arena::{ArenaMap, Idx};
-pub(crate) use utils::get::Get;
 use rustc_hash::FxHashMap;
-use syntax::{SyntaxKind, ast::AstNode};
+use syntax::{SyntaxKind, TokenKind, ast::AstNode};
+pub(crate) use utils::get::Get;
 use utils::{get::GetRef, text_edit::TextRange};
 
 pub trait IsSrc: PartialEq + Eq + Hash + Copy + Clone + Debug {
@@ -24,6 +24,14 @@ pub trait IsSrc: PartialEq + Eq + Hash + Copy + Clone + Debug {
     fn kind(&self) -> SyntaxKind;
 
     fn range(&self) -> TextRange;
+
+    fn name_kind(&self) -> Option<TokenKind> {
+        None
+    }
+
+    fn name_range(&self) -> Option<TextRange> {
+        None
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -153,5 +161,170 @@ macro_rules! define_src {
                 }
             }
         )*
+    };
+}
+
+#[macro_export]
+macro_rules! define_src_with_name {
+    ($name:ident(ast::$ty:ident)) => {
+        #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+        pub struct $name {
+            pub node: syntax::ptr::SyntaxNodePtr,
+            pub name: Option<syntax::ptr::SyntaxTokenPtr>,
+        }
+
+        impl $crate::source_map::IsSrc for $name {
+            fn kind(&self) -> syntax::SyntaxKind {
+                self.node.kind()
+            }
+
+            fn range(&self) -> utils::text_edit::TextRange {
+                self.node.range()
+            }
+
+            fn name_kind(&self) -> Option<syntax::TokenKind> {
+                self.name.map(|name| name.kind())
+            }
+
+            fn name_range(&self) -> Option<utils::text_edit::TextRange> {
+                self.name.map(|name| name.range())
+            }
+        }
+
+        impl<'a> $crate::source_map::ToAstNode<'a, ast::$ty<'a>> for $name {
+            fn to_node(&self, tree: &'a syntax::SyntaxTree) -> Option<ast::$ty<'a>> {
+                let mut node = self.node.to_node(tree)?;
+                while !<ast::$ty<'a> as syntax::ast::AstNode>::can_cast(node.kind()) && node.child_count() == 1 {
+                    node = node.child_node(0).unwrap();
+                }
+                <ast::$ty<'a> as syntax::ast::AstNode>::cast(node)
+            }
+        }
+
+        impl From<ast::$ty<'_>> for $name {
+            fn from(node: ast::$ty<'_>) -> Self {
+                Self {
+                    node: syntax::slang_ext::AstNodeExt::to_ptr(&node),
+                    name: <ast::$ty<'_> as syntax::has_name::HasName<'_>>::name(&node)
+                    .map(|name| syntax::ptr::SyntaxTokenPtr::from_token(name)),
+                }
+            }
+        }
+
+        impl From<$name> for syntax::ptr::SyntaxNodePtr {
+            fn from(src: $name) -> Self {
+                src.node
+            }
+        }
+
+        impl From<$name> for Option<syntax::ptr::SyntaxTokenPtr> {
+            fn from(src: $name) -> Self {
+                src.name
+            }
+        }
+    };
+
+    ($name:ident($(ast::$ty:ident),*)$(,)?) => {
+        #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+        pub enum $name {
+            $(
+                $ty {
+                    node: syntax::ptr::SyntaxNodePtr,
+                    name: Option<syntax::ptr::SyntaxTokenPtr>,
+                }
+            )*
+        }
+
+        impl $crate::source_map::IsSrc for $name {
+            fn kind(&self) -> syntax::SyntaxKind {
+                match self {
+                    $(
+                        $name::$ty { node, .. } => node.kind(),
+                    )*
+                }
+            }
+
+            fn range(&self) -> utils::text_edit::TextRange {
+                match self {
+                    $(
+                        $name::$ty { node, .. } => node.range(),
+                    )*
+                }
+            }
+
+            fn name_kind(&self) -> Option<syntax::TokenKind> {
+                match self {
+                    $(
+                        $name::$ty { name, .. } => name.kind(),
+                    )*
+                }
+            }
+
+            fn name_range(&self) -> Option<utils::text_edit::TextRange> {
+                match self {
+                    $(
+                        $name::$ty { name, .. } => name.range(),
+                    )*
+                }
+            }
+        }
+
+        $(
+            impl<'a> $crate::source_map::ToAstNode<'a, ast::$ty<'a>> for $name {
+                fn to_node(&self, tree: &'a syntax::SyntaxTree) -> Option<ast::$ty<'a>> {
+                    match self {
+                        $name::$ty { node, .. } => {
+                            let mut node = node.to_node(tree)?;
+                            while !<ast::$ty<'a> as syntax::ast::AstNode>::can_cast(node.kind()) && node.child_count() == 1 {
+                                node = node.child_node(0).unwrap();
+                            }
+                            <ast::$ty<'a> as syntax::ast::AstNode>::cast(node)
+                        }
+                        _ => None,
+                    }
+                }
+
+                fn to_name_tok(&self, tree: &'a syntax::SyntaxTree) -> Option<SyntaxTokenWithParent<'a>> {
+                    match self {
+                        $name::$ty { name, .. } => {
+                            let mut name = name?.to_token(tree)?;
+                            (name.tok.kind() == name.unwrap().kind()).then(|| name)
+                        }
+                        _ => None,
+                    }
+                }
+            }
+        )*
+
+        $(
+            impl From<ast::$ty<'_>> for $name {
+                fn from(node: ast::$ty<'_>) -> Self {
+                    Self::$ty {
+                        node: syntax::slang_ext::AstNodeExt::to_ptr(&node),
+                        name: node.name(),
+                    }
+                }
+            }
+        )*
+
+        impl From<$name> for syntax::ptr::SyntaxNodePtr {
+            fn from(src: $name) -> Self {
+                match src {
+                    $(
+                        $name::$ty { node, .. } => node,
+                    )*
+                }
+            }
+        }
+
+        impl From<$name> for Option<syntax::ptr::SyntaxTokenPtr> {
+            fn from(src: $name) -> Self {
+                match src {
+                    $(
+                        $name::$ty { name, .. } => name,
+                    )*
+                }
+            }
+        }
     };
 }

@@ -36,7 +36,7 @@ use super::{
 use crate::{
     container::InFile,
     db::{HirDb, InternDb},
-    define_src,
+    define_src_with_name,
     file::HirFileId,
     source_map::{SourceMap, ToAstNode},
 };
@@ -79,7 +79,7 @@ define_container! {
     }
 }
 
-define_src!(ModuleSrc(ast::ModuleDeclaration));
+define_src_with_name!(ModuleSrc(ast::ModuleDeclaration));
 
 define_enum_deriving_from! {
     #[derive(Debug, PartialEq, Eq, Clone)]

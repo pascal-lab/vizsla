@@ -54,56 +54,57 @@ impl DefinitionOrigins {
         }
     }
 
-    #[inline]
-    pub fn name(&self, db: &dyn HirDb) -> InFile<(SmolStr, TextRange)> {
+    pub fn name(&self, db: &dyn HirDb) -> SmolStr {
         match *self {
             DefinitionOrigins::ModuleId(InFile { value, file_id }) => {
-                let name = file_id.to_container(db).get(value).name.clone().unwrap();
-                let range = file_id.to_container_src_map(db).get(value).range();
-                InFile { value: (name, range), file_id }
+                file_id.to_container(db).get(value).name.clone().unwrap()
             }
             DefinitionOrigins::BlockId(block_id) => {
-                let BlockLoc { cont_id, src: InFile { value, file_id } } = block_id.lookup(db);
+                let BlockLoc { cont_id, src: InFile { value, file_id: _ } } = block_id.lookup(db);
                 let cont = cont_id.to_container(db);
-                let cont_src_map = cont_id.to_container_src_map(db);
-                let name = value.hir(&cont, &cont_src_map).name.clone().unwrap();
-                InFile::new(file_id, (name, value.range()))
+                value.hir(&cont, &cont_id.to_container_src_map(db)).name.clone().unwrap()
             }
             DefinitionOrigins::NonAnsiPort(InModule { value, module_id }) => {
-                let cont = module_id.to_container(db);
-                let name = cont.get(value).label.clone().unwrap();
-
-                let cont_src_map = module_id.to_container_src_map(db);
-                let src = cont_src_map.get(value);
-
-                InFile::new(module_id.file_id, (name, src.range()))
+                module_id.to_container(db).get(value).label.clone().unwrap()
             }
             DefinitionOrigins::Decl(InContainer { value, cont_id }) => {
-                let cont = cont_id.to_container(db);
-                let name = cont.get(value).name.clone().unwrap();
-
-                let cont_src_map = cont_id.to_container_src_map(db);
-                let src = cont_src_map.get(value);
-
-                InFile::new(cont_id.file_id(db).into(), (name, src.range()))
+                cont_id.to_container(db).get(value).name.clone().unwrap()
             }
             DefinitionOrigins::Instance(InModule { value, module_id }) => {
-                let cont = module_id.to_container(db);
-                let name = cont.get(value).name.clone().unwrap();
-
-                let cont_src_map = module_id.to_container_src_map(db);
-                let src = cont_src_map.get(value);
-
-                InFile::new(module_id.file_id, (name, src.range()))
+                module_id.to_container(db).get(value).name.clone().unwrap()
             }
             DefinitionOrigins::Stmt(InContainer { value, cont_id }) => {
-                let cont = cont_id.to_container(db);
-                let name = cont.get(value).label.clone().unwrap();
+                cont_id.to_container(db).get(value).label.clone().unwrap()
+            }
+        }
+    }
 
-                let cont_src_map = cont_id.to_container_src_map(db);
-                let src = cont_src_map.get(value);
-
-                InFile::new(cont_id.file_id(db).into(), (name, src.range()))
+    pub fn name_range(&self, db: &dyn HirDb) -> InFile<TextRange> {
+        match *self {
+            DefinitionOrigins::ModuleId(InFile { value, file_id }) => {
+                let range = file_id.to_container_src_map(db).get(value).name_range().unwrap();
+                InFile::new(file_id, range)
+            }
+            DefinitionOrigins::BlockId(block_id) => {
+                let BlockLoc { src: InFile { value, file_id }, .. } = block_id.lookup(db);
+                let range = value.name_range().unwrap();
+                InFile::new(file_id, range)
+            }
+            DefinitionOrigins::NonAnsiPort(InModule { value, module_id }) => {
+                let range = module_id.to_container_src_map(db).get(value).name_range().unwrap();
+                InFile::new(module_id.file_id, range)
+            }
+            DefinitionOrigins::Decl(InContainer { value, cont_id }) => {
+                let range = cont_id.to_container_src_map(db).get(value).name_range().unwrap();
+                InFile::new(cont_id.file_id(db).into(), range)
+            }
+            DefinitionOrigins::Instance(InModule { value, module_id }) => {
+                let range = module_id.to_container_src_map(db).get(value).name_range().unwrap();
+                InFile::new(module_id.file_id, range)
+            }
+            DefinitionOrigins::Stmt(InContainer { value, cont_id }) => {
+                let range = cont_id.to_container_src_map(db).get(value).name_range().unwrap();
+                InFile::new(cont_id.file_id(db).into(), range)
             }
         }
     }

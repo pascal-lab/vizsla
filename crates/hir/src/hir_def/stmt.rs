@@ -3,12 +3,11 @@ use smallvec::SmallVec;
 use syntax::{
     SyntaxKind, SyntaxToken, TokenKind,
     ast::{self, AstNode},
-    ptr::SyntaxNodePtr,
 };
 
 use super::{
     HirData, Ident,
-    block::{BlockInfo, BlockLoc},
+    block::{BlockInfo, BlockLoc, BlockSrc},
     expr::{
         Expr, ExprId, ExprSrc, LowerExpr,
         data_ty::DataTy,
@@ -23,7 +22,7 @@ use super::{
 use crate::{
     container::{ContainerId, InFile},
     db::InternDb,
-    define_src,
+    define_src_with_name,
     file::HirFileId,
     hir_def::{alloc_idx_and_src, lower_named_label_opt},
     source_map::SourceMap,
@@ -75,13 +74,7 @@ pub enum StmtKind {
     Disable(DisableKind),
 }
 
-define_src!(StmtSrc(ast::Statement));
-
-impl StmtSrc {
-    pub(super) fn new(src: SyntaxNodePtr) -> Self {
-        Self(src)
-    }
-}
+define_src_with_name!(StmtSrc(ast::Statement));
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum ProcAssignKind {
@@ -190,10 +183,15 @@ impl LowerStmtCtx<'_> {
 
     pub(crate) fn lower_stmt(&mut self, stmt: ast::Statement) -> StmtId {
         let hir_stmt = self.lower_stmt_inner(stmt);
-        alloc_idx_and_src! {
+        let hir_idx = alloc_idx_and_src! {
             hir_stmt => self.stmts,
             stmt => self.stmt_srcs,
+        };
+        if let Some(block) = ast::BlockStatement::cast(stmt.syntax()) {
+            let block = BlockSrc::from(block);
+            self.stmt_srcs.insert(block.into(), hir_idx);
         }
+        hir_idx
     }
 
     fn lower_stmt_inner(&mut self, stmt: ast::Statement) -> Stmt {

@@ -6,7 +6,7 @@ use utils::define_enum_deriving_from;
 use super::{Expr, ExprId, ExprSrc, LowerExpr, data_ty::Dimension, impl_lower_expr};
 use crate::{
     db::InternDb,
-    define_src,
+    define_src_with_name,
     hir_def::{
         HirData, Ident, alloc_idx_and_src,
         declaration::DeclarationId,
@@ -39,7 +39,7 @@ define_enum_deriving_from! {
 pub type DeclId = Idx<Declarator>;
 pub type DeclsRange = IdxRange<Declarator>;
 
-define_src!(DeclaratorSrc(ast::Declarator));
+define_src_with_name!(DeclaratorSrc(ast::Declarator));
 
 pub(crate) struct LowerDeclCtx<'a> {
     pub(crate) db: &'a dyn InternDb,

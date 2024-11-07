@@ -1,10 +1,14 @@
 use hir::{
-    db::HirDb, file::HirFileId, hir_def::{
+    db::HirDb,
+    file::HirFileId,
+    hir_def::{
         block::{BlockId, BlockInfo, BlockSrc, LocalBlockId},
         expr::declarator::{DeclId, Declarator, DeclaratorSrc},
-        module::{instantiation::InstanceSrc, ModuleId, ModuleSrc},
+        module::{ModuleId, ModuleSrc, instantiation::InstanceSrc},
         stmt::{Stmt, StmtId, StmtSrc},
-    }, semantics::Semantics, source_map::IsSrc
+    },
+    semantics::Semantics,
+    source_map::IsSrc,
 };
 use ide_db::root_db::RootDb;
 use line_index::TextRange;
@@ -203,7 +207,6 @@ fn build_stmt<'a, Arn, SrcMap>(
     Arn: GetRef<StmtId, Output = Stmt> + GetRef<LocalBlockId, Output = BlockInfo>,
     SrcMap: Get<StmtSrc, Output = StmtId> + Get<BlockSrc, Output = LocalBlockId>,
 {
-    let db = sema.db;
     if stmt.name().is_some() {
         let hir = StmtSrc::from(stmt).hir(arena, src_map);
         let sym = build(hir.label.clone(), stmt, container_name.cloned(), None);

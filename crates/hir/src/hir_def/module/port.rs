@@ -7,7 +7,7 @@ use syntax::{
 use utils::get::{Get, GetRef};
 
 use crate::{
-    define_src,
+    define_src, define_src_with_name,
     hir_def::{
         HirData, Ident, alloc_idx_and_src,
         expr::{
@@ -134,7 +134,7 @@ pub struct NonAnsiPort {
 
 pub type NonAnsiPortId = Idx<NonAnsiPort>;
 
-define_src!(NonAnsiPortSrc(ast::NonAnsiPort));
+define_src_with_name!(NonAnsiPortSrc(ast::NonAnsiPort));
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct PortRef {

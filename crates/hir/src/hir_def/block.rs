@@ -30,7 +30,7 @@ use super::{
 use crate::{
     container::{ContainerId, InFile},
     db::{HirDb, InternDb},
-    define_src,
+    define_src_with_name,
     file::HirFileId,
     source_map::{SourceMap, ToAstNode},
 };
@@ -67,11 +67,17 @@ pub enum ParBlockKind {
     JoinNone,
 }
 
-define_src!(BlockSrc(ast::BlockStatement));
+define_src_with_name!(BlockSrc(ast::BlockStatement));
 
 impl From<BlockSrc> for StmtSrc {
-    fn from(src: BlockSrc) -> Self {
-        StmtSrc::new(src.into())
+    fn from(BlockSrc { node, name }: BlockSrc) -> Self {
+        StmtSrc { node, name }
+    }
+}
+
+impl From<StmtSrc> for BlockSrc {
+    fn from(StmtSrc { node, name }: StmtSrc) -> Self {
+        BlockSrc { node, name }
     }
 }
 
@@ -80,7 +86,7 @@ impl Get<LocalBlockId> for SourceMap<StmtSrc, Stmt> {
 
     fn get(&self, block_id: LocalBlockId) -> Self::Output {
         let stmt_id = block_id.0;
-        BlockSrc(self.get(stmt_id).into())
+        self.get(stmt_id).into()
     }
 }
 

@@ -73,7 +73,7 @@ fn highlight_refs<'a>(
     DocumentHighlightConfig { scope_visibility }: DocumentHighlightConfig,
 ) -> Option<Vec<DocumentHighlight>> {
     let defs = def.origins().into_iter().filter_map(|def| {
-        let InFile { value: (_, range), file_id: def_file_id } = def.name(sema.db);
+        let InFile { value: range, file_id: def_file_id } = def.name_range(sema.db);
         if file_id == def_file_id.file_id() {
             Some(DocumentHighlight { range, category: ReferenceCategory::empty() })
         } else {

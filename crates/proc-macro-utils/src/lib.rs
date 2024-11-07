@@ -158,10 +158,8 @@ pub fn define_container(input: TokenStream) -> TokenStream {
         .filter_map(|field| field.as_ref().right())
         .map(|field| field.data_name.clone());
 
-    let impl_arena = fields
-        .iter()
-        .filter_map(|field| field.as_ref().right())
-        .flat_map(|HirDataField { data_name, data_ty, access: idx_access, data_id_ty, .. }| {
+    let impl_arena = fields.iter().filter_map(|field| field.as_ref().right()).flat_map(
+        |HirDataField { data_name, data_ty, access: idx_access, data_id_ty, .. }| {
             let build = move |data_ty, data_id_ty| {
                 quote! {
                     impl utils::get::GetRef<#data_id_ty> for #container_name {
@@ -181,7 +179,8 @@ pub fn define_container(input: TokenStream) -> TokenStream {
                 )),
                 None => Either::Right(iter::once(build(data_ty, data_id_ty.as_ref().unwrap()))),
             }
-        });
+        },
+    );
 
     let data_def = quote! {
         #(#attrs)*
@@ -214,10 +213,8 @@ pub fn define_container(input: TokenStream) -> TokenStream {
         .filter_map(|field| field.as_ref().right())
         .map(|field| field.src_name.clone());
 
-    let impl_source_map = fields
-        .iter()
-        .filter_map(|field| field.as_ref().right())
-        .flat_map(|HirDataField { src_name, src_ty, access: idx_access, data_id_ty, .. }| {
+    let impl_source_map = fields.iter().filter_map(|field| field.as_ref().right()).flat_map(
+        |HirDataField { src_name, src_ty, access: idx_access, data_id_ty, .. }| {
             let build = move |src_ty, data_id_ty| {
                 quote! {
                     impl utils::get::Get<#src_ty> for #src_map_name {
@@ -245,7 +242,8 @@ pub fn define_container(input: TokenStream) -> TokenStream {
                     .collect(),
                 None => vec![build(src_ty, data_id_ty.as_ref().unwrap())],
             }
-        });
+        },
+    );
 
     let src_map_def = quote! {
         #(#attrs)*

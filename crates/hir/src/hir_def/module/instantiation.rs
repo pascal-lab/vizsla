@@ -4,7 +4,7 @@ use syntax::ast;
 
 use super::LowerModuleCtx;
 use crate::{
-    define_src,
+    define_src, define_src_with_name,
     hir_def::{
         Ident, alloc_idx_and_src,
         expr::{ExprId, LowerExpr, data_ty::Dimension},
@@ -32,7 +32,7 @@ pub struct Instance {
 
 pub type InstanceId = Idx<Instance>;
 
-define_src!(InstanceSrc(ast::HierarchicalInstance));
+define_src_with_name!(InstanceSrc(ast::HierarchicalInstance));
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ParamAssign {

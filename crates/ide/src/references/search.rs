@@ -7,12 +7,12 @@ use hir::{
     source_map::IsSrc,
 };
 use ide_db::root_db::RootDb;
+use itertools::Itertools;
 use line_index::{TextRange, TextSize};
 use memchr::memmem::Finder;
 use nohash_hasher::IntMap;
 use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
-use smol_str::SmolStr;
 use syntax::{
     SyntaxNode, SyntaxNodeExt, SyntaxTokenWithParent, ast::AstNode, has_text_range::HasTextRange,
     token::TokenKindExt,
@@ -144,27 +144,25 @@ impl<'a, 'b> ReferencesCtx<'a, 'b> {
 
     pub(crate) fn search(&self) -> IntMap<FileId, Vec<ReferenceToken<'a>>> {
         let sema = self.sema;
+        let db = sema.db;
         let mut res: IntMap<_, Vec<_>> = IntMap::default();
 
-        let names = self
-            .def
-            .origins()
-            .into_iter()
-            .map(|def| def.name(sema.db))
-            .collect::<SmallVec<[_; 6]>>();
-        let name = &names[0].value.0;
+        let name = self.def.origins().into_iter().map(|def| def.name(db)).next().unwrap();
+        debug_assert! {{
+            let names = self.def.origins().into_iter().map(|def| def.name(sema.db)).collect_vec();
+            !names.is_empty() && names.iter().all(|namei| namei == &name)
+        }};
 
-        debug_assert! {
-            !names.is_empty() && names.iter().all(|InFile { value: (namei, _), .. }| namei == name)
-        };
+        let def_ranges: SmallVec<[_; 6]> =
+            self.def.origins().into_iter().map(|def| def.name_range(db)).collect();
 
-        let finder = &Finder::new(name);
+        let finder = &Finder::new(&name);
         for (text, file_id, range) in self.scope_files() {
             self.sema.db.unwind_if_cancelled();
 
             let root = LazyCell::new(|| sema.parse(file_id).syntax());
             Self::match_text(&text, finder, range)
-                .filter_map(|offset| Self::filter_token(*root, file_id, &names, offset))
+                .filter_map(|offset| Self::filter_token(*root, file_id, &def_ranges, offset))
                 .filter(|tp| self.classify_and_filter(sema, tp))
                 .for_each(|token| res.entry(file_id).or_default().push(ReferenceToken { token }));
         }
@@ -208,13 +206,13 @@ impl<'a, 'b> ReferencesCtx<'a, 'b> {
     fn filter_token(
         node: SyntaxNode<'a>,
         file_id: FileId,
-        names: &[InFile<(SmolStr, TextRange)>],
+        names: &[InFile<TextRange>],
         offset: TextSize,
     ) -> Option<SyntaxTokenWithParent<'a>> {
         let tok = node.token_at_offset(offset).find(|tok| tok.kind().name_like())?;
 
         // filter out definitions
-        if names.iter().any(|InFile { value: (_, range), file_id: name_file_id }| {
+        if names.iter().any(|InFile { value: range, file_id: name_file_id }| {
             &tok.text_range().unwrap() == range && *name_file_id == file_id.into()
         }) {
             None

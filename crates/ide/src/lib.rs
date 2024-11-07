@@ -4,6 +4,12 @@
 #![feature(trait_upcasting)]
 
 pub use base_db::Cancelled;
+use hir::hir_def::{
+    block::BlockId,
+    expr::declarator::DeclId,
+    module::{ModuleId, instantiation::InstanceId, port::NonAnsiPortId},
+    stmt::StmtId,
+};
 use syntax::{SyntaxNode, ast, match_ast};
 pub type Cancellable<T> = Result<T, Cancelled>;
 
@@ -60,6 +66,43 @@ impl SymbolKind {
             ast::GenerateBlock => SymbolKind::Generate,
             _ => unreachable!("unexpected node: {:?}", node),
         }
+    }
+}
+
+// TODO: const impl
+impl From<ModuleId> for SymbolKind {
+    fn from(_: ModuleId) -> Self {
+        SymbolKind::Module
+    }
+}
+
+impl From<BlockId> for SymbolKind {
+    fn from(_: BlockId) -> Self {
+        SymbolKind::Block
+    }
+}
+
+impl From<NonAnsiPortId> for SymbolKind {
+    fn from(_: NonAnsiPortId) -> Self {
+        SymbolKind::PortLabel
+    }
+}
+
+impl From<DeclId> for SymbolKind {
+    fn from(_: DeclId) -> Self {
+        SymbolKind::Decl
+    }
+}
+
+impl From<InstanceId> for SymbolKind {
+    fn from(_: InstanceId) -> Self {
+        SymbolKind::Instance
+    }
+}
+
+impl From<StmtId> for SymbolKind {
+    fn from(_: StmtId) -> Self {
+        SymbolKind::Stmt
     }
 }
 
