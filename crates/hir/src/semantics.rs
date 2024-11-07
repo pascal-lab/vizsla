@@ -2,7 +2,7 @@ use std::{cell::RefCell, ops};
 
 use itertools::Itertools;
 use rustc_hash::FxHashMap;
-use source_to_def::Source2DefCtx;
+use source_to_def::{Source2DefCache, Source2DefCtx};
 use syntax::{
     SyntaxNode, SyntaxNodeExt,
     ast::{self, AstNode},
@@ -40,11 +40,16 @@ pub struct SemanticsImpl<'db> {
     // s2d_cache
     // Root -> HirFileId
     root2file_cache: RefCell<FxHashMap<SyntaxNode<'db>, HirFileId>>,
+    source2def_cache: RefCell<Source2DefCache<'db>>,
 }
 
 impl<'db> SemanticsImpl<'db> {
     fn new(db: &'db dyn HirDb) -> Self {
-        SemanticsImpl { db, root2file_cache: Default::default() }
+        SemanticsImpl {
+            db,
+            root2file_cache: Default::default(),
+            source2def_cache: Default::default(),
+        }
     }
 
     pub fn parse(&self, file_id: FileId) -> ast::CompilationUnit {
@@ -59,7 +64,7 @@ impl<'db> SemanticsImpl<'db> {
 
     pub fn find_file(&self, node: SyntaxNode) -> HirFileId {
         let root_node = node.find_root();
-        self.lookup(root_node).unwrap_or_else(|| {
+        self.lookup_file_id(root_node).unwrap_or_else(|| {
             panic!(
                 "\n\nFailed to lookup {:?}.\nroot node:   {:?}\nknown nodes: {}\n\n",
                 node,
@@ -76,13 +81,13 @@ impl<'db> SemanticsImpl<'db> {
         debug_assert!(prev.is_none() || prev == Some(file_id))
     }
 
-    fn lookup(&self, root_node: SyntaxNode) -> Option<HirFileId> {
+    fn lookup_file_id(&self, root_node: SyntaxNode) -> Option<HirFileId> {
         let cache = self.root2file_cache.borrow();
         cache.get(&root_node).copied()
     }
 
-    fn with_ctx<F: FnOnce(&mut Source2DefCtx<'_>) -> T, T>(&self, f: F) -> T {
-        let mut ctx = Source2DefCtx { db: self.db };
+    fn with_ctx<F: FnOnce(&mut Source2DefCtx<'_, '_>) -> T, T>(&self, f: F) -> T {
+        let mut ctx = Source2DefCtx { db: self.db, cache: &mut self.source2def_cache.borrow_mut() };
         f(&mut ctx)
     }
 }

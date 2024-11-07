@@ -1,3 +1,4 @@
+use rustc_hash::FxHashMap;
 use syntax::{
     SyntaxAncestors, SyntaxNode,
     ast::{self, AstNode},
@@ -16,11 +17,17 @@ use crate::{
     source_map::ToAstNode,
 };
 
-pub(super) struct Source2DefCtx<'a> {
-    pub(super) db: &'a dyn HirDb,
+#[derive(Default, Debug)]
+pub(super) struct Source2DefCache<'db> {
+    find_container: FxHashMap<(HirFileId, SyntaxNode<'db>), ContainerId>,
 }
 
-impl Source2DefCtx<'_> {
+pub(super) struct Source2DefCtx<'db, 'cache> {
+    pub(super) db: &'db dyn HirDb,
+    pub(super) cache: &'cache mut Source2DefCache<'db>,
+}
+
+impl Source2DefCtx<'_, '_> {
     pub(super) fn module_to_def(
         &mut self,
         InFile { file_id, value: src }: InFile<ModuleSrc>,
@@ -88,11 +95,19 @@ impl Source2DefCtx<'_> {
 
     pub(super) fn find_container(
         &mut self,
-        InFile { value: src, file_id }: InFile<SyntaxNode>,
+        InFile { value: node, file_id }: InFile<SyntaxNode>,
     ) -> ContainerId {
-        SyntaxAncestors::start_from(src)
+        let node = unsafe { std::mem::transmute::<SyntaxNode<'_>, SyntaxNode<'_>>(node) };
+
+        if let Some(container_id) = self.cache.find_container.get(&(file_id, node)) {
+            return *container_id;
+        }
+
+        let container_id = SyntaxAncestors::start_from(node)
             .skip(1) // skip the node itself
             .find_map(|node| self.container_to_def(file_id, node))
-            .unwrap_or(file_id.into())
+            .unwrap_or(file_id.into());
+        self.cache.find_container.insert((file_id, node), container_id);
+        container_id
     }
 }
