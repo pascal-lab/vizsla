@@ -268,6 +268,8 @@ fn build_stmt<'a, Arn, SrcMap>(
             collect_block_items(sema, hir.block_id, stmt, container_name.cloned(), res);
         }
 
+        EmptyStatement(_) => {}
+
         ProceduralAssignStatement(_)
         | ProceduralDeassignStatement(_)
         | DisableStatement(_)
