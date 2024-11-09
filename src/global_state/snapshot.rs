@@ -2,7 +2,7 @@ use ide::{Cancellable, analysis::Analysis};
 use lsp_types::Url;
 use nohash_hasher::IntMap;
 use parking_lot::{MappedRwLockReadGuard, RwLock, RwLockReadGuard};
-use project_model::workspace::Workspace;
+use project_model::Workspace;
 use triomphe::Arc;
 use utils::lines::{LineEnding, LineInfo};
 use vfs::{FileId, Vfs};

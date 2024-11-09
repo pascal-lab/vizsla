@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use project_model::{
+    Workspace, get_workspace_folder,
     project_manifest::{MANIFEST_FILE_NAME, ProjectManifest},
-    workspace::{Workspace, get_workspace_folder},
 };
 use rustc_hash::FxHashSet;
 use triomphe::Arc;

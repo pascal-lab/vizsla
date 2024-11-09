@@ -15,7 +15,7 @@ use ide::analysis_host::AnalysisHost;
 use lsp_server::{Message, ReqQueue, Request};
 use nohash_hasher::IntMap;
 use parking_lot::RwLock;
-use project_model::workspace::Workspace;
+use project_model::Workspace;
 use triomphe::Arc;
 use utils::{
     excl_task::ExclTask,
