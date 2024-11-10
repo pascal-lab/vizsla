@@ -71,7 +71,6 @@ pub(crate) fn handle_references(
     params: lsp_types::ReferenceParams,
 ) -> anyhow::Result<Option<Vec<lsp_types::Location>>> {
     let position = from_proto::file_position(&snap, params.text_document_position)?;
-    let line_info = snap.line_info(position.file_id)?;
     let config = snap.config.references_config();
     let Some(refs) = snap.analysis.references(position, config)? else {
         return Ok(None);

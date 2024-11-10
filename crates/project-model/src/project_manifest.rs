@@ -13,30 +13,18 @@ pub enum ProjectManifest {
 }
 
 impl ProjectManifest {
-    fn validate_toml(path: &AbsPathBuf) -> Result<(), String> {
-        if path.parent().is_none() {
-            return Err(String::from("Bad manifest path: {path}"));
-        }
-
-        if path.file_name().unwrap_or_default() != MANIFEST_FILE_NAME {
-            return Err(String::from("Project root must point to {MANIFEST_FILE_NAME}: {path}"));
-        }
-
-        Ok(())
-    }
-
-    fn from_toml(path: AbsPathBuf) -> Result<Self, String> {
-        Self::validate_toml(&path)?;
-        Ok(ProjectManifest::Toml(path))
-    }
-
-    fn from_toml_ref(path: &AbsPathBuf) -> Result<Self, String> {
-        Self::validate_toml(path)?;
-        Ok(ProjectManifest::Toml(path.clone()))
+    pub fn discover_all(paths: &[AbsPathBuf]) -> Vec<ProjectManifest> {
+        paths
+            .iter()
+            .filter_map(|path| ProjectManifest::discover(path).ok())
+            .flatten()
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect_vec()
     }
 
     pub fn discover(path: &AbsPathBuf) -> anyhow::Result<Vec<ProjectManifest>> {
-        if let Ok(manifest) = Self::from_toml_ref(path) {
+        if let Ok(manifest) = Self::from_toml(path) {
             return Ok(vec![manifest]);
         }
 
@@ -46,7 +34,7 @@ impl ProjectManifest {
             let candidate = path.join(MANIFEST_FILE_NAME);
 
             if fs::metadata(&candidate).is_ok()
-                && let Ok(manifest) = Self::from_toml(candidate)
+                && let Ok(manifest) = Self::from_toml(&candidate)
             {
                 return Ok(vec![manifest]);
             }
@@ -59,7 +47,7 @@ impl ProjectManifest {
             .filter_map(Result::ok)
             .map(|it| it.path().join(MANIFEST_FILE_NAME))
             .filter(|it| it.exists())
-            .filter_map(|it| Self::from_toml(AbsPathBuf::assert_utf8(it)).ok())
+            .filter_map(|it| Self::from_toml(&AbsPathBuf::assert_utf8(it)).ok())
             .collect_vec();
 
         if entities.is_empty() {
@@ -69,13 +57,15 @@ impl ProjectManifest {
         Ok(entities)
     }
 
-    pub fn discover_all(paths: &[AbsPathBuf]) -> Vec<ProjectManifest> {
-        paths
-            .iter()
-            .filter_map(|path| ProjectManifest::discover(path).ok())
-            .flatten()
-            .collect::<BTreeSet<_>>()
-            .into_iter()
-            .collect_vec()
+    fn from_toml(path: &AbsPathBuf) -> Result<Self, String> {
+        if path.parent().is_none() {
+            return Err(String::from("Bad manifest path: {path}"));
+        }
+
+        if path.file_name().unwrap_or_default() != MANIFEST_FILE_NAME {
+            return Err(String::from("Project root must point to {MANIFEST_FILE_NAME}: {path}"));
+        }
+
+        Ok(ProjectManifest::Toml(path.clone()))
     }
 }
