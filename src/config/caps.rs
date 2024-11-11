@@ -143,10 +143,10 @@ impl Config {
                 work_done_progress_options: WorkDoneProgressOptions { work_done_progress: None },
             }
             .into(),
-            declaration_provider: Some(DeclarationCapability::Simple(true)),
+            declaration_provider: Some(DeclarationCapability::Simple(false)),
             definition_provider: OneOf::Left(true).into(),
             type_definition_provider: Some(true.into()),
-            implementation_provider: Some(true.into()),
+            implementation_provider: Some(false.into()),
             references_provider: OneOf::Left(true).into(),
             document_highlight_provider: OneOf::Left(true).into(),
             document_symbol_provider: OneOf::Left(true).into(),
@@ -180,7 +180,7 @@ impl Config {
             }),
             code_lens_provider: CodeLensOptions { resolve_provider: true.into() }.into(),
             document_formatting_provider: OneOf::Left(true).into(),
-            document_range_formatting_provider: OneOf::Left(true).into(),
+            document_range_formatting_provider: OneOf::Left(false).into(),
             document_on_type_formatting_provider: DocumentOnTypeFormattingOptions {
                 first_trigger_character: "=".to_string(),
                 more_trigger_character: Some([".", ">", "{", "(", "<"].map(String::from).into()),
@@ -249,6 +249,7 @@ impl Config {
             ),
             moniker_provider: None,
             linked_editing_range_provider: None,
+            // TODO: const eval?
             inline_value_provider: None,
             inlay_hint_provider: OneOf::Right(InlayHintServerCapabilities::Options(
                 InlayHintOptions {
@@ -257,7 +258,17 @@ impl Config {
                 },
             ))
             .into(),
-            diagnostic_provider: None,
+            diagnostic_provider: Some(lsp_types::DiagnosticServerCapabilities::Options(
+                lsp_types::DiagnosticOptions {
+                    identifier: None,
+                    inter_file_dependencies: true,
+                    // FIXME:
+                    workspace_diagnostics: false,
+                    work_done_progress_options: WorkDoneProgressOptions {
+                        work_done_progress: None,
+                    },
+                },
+            )),
             experimental: None,
         }
     }
