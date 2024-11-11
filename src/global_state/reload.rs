@@ -60,8 +60,7 @@ impl GlobalState {
                     // Get libraries from loaded workspaces
                     let (lib_manifests, errors): (Vec<_>, Vec<_>) = workspaces
                         .iter()
-                        .map(|it| &it.0.package)
-                        .flatten()
+                        .flat_map(|it| &it.0.package)
                         .map(ProjectManifest::discover)
                         .partition_result();
 

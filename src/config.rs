@@ -1,14 +1,12 @@
 pub mod caps;
 pub mod user_config;
 
-use std::{fmt, path::PathBuf};
+use std::fmt;
 
 use itertools::Itertools;
 use lsp_types::ClientCapabilities;
 use project_model::project_manifest::ProjectManifest;
-use triomphe::Arc;
 use utils::{
-    json::get_field,
     lines::PositionEncoding,
     paths::{AbsPath, AbsPathBuf},
 };
@@ -80,26 +78,18 @@ impl Config {
         snippets: Vec<Snippet>,
     ) -> Self {
         let discovered_manifests = Self::discover_manifest(&workspace_roots);
-        Config {
-            opt,
-            workspace_roots,
-            client_caps,
-            root_path,
-            user_config,
-            discovered_manifests,
-        }
+        Config { opt, workspace_roots, client_caps, root_path, user_config, discovered_manifests }
     }
 
     pub(crate) fn update(&mut self, json: serde_json::Value) -> Result<(), ConfigError> {
-        let (user_config, snippets, errors) =
-            Self::parse_initialization_options(json);
+        let (user_config, snippets, errors) = Self::parse_initialization_options(json);
         self.user_config = user_config;
 
         if errors.is_empty() { Ok(()) } else { Err(errors) }
     }
 
     pub(crate) fn parse_initialization_options(
-        mut options: serde_json::Value,
+        options: serde_json::Value,
     ) -> (UserConfig, Vec<Snippet>, ConfigError) {
         tracing::info!("Config updating from JSON: {:#}", options);
         if options.is_null() || options.as_object().map_or(false, |obj| obj.is_empty()) {

@@ -6,7 +6,6 @@ mod toml_workspace;
 use anyhow::Context;
 use base_db::source_root::SourceRootConfig;
 use itertools::Itertools;
-use triomphe::Arc;
 use utils::paths::AbsPathBuf;
 use vfs::{FileSetConfig, VfsPath};
 

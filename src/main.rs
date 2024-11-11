@@ -13,7 +13,6 @@ use tracing_subscriber::{
     Registry, filter::Targets, fmt::writer::BoxMakeWriter, layer::SubscriberExt,
     util::SubscriberInitExt,
 };
-use triomphe::Arc;
 use utils::{
     json::from_json,
     paths::{AbsPathBuf, patch_path_prefix},
@@ -133,14 +132,7 @@ fn run_server(opt: Opt) -> anyhow::Result<()> {
         Default::default()
     };
 
-    let config = Config::new(
-        opt,
-        root_path,
-        client_caps,
-        workspace_roots,
-        user_config,
-        snippets,
-    );
+    let config = Config::new(opt, root_path, client_caps, workspace_roots, user_config, snippets);
 
     let initialize_result = lsp_types::InitializeResult {
         capabilities: config.get_server_capabilities(),
