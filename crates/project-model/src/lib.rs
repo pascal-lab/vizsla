@@ -13,10 +13,7 @@ use vfs::{FileSetConfig, VfsPath};
 use crate::{project_manifest::ProjectManifest, toml_workspace::TomlWorkspace};
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum Workspace {
-    Project(TomlWorkspace),
-    DetachedFiles(Arc<Vec<AbsPathBuf>>),
-}
+pub struct Workspace(pub TomlWorkspace);
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct WorkspaceRoot {
@@ -37,36 +34,19 @@ impl Workspace {
                 let toml_workspaces = TomlWorkspace::load_from_file(toml, is_lib)
                     .with_context(|| "failed to load workspace in {manifest:?}")?;
 
-                Ok(Workspace::Project(toml_workspaces))
+                Ok(Self(toml_workspaces))
             }
-            ProjectManifest::Discover(path) => {
-                Ok(Workspace::Project(TomlWorkspace::default_from_path(path)))
-            }
+            ProjectManifest::Discover(path) => Ok(Self(TomlWorkspace::default_from_path(path))),
         }
-    }
-
-    pub fn load_detached_files(files: Arc<Vec<AbsPathBuf>>) -> anyhow::Result<Workspace> {
-        Ok(Workspace::DetachedFiles(files))
     }
 
     pub fn to_roots(&self) -> Vec<WorkspaceRoot> {
-        match self {
-            Workspace::Project(TomlWorkspace { include, exclude, is_lib, .. }) => {
-                vec![WorkspaceRoot {
-                    is_lib: *is_lib,
-                    include: include.to_vec(),
-                    exclude: exclude.to_vec(),
-                }]
-            }
-            Workspace::DetachedFiles(files) => files
-                .iter()
-                .map(|it| WorkspaceRoot {
-                    is_lib: false,
-                    include: vec![it.clone()],
-                    exclude: vec![],
-                })
-                .collect(),
-        }
+        let Workspace(TomlWorkspace { include, exclude, is_lib, .. }) = self;
+        vec![WorkspaceRoot {
+            is_lib: *is_lib,
+            include: include.to_vec(),
+            exclude: exclude.to_vec(),
+        }]
     }
 }
 

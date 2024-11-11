@@ -168,10 +168,9 @@ pub(crate) fn handle_did_change_workspace_folders(
     let added = params.event.added.into_iter().filter_map(|it| from_proto::abs_path(&it.uri).ok());
     config.add_workspaces(added);
 
-    if config.detached_files.is_empty() {
-        config.rediscover_manifest();
-        state.fetch_workspaces_task.request("client workspaces changed".to_string())
-    }
+    // TODO: ??
+    config.rediscover_manifest();
+    state.fetch_workspaces_task.request("client workspaces changed".to_string());
 
     Ok(())
 }

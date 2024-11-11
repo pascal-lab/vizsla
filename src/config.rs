@@ -64,7 +64,6 @@ pub struct Config {
     pub(crate) client_caps: lsp_types::ClientCapabilities,
     pub(crate) root_path: AbsPathBuf,
     pub(crate) user_config: UserConfig,
-    pub(crate) detached_files: Arc<Vec<AbsPathBuf>>,
     pub(crate) discovered_manifests: Vec<ProjectManifest>,
 }
 
@@ -78,7 +77,6 @@ impl Config {
         client_caps: ClientCapabilities,
         workspace_roots: Vec<AbsPathBuf>,
         user_config: UserConfig,
-        detached_files: Arc<Vec<AbsPathBuf>>,
         snippets: Vec<Snippet>,
     ) -> Self {
         let discovered_manifests = Self::discover_manifest(&workspace_roots);
@@ -88,23 +86,21 @@ impl Config {
             client_caps,
             root_path,
             user_config,
-            detached_files,
             discovered_manifests,
         }
     }
 
     pub(crate) fn update(&mut self, json: serde_json::Value) -> Result<(), ConfigError> {
-        let (user_config, detached_files, snippets, errors) =
+        let (user_config, snippets, errors) =
             Self::parse_initialization_options(json);
         self.user_config = user_config;
-        self.detached_files = Arc::new(detached_files);
 
         if errors.is_empty() { Ok(()) } else { Err(errors) }
     }
 
     pub(crate) fn parse_initialization_options(
         mut options: serde_json::Value,
-    ) -> (UserConfig, Vec<AbsPathBuf>, Vec<Snippet>, ConfigError) {
+    ) -> (UserConfig, Vec<Snippet>, ConfigError) {
         tracing::info!("Config updating from JSON: {:#}", options);
         if options.is_null() || options.as_object().map_or(false, |obj| obj.is_empty()) {
             return Default::default();
@@ -112,18 +108,12 @@ impl Config {
 
         let mut errors = Vec::new();
 
-        let detached_files =
-            get_field::<Vec<PathBuf>>(&mut options, &mut errors, "detachedFiles", "[]")
-                .into_iter()
-                .map(AbsPathBuf::assert_utf8)
-                .collect_vec();
-
         // TODO: user-defined snippets
         let snippets: Vec<Snippet> = Vec::new();
 
         let user_config = UserConfig::from_json(options, &mut errors);
 
-        (user_config, detached_files, snippets, ConfigError { errors })
+        (user_config, snippets, ConfigError { errors })
     }
 
     fn discover_manifest(roots: &[AbsPathBuf]) -> Vec<ProjectManifest> {

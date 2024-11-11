@@ -116,8 +116,8 @@ fn run_server(opt: Opt) -> anyhow::Result<()> {
         .filter(|folders| !folders.is_empty())
         .unwrap_or_else(|| vec![root_path.clone()]);
 
-    let (user_config, detached_files, snippets) = if initialization_options.is_some() {
-        let (user_config, detached_files, snippets, errors) =
+    let (user_config, snippets) = if initialization_options.is_some() {
+        let (user_config, snippets, errors) =
             Config::parse_initialization_options(initialization_options.unwrap());
         if !errors.is_empty() {
             use lsp_types::notification::{Notification, ShowMessage};
@@ -128,7 +128,7 @@ fn run_server(opt: Opt) -> anyhow::Result<()> {
                 });
             connection.sender.send(lsp_server::Message::Notification(noti)).unwrap();
         }
-        (user_config, Arc::new(detached_files), snippets)
+        (user_config, snippets)
     } else {
         Default::default()
     };
@@ -139,7 +139,6 @@ fn run_server(opt: Opt) -> anyhow::Result<()> {
         client_caps,
         workspace_roots,
         user_config,
-        detached_files,
         snippets,
     );
 

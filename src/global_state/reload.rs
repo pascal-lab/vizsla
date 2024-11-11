@@ -38,7 +38,6 @@ impl GlobalState {
 
         self.task_pool.handle.spawn_and_send_cps(ThreadIntent::Worker, {
             let mut manifests = self.config.discovered_manifests.clone();
-            let detached_files = self.config.detached_files.clone();
 
             move |sender| {
                 sender.send(FetchWorkspaceProgress::Begin.into()).unwrap();
@@ -61,10 +60,7 @@ impl GlobalState {
                     // Get libraries from loaded workspaces
                     let (lib_manifests, errors): (Vec<_>, Vec<_>) = workspaces
                         .iter()
-                        .filter_map(|it| match it {
-                            Workspace::Project(it) => Some(&it.package),
-                            Workspace::DetachedFiles(_) => None,
-                        })
+                        .map(|it| &it.0.package)
                         .flatten()
                         .map(ProjectManifest::discover)
                         .partition_result();
@@ -79,13 +75,6 @@ impl GlobalState {
                         .collect_vec();
 
                     is_lib = true;
-                }
-
-                if !detached_files.is_empty() {
-                    match Workspace::load_detached_files(detached_files) {
-                        Ok(ws) => all_workspaces.push(ws),
-                        Err(err) => error_sink.push(err),
-                    }
                 }
 
                 tracing::info!("did fetch workspaces {:?}", all_workspaces);
