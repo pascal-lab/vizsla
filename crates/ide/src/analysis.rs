@@ -3,12 +3,14 @@ use ide_db::{line_index_db::LineIndexDb, root_db::RootDb};
 use line_index::{LineIndex, TextRange};
 use span::{FilePosition, RangeInfo};
 use triomphe::Arc;
+use utils::{lines::LineEnding, text_edit::TextEdit};
 use vfs::FileId;
 
 use crate::{
     Cancellable,
     document_highlight::{self, DocumentHighlight, DocumentHighlightConfig},
     document_symbols::{self, DocumentSymbol},
+    formatting::{self, FmtConfig},
     goto_definition,
     navigation_target::NavTarget,
     references::{self, References, ReferencesConfig},
@@ -73,5 +75,15 @@ impl Analysis {
         new_name: &str,
     ) -> Cancellable<RenameResult<SourceChange>> {
         self.with_db(|db| rename::rename(db, position, config, new_name))
+    }
+
+    pub fn format(
+        &self,
+        file_id: FileId,
+        line_range: Option<(usize, usize)>,
+        line_ending: LineEnding,
+        config: FmtConfig,
+    ) -> Cancellable<anyhow::Result<Option<TextEdit>>> {
+        self.with_db(|db| formatting::format(db, file_id, line_range, line_ending, config))
     }
 }

@@ -1,5 +1,6 @@
 use ide::{
-    document_highlight::DocumentHighlightConfig, references::ReferencesConfig, rename::RenameConfig,
+    document_highlight::DocumentHighlightConfig, formatting::FmtConfig,
+    references::ReferencesConfig, rename::RenameConfig,
 };
 use serde::{Deserialize, Serialize};
 use utils::{json::get_field, paths::Utf8PathBuf};
@@ -79,6 +80,9 @@ config_data! {
 
         /// If true, symbols within a scope (except for ports) are private to other scopes.
         scope_visibility: ScopeVisibility = ScopeVisibility::Private,
+
+        formatter_path: Option<Utf8PathBuf> = None,
+        formatter_args: Vec<String> = vec![],
     }
 }
 
@@ -96,6 +100,13 @@ impl Config {
     pub(crate) fn rename_config(&self) -> RenameConfig {
         let scope_visibility = self.user_config.scope_visibility.into();
         RenameConfig { scope_visibility }
+    }
+
+    pub(crate) fn fmt_config(&self) -> FmtConfig {
+        FmtConfig {
+            executable: self.user_config.formatter_path.clone(),
+            args: self.user_config.formatter_args.clone(),
+        }
     }
 }
 

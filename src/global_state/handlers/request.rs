@@ -127,3 +127,38 @@ pub(crate) fn handle_rename(
     let workspace_edit = to_proto::workspace_edit(&snap, change)?;
     Ok(Some(workspace_edit))
 }
+
+pub(crate) fn handle_formatting(
+    snap: GlobalStateSnapshot,
+    params: lsp_types::DocumentFormattingParams,
+) -> anyhow::Result<Option<Vec<lsp_types::TextEdit>>> {
+    let file_id = from_proto::file_id(&snap, &params.text_document.uri)?;
+    let line_info = snap.line_info(file_id)?;
+
+    let config = snap.config.fmt_config();
+    let edit = snap
+        .analysis
+        .format(file_id, None, line_info.ending, config)?
+        .map_err(to_proto::format_error)?;
+
+    let text_edits = edit.map(|edit| to_proto::text_edits(&line_info, edit));
+    Ok(text_edits)
+}
+
+pub(crate) fn handle_range_formatting(
+    snap: GlobalStateSnapshot,
+    params: lsp_types::DocumentRangeFormattingParams,
+) -> anyhow::Result<Option<Vec<lsp_types::TextEdit>>> {
+    let file_id = from_proto::file_id(&snap, &params.text_document.uri)?;
+    let line_info = snap.line_info(file_id)?;
+    let line_ranges = Some((params.range.start.line as usize, params.range.end.line as usize));
+
+    let config = snap.config.fmt_config();
+    let edit = snap
+        .analysis
+        .format(file_id, line_ranges, line_info.ending, config)?
+        .map_err(to_proto::format_error)?;
+
+    let text_edits = edit.map(|edit| to_proto::text_edits(&line_info, edit));
+    Ok(text_edits)
+}

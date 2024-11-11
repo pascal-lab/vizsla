@@ -6,8 +6,10 @@ description = "IDE related components"
 edition.workspace = true
 
 [dependencies]
+anyhow.workspace = true
 base-db.workspace = true
 bitflags.workspace = true
+dissimilar = "1.0.9"
 hir.workspace = true
 ide-db.workspace = true
 itertools.workspace = true
@@ -23,4 +25,5 @@ syntax.workspace = true
 thiserror.workspace = true
 triomphe.workspace = true
 utils.workspace = true
+which = "7.0.0"
 vfs.workspace = true

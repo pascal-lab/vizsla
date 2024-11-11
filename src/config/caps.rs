@@ -180,7 +180,7 @@ impl Config {
             }),
             code_lens_provider: CodeLensOptions { resolve_provider: true.into() }.into(),
             document_formatting_provider: OneOf::Left(true).into(),
-            document_range_formatting_provider: OneOf::Left(false).into(),
+            document_range_formatting_provider: OneOf::Left(true).into(),
             document_on_type_formatting_provider: DocumentOnTypeFormattingOptions {
                 first_trigger_character: "=".to_string(),
                 more_trigger_character: Some([".", ">", "{", "(", "<"].map(String::from).into()),

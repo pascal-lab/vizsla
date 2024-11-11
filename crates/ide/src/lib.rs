@@ -21,6 +21,7 @@ pub mod source_change;
 
 pub mod document_highlight;
 pub mod document_symbols;
+pub mod formatting;
 pub mod goto_definition;
 pub mod references;
 pub mod rename;

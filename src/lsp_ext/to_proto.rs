@@ -1,3 +1,4 @@
+use anyhow::Error;
 use ide::{
     Cancellable, SymbolKind, document_highlight::DocumentHighlight, navigation_target::NavTarget,
     references::ReferenceCategory, rename::RenameError, source_change::SourceChange,
@@ -11,7 +12,7 @@ use utils::{
         AbsPath,
         camino::{Utf8Component, Utf8Prefix},
     },
-    text_edit::TextEditItem,
+    text_edit::{TextEdit, TextEditItem},
 };
 use vfs::FileId;
 
@@ -218,6 +219,10 @@ pub(crate) fn rename_error(err: RenameError) -> LspError {
     LspError::new(lsp_server::ErrorCode::InvalidParams as i32, err.to_string())
 }
 
+pub(crate) fn format_error(err: Error) -> LspError {
+    LspError::new(lsp_server::ErrorCode::InternalError as i32, err.to_string())
+}
+
 pub(crate) fn workspace_edit(
     snap: &GlobalStateSnapshot,
     source_change: SourceChange,
@@ -257,4 +262,8 @@ pub(crate) fn text_edit(line_info: &LineInfo, item: TextEditItem) -> lsp_types::
         LineEnding::Dos => item.ins.replace('\n', "\r\n"),
     };
     lsp_types::TextEdit { range, new_text }
+}
+
+pub(crate) fn text_edits(line_info: &LineInfo, edit: TextEdit) -> Vec<lsp_types::TextEdit> {
+    edit.into_iter().map(|it| self::text_edit(line_info, it)).collect()
 }

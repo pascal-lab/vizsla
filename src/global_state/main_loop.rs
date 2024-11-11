@@ -184,6 +184,8 @@ impl GlobalState {
             .on::<References>(handle_references)
             .on::<PrepareRenameRequest>(handle_prepare_rename)
             .on::<Rename>(handle_rename)
+            .on::<Formatting>(handle_formatting)
+            .on::<RangeFormatting>(handle_range_formatting)
             .finish();
     }
 
