@@ -82,7 +82,7 @@ config_data! {
         scope_visibility: ScopeVisibility = ScopeVisibility::Private,
 
         formatter_path: Option<Utf8PathBuf> = None,
-        formatter_args: Vec<String> = vec![],
+        formatter_args: Vec<String> = vec!["--indentation_spaces=4"].into_iter().map(String::from).collect(),
     }
 }
 
