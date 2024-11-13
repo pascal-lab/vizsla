@@ -1,6 +1,6 @@
 use either::Either;
 use slang::{
-    SyntaxToken, SyntaxTokenWithParent, T, TokenKind,
+    SyntaxToken, SyntaxTokenWithParent, Token, TokenKind,
     ast::{self, AstNode},
 };
 
@@ -16,7 +16,7 @@ impl TokenKindExt for TokenKind {
     fn is_pair_token(&self) -> bool {
         macro_rules! P {
         ($($tok:ident)|* $(|)?) => {
-            $(*self == T![$tok] ||)* false
+            $(*self == Token![$tok] ||)* false
         };
     }
         P! {
@@ -45,10 +45,10 @@ pub fn pair_token(
 
     macro_rules! P {
         ($beg:ident | $end:ident, $($rest:tt)*) => {
-            if kind == T![$beg] {
-                Either::Right(support::child_token(parent, T![$end])?)
-            } else if kind == T![$end] {
-                Either::Left(support::child_token(parent, T![$beg])?)
+            if kind == Token![$beg] {
+                Either::Right(support::child_token(parent, Token![$end])?)
+            } else if kind == Token![$end] {
+                Either::Left(support::child_token(parent, Token![$beg])?)
             } else {
                 P! { $($rest)* }
             }
@@ -57,12 +57,12 @@ pub fn pair_token(
     }
 
     let res = match kind {
-        T![module] => {
+        Token![module] => {
             // move from header to declaration
             let parent = ast::ModuleDeclaration::cast(parent.parent().unwrap()).unwrap();
             Either::Right(parent.endmodule()?)
         }
-        T![endmodule] => {
+        Token![endmodule] => {
             // move from declaration to header
             let parent = ast::ModuleDeclaration::cast(parent).unwrap();
             Either::Left(parent.header().module_keyword()?)
