@@ -5,8 +5,8 @@ use instantiation::{
 };
 use la_arena::{Arena, Idx, IdxRange, RawIdx};
 use port::{
-    AnsiPort, AnsiPortId, AnsiPortSrc, NonAnsiPort, NonAnsiPortId, NonAnsiPortSrc, PortDecl,
-    PortDeclId, PortDeclSrc, PortRef, PortRefId, PortRefSrc, PortSrcs, Ports,
+    NonAnsiPort, NonAnsiPortId, NonAnsiPortSrc, PortDecl, PortDeclId, PortDeclSrc, PortRef,
+    PortRefId, PortRefSrc, PortSrcs, Ports,
 };
 use proc_macro_utils::define_container;
 use syntax::ast::{self, AstNode, PortList};
@@ -53,10 +53,9 @@ define_container! {
         param_ports: Option<IdxRange<Declaration>>,
         ports | port_srcs: Ports[_ | PortSrcs] => {
             NonAnsiPort[NonAnsiPortId | NonAnsiPortSrc],
-            AnsiPort[AnsiPortId | AnsiPortSrc],
             PortRef[PortRefId | PortRefSrc],
+            PortDecl[PortDeclId | PortDeclSrc],
         },
-        port_decls | prot_decl_srcs: PortDecl[PortDeclId | PortDeclSrc],
 
         cont_assigns | assign_srcs: ContAssign[ContAssignId | ContAssignSrc],
         declarations | declaration_srcs: Declaration[DeclarationId | DeclarationSrc],

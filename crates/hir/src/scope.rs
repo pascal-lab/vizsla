@@ -144,21 +144,29 @@ impl ModuleScope {
                 continue;
             };
 
+            let is_port_decl = matches!(decl.parent, DeclaratorParent::PortDeclId(_));
+
             if let Some(ModuleEntry::NonAnsiPortEntry(entry)) = scope.get_mut(name) {
-                if matches!(decl.parent, DeclaratorParent::PortDeclId(_)) {
+                if is_port_decl {
                     entry.port_decl = Some(decl_id);
                 } else {
                     entry.data_decl = Some(decl_id);
                 }
-            } else if matches!(decl.parent, DeclaratorParent::PortDeclId(_)) {
-                let entry =
-                    NonAnsiPortEntry { port_decl: Some(decl_id), ..Default::default() }.into();
-                scope.insert(name, entry);
-            } else if matches!(decl.parent, DeclaratorParent::AnsiPortId(_)) {
-                scope.insert(name, AnsiPortEntry(decl_id).into());
-            } else {
-                scope.insert(name, decl_id.into());
+                continue;
             }
+
+            let entry = if is_port_decl {
+                match module.ports {
+                    Ports::NonAnsi { .. } => {
+                        NonAnsiPortEntry { port_decl: Some(decl_id), ..Default::default() }.into()
+                    }
+                    Ports::Ansi(_) => AnsiPortEntry(decl_id).into(),
+                }
+            } else {
+                decl_id.into()
+            };
+
+            scope.insert(name, entry);
         }
 
         for (instance_id, instance) in module.instances.iter() {

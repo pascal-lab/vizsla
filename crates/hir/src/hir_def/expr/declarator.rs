@@ -8,11 +8,8 @@ use crate::{
     db::InternDb,
     define_src_with_name,
     hir_def::{
-        HirData, Ident, alloc_idx_and_src,
-        declaration::DeclarationId,
-        lower_ident_opt,
-        module::port::{AnsiPortId, PortDeclId},
-        stmt::StmtId,
+        HirData, Ident, alloc_idx_and_src, declaration::DeclarationId, lower_ident_opt,
+        module::port::PortDeclId, stmt::StmtId,
     },
     source_map::SourceMap,
 };
@@ -28,9 +25,8 @@ pub struct Declarator {
 define_enum_deriving_from! {
     #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
     pub enum DeclaratorParent {
-        AnsiPortId,
-        PortDeclId, // Does not include AnsiPortId
-        DeclarationId,
+        PortDeclId,
+        DeclarationId, // ParamDecl, NetDecl, DataDecl
         StmtId,
     }
 }
