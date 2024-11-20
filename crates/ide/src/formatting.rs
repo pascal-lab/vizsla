@@ -260,6 +260,8 @@ fn format_in_bc(
     Ok(Some(TextEdit::replace(TextRange::new(line_start, offset), res)))
 }
 
+const PLACEHOLDER: &str = "/**/"; // used for separating ranges of edits
+
 fn format_previous<'a>(
     db: &RootDb,
     file_id: FileId,
@@ -276,33 +278,46 @@ fn format_previous<'a>(
 
     let list_range = loop {
         check!(cursor.goto_parent());
-        let is_list = |kind| kind == SyntaxKind::SYNTAX_LIST || kind == SyntaxKind::SEPARATED_LIST;
-        if is_list(cursor.to_node().unwrap().kind()) {
-            let list = cursor.to_node().unwrap();
 
+        let node = cursor.to_node().unwrap();
+        if matches!(node.kind(), SyntaxKind::SYNTAX_LIST | SyntaxKind::SEPARATED_LIST) {
             check!(cursor.goto_last_child_before_pos(offset.into()));
-            if let Some(node) = cursor.to_node()
-                && node.text_range().unwrap().contains(offset)
+
+            if let Some(last_child) = cursor.to_node()
+                && last_child.text_range().unwrap().contains(offset)
             {
                 // Inside the element
                 return None;
             }
 
-            break list.range().unwrap().to_text_range();
+            break node.text_range().unwrap();
         }
     };
 
-    let line_range = [list_range.start(), list_range.end()]
-        .into_iter()
-        .map(|pos| index.line_col(pos).line as usize)
-        .collect_tuple();
+    let line_range = {
+        let line_start = index.line_col(list_range.start()).line as usize;
+        let line_end = index.line_col(list_range.end()).line as usize;
+        Some((line_start, line_end))
+    };
 
-    // TODO: add api for reparse the file?
-    const PLACEHOLDER: &str = "/**/"; // used for separating ranges of edits
     let mut text = db.file_text(file_id).to_string();
     text.insert_str(offset.into(), PLACEHOLDER);
 
-    let Ok(Some(edits)) = dbg!(format_inner(&text, line_range, ending, config)) else {
+    // WORKAROUND: if there is a redundant token at the end of the list, remove it.
+    // Otherwise, the formatter will not work correctly
+    if let Some(token) = cursor.to_token()
+        && let Some(token_range) = token.text_range()
+    {
+        let idx = cursor.idx().unwrap();
+        cursor.goto_parent();
+        if cursor.to_node().unwrap().child_count() == idx + 1 {
+            let start: usize = token_range.start().into();
+            let end: usize = token_range.end().into();
+            text.replace_range(start..end, "");
+        }
+    }
+
+    let Ok(Some(edits)) = format_inner(&text, line_range, ending, config) else {
         return None;
     };
 
