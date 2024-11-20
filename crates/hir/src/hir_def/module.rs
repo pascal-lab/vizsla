@@ -181,6 +181,7 @@ impl LowerModuleCtx<'_> {
                     continue;
                 }
                 ExplicitAnsiPort(_) | ImplicitAnsiPort(_) => unreachable!(),
+                EmptyMember(_) => continue,
                 _ => unimplemented!("unhandled module member: {:?}", member.syntax().kind()),
             };
             self.module.items.alloc(idx);
