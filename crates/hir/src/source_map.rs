@@ -97,8 +97,8 @@ macro_rules! define_src {
         impl<'a> $crate::source_map::ToAstNode<'a, ast::$ty<'a>> for $name {
             fn to_node(&self, tree: &'a syntax::SyntaxTree) -> Option<ast::$ty<'a>> {
                 let mut node = self.0.to_node(tree)?;
-                while !<ast::$ty<'a> as syntax::ast::AstNode>::can_cast(node.kind()) && node.child_count() == 1 {
-                    node = node.child_node(0).unwrap();
+                while !<ast::$ty<'a> as syntax::ast::AstNode>::can_cast(node.kind()) {
+                    node = node.children().find_map(|elem| elem.as_node()).unwrap();
                 }
                 <ast::$ty<'a> as syntax::ast::AstNode>::cast(node)
             }
@@ -194,8 +194,8 @@ macro_rules! define_src_with_name {
         impl<'a> $crate::source_map::ToAstNode<'a, ast::$ty<'a>> for $name {
             fn to_node(&self, tree: &'a syntax::SyntaxTree) -> Option<ast::$ty<'a>> {
                 let mut node = self.node.to_node(tree)?;
-                while !<ast::$ty<'a> as syntax::ast::AstNode>::can_cast(node.kind()) && node.child_count() == 1 {
-                    node = node.child_node(0).unwrap();
+                while !<ast::$ty<'a> as syntax::ast::AstNode>::can_cast(node.kind()) {
+                    node = node.children().find_map(|elem| elem.as_node()).unwrap();
                 }
                 <ast::$ty<'a> as syntax::ast::AstNode>::cast(node)
             }
