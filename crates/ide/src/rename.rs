@@ -71,10 +71,7 @@ pub(crate) fn rename(
         .search()
         .into_iter()
         .map(|file_toks| edits_from_refs(&sema, file_toks, &def, &old_name, new_name))
-        .for_each(|(file_id, edit)| {
-            dbg!(file_id, &edit);
-            source_changes.insert_text_edit(file_id, edit)
-        });
+        .for_each(|(file_id, edit)| source_changes.insert_text_edit(file_id, edit));
 
     def.origins().into_iter().for_each(|def| {
         let mut text_edit = TextEdit::builder();

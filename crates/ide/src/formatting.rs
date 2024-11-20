@@ -301,7 +301,7 @@ fn format_previous<'a>(
     const PLACEHOLDER: &str = "/**/"; // used for separating ranges of edits
     let mut text = db.file_text(file_id).to_string();
     text.insert_str(offset.into(), PLACEHOLDER);
-    dbg!(&list_range);
+
     let Ok(Some(edits)) = dbg!(format_inner(&text, line_range, ending, config)) else {
         return None;
     };
