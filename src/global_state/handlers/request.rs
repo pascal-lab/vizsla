@@ -1,7 +1,10 @@
+use std::iter;
+
 use ide::references::References;
 use itertools::Itertools;
+use line_index::TextRange;
 use lsp_types::{PrepareRenameResponse, RenameParams, WorkspaceEdit};
-use span::FileRange;
+use span::{FilePosition, FileRange};
 
 use crate::{
     global_state::snapshot::GlobalStateSnapshot,
@@ -172,4 +175,36 @@ pub(crate) fn handle_on_type_formatting(
 
     let text_edits = edit.map(|edit| to_proto::text_edits(&line_info, edit));
     Ok(text_edits)
+}
+
+pub(crate) fn handle_selection_range(
+    snap: GlobalStateSnapshot,
+    params: lsp_types::SelectionRangeParams,
+) -> anyhow::Result<Option<Vec<lsp_types::SelectionRange>>> {
+    let file_id = from_proto::file_id(&snap, &params.text_document.uri)?;
+    let line_info = snap.line_info(file_id)?;
+
+    let res = params
+        .positions
+        .into_iter()
+        .map(|pos| {
+            let offset = from_proto::offset(&line_info, pos)?;
+
+            let ranges = snap
+                .analysis
+                .selection_ranges(FilePosition { file_id, offset })?
+                .into_iter()
+                .rfold(None, |parent, range| {
+                    Some(lsp_types::SelectionRange {
+                        range: to_proto::range(&line_info, range),
+                        parent: parent.map(Box::new),
+                    })
+                })
+                .unwrap();
+
+            Ok(ranges)
+        })
+        .collect::<anyhow::Result<Vec<_>>>()?;
+
+    Ok(Some(res))
 }

@@ -72,23 +72,20 @@ pub trait SyntaxNodeExt<'a> {
 impl<'a> SyntaxNodeExt<'a> for SyntaxNode<'a> {
     fn elem_at_range(&self, range: TextRange) -> Option<SyntaxElement<'a>> {
         let start = range.start();
-        let start_offset: usize = start.into();
-        let end = range.end();
-
         let mut cursor = self.walk();
         loop {
             let elem = cursor.to_elem();
-            let range = elem.text_range()?;
+            let elem_range = elem.text_range()?;
 
-            if !(range.contains_inclusive(start) && range.contains_inclusive(end)) {
+            if !elem_range.contains_range(range) {
                 return None;
             }
 
-            if range.start() == start && range.end() == end {
+            if elem_range == range {
                 return Some(elem);
             }
 
-            cursor.goto_first_child_after_pos(start_offset);
+            cursor.goto_first_child_after_pos(start.into());
         }
     }
 

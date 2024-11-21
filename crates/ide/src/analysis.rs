@@ -1,7 +1,7 @@
 use base_db::{Cancelled, salsa};
 use ide_db::{line_index_db::LineIndexDb, root_db::RootDb};
 use line_index::{LineIndex, TextRange};
-use span::{FilePosition, RangeInfo};
+use span::{FilePosition, FileRange, RangeInfo};
 use triomphe::Arc;
 use utils::{lines::LineInfo, text_edit::TextEdit};
 use vfs::FileId;
@@ -15,6 +15,7 @@ use crate::{
     navigation_target::NavTarget,
     references::{self, References, ReferencesConfig},
     rename::{self, RenameConfig, RenameResult},
+    selection_ranges,
     source_change::SourceChange,
 };
 
@@ -95,5 +96,9 @@ impl Analysis {
         config: FmtConfig,
     ) -> Cancellable<anyhow::Result<Option<TextEdit>>> {
         self.with_db(|db| formatting::format_on_type(db, position, ch, line_info, config))
+    }
+
+    pub fn selection_ranges(&self, position: FilePosition) -> Cancellable<Vec<TextRange>> {
+        self.with_db(|db| selection_ranges::selection_ranges(db, position))
     }
 }

@@ -25,6 +25,7 @@ pub mod formatting;
 pub mod goto_definition;
 pub mod references;
 pub mod rename;
+pub mod selection_ranges;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum SymbolKind {

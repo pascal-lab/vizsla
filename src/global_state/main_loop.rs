@@ -187,6 +187,7 @@ impl GlobalState {
             .on::<Formatting>(handle_formatting)
             .on::<RangeFormatting>(handle_range_formatting)
             .on::<OnTypeFormatting>(handle_on_type_formatting)
+            .on::<SelectionRangeRequest>(handle_selection_range)
             .finish();
     }
 
