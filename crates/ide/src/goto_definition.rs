@@ -52,7 +52,7 @@ fn handle_ctrl_flow_kw(
     }
 }
 
-fn token_precedence(kind: TokenKind) -> usize {
+pub(crate) fn token_precedence(kind: TokenKind) -> usize {
     match kind {
         _ if kind.name_like() => 4,
         _ if kind.is_pair_token() => 4,

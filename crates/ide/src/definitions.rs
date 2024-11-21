@@ -144,6 +144,25 @@ impl Definition {
         res
     }
 
+    pub fn declaration_origins(&self) -> SmallVec<[DefinitionOrigins; 3]> {
+        let mut res = smallvec![];
+        let mut add_source = |source| res.push(source);
+
+        match self.0 {
+            PathResolution::NonAnsiPort { port_decl, data_decl, module, .. } => {
+                let container: ContainerId = module.into();
+                if let Some(port_decl) = port_decl {
+                    add_source(InContainer::new(container, port_decl).into());
+                } else if let Some(decl) = data_decl {
+                    add_source(InContainer::new(container, decl).into());
+                }
+            }
+            _ => add_source(self.pick()),
+        };
+
+        res
+    }
+
     pub fn is_port(&self) -> bool {
         matches!(self.0, PathResolution::AnsiPort(_) | PathResolution::NonAnsiPort { .. })
     }

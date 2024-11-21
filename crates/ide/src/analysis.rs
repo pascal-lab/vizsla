@@ -11,7 +11,7 @@ use crate::{
     document_highlight::{self, DocumentHighlight, DocumentHighlightConfig},
     document_symbols::{self, DocumentSymbol},
     formatting::{self, FmtConfig},
-    goto_definition,
+    goto_declaration, goto_definition,
     navigation_target::NavTarget,
     references::{self, References, ReferencesConfig},
     rename::{self, RenameConfig, RenameResult},
@@ -43,6 +43,13 @@ impl Analysis {
         position: FilePosition,
     ) -> Cancellable<Option<RangeInfo<Vec<NavTarget>>>> {
         self.with_db(|db| goto_definition::goto_definition(db, position))
+    }
+
+    pub fn goto_declaration(
+        &self,
+        position: FilePosition,
+    ) -> Cancellable<Option<RangeInfo<Vec<NavTarget>>>> {
+        self.with_db(|db| goto_declaration::goto_declaration(db, position))
     }
 
     pub fn document_symbol(&self, file_id: FileId) -> Cancellable<Vec<DocumentSymbol>> {

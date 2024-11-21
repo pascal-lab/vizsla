@@ -143,7 +143,7 @@ impl Config {
                 work_done_progress_options: WorkDoneProgressOptions { work_done_progress: None },
             }
             .into(),
-            declaration_provider: Some(DeclarationCapability::Simple(false)),
+            declaration_provider: Some(DeclarationCapability::Simple(true)),
             definition_provider: OneOf::Left(true).into(),
             type_definition_provider: Some(true.into()),
             implementation_provider: Some(false.into()),

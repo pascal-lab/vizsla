@@ -23,6 +23,7 @@ pub mod document_highlight;
 pub mod document_symbols;
 pub mod formatting;
 pub mod goto_definition;
+pub mod goto_declaration;
 pub mod references;
 pub mod rename;
 pub mod selection_ranges;

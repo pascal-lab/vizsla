@@ -179,6 +179,7 @@ impl GlobalState {
         use lsp_types::request::*;
         dispatcher
             .on::<GotoDefinition>(handle_goto_definition)
+            .on::<GotoDeclaration>(handle_goto_declaration)
             .on::<DocumentSymbolRequest>(handle_document_symbol)
             .on::<DocumentHighlightRequest>(handle_document_highlight)
             .on::<References>(handle_references)
