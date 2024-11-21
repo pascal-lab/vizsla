@@ -41,14 +41,13 @@ pub(crate) fn selection_ranges(
         }
     };
 
-    let mut push_to_res = |range: TextRange| {
-        if let Some(trivias_start) = trivias_start {
-            if trivias_start < range.start() {
-                res.push(TextRange::new(trivias_start, range.end()));
-            } else {
-                res.push(range);
-            }
-        } else {
+    let mut push_to_res = |mut range: TextRange| {
+        if let Some(trivias_start) = trivias_start
+            && trivias_start < range.start()
+        {
+            range = TextRange::new(trivias_start, range.end());
+        }
+        if !range.is_empty() {
             res.push(range);
         }
     };
@@ -70,6 +69,7 @@ pub(crate) fn selection_ranges(
 fn token_precedence(kind: TokenKind) -> usize {
     match kind {
         _ if kind.name_like() => 4,
+        _ if kind.is_literal() => 3,
         _ => 1,
     }
 }

@@ -10,6 +10,7 @@ use crate::support;
 pub trait TokenKindExt {
     fn is_pair_token(&self) -> bool;
     fn name_like(&self) -> bool;
+    fn is_literal(&self) -> bool;
 }
 
 impl TokenKindExt for TokenKind {
@@ -34,6 +35,18 @@ impl TokenKindExt for TokenKind {
     #[inline]
     fn name_like(&self) -> bool {
         matches!(*self, TokenKind::IDENTIFIER | TokenKind::SYSTEM_IDENTIFIER)
+    }
+
+    #[inline]
+    fn is_literal(&self) -> bool {
+        matches!(
+            *self,
+            TokenKind::INTEGER_LITERAL
+                | TokenKind::REAL_LITERAL
+                | TokenKind::STRING_LITERAL
+                | TokenKind::UNBASED_UNSIZED_LITERAL
+                | TokenKind::TIME_LITERAL
+        )
     }
 }
 
