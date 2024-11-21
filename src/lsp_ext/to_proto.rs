@@ -267,3 +267,18 @@ pub(crate) fn text_edit(line_info: &LineInfo, item: TextEditItem) -> lsp_types::
 pub(crate) fn text_edits(line_info: &LineInfo, edit: TextEdit) -> Vec<lsp_types::TextEdit> {
     edit.into_iter().map(|it| self::text_edit(line_info, it)).collect()
 }
+
+pub(crate) fn selection_ranges(
+    line_info: &LineInfo,
+    ranges: Vec<TextRange>,
+) -> lsp_types::SelectionRange {
+    ranges
+        .into_iter()
+        .rfold(None, |parent, range| {
+            Some(lsp_types::SelectionRange {
+                range: self::range(&line_info, range),
+                parent: parent.map(Box::new),
+            })
+        })
+        .unwrap()
+}
