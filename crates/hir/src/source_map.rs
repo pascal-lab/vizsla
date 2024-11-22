@@ -30,6 +30,10 @@ pub trait IsNamedSrc: IsSrc {
     fn name_kind(&self) -> Option<TokenKind>;
 
     fn name_range(&self) -> Option<TextRange>;
+
+    fn name_or_full_range(&self) -> TextRange {
+        self.name_range().unwrap_or_else(|| self.range())
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]

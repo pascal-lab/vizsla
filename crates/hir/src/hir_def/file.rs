@@ -31,8 +31,6 @@ use crate::{
 define_container! {
     #[derive(Default, Debug, PartialEq, Eq, Clone)]
     pub struct HirFile {
-        items: SmallVec<[FileItem; 3]>,
-
         modules: [ModuleInfo],
         procs: [Proc],
 
@@ -50,6 +48,8 @@ define_container! {
 define_container! {
     #[derive(Default, Debug, PartialEq, Eq, Clone)]
     pub struct FileSourceMap {
+        items: SmallVec<[FileItem; 3]>,
+
         module_srcs: [ModuleInfo | ModuleSrc],
         proc_srcs: [Proc | ProcSrc],
 
@@ -132,7 +132,7 @@ impl LowerFileCtx<'_> {
                 NetDeclaration(net_decl) => self.declaration_ctx().lower_net_decl(net_decl).into(),
                 _ => unimplemented!(),
             };
-            self.file.items.push(idx);
+            self.file_source_map.items.push(idx);
         }
     }
 }

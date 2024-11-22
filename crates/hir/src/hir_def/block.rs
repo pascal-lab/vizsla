@@ -40,7 +40,6 @@ define_container! {
     pub struct Block {
         name: Option<Ident>,
         kind: BlockKind,
-        items: SmallVec<[BlockItem; 2]>,
 
         declarations: [Declaration],
         exprs: [Expr],
@@ -56,6 +55,8 @@ define_container! {
 define_container! {
     #[derive(Default, Debug, PartialEq, Eq, Clone)]
     pub struct BlockSourceMap {
+        items: SmallVec<[BlockItem; 2]>,
+
         declaration_srcs: [Declaration | DeclarationSrc],
         expr_srcs: [Expr | ExprSrc],
         event_expr_srcs: [EventExpr | EventExprSrc],
@@ -176,7 +177,7 @@ impl LowerBlockCtx<'_> {
             Some(TokenKind::JOIN_NONE_KEYWORD) => BlockKind::Parallel(ParBlockKind::JoinNone),
             _ => BlockKind::Sequential, // Some(TokenKind::END_KEYWORD) | None | Others
         };
-        self.block.items = block
+        self.block_source_map.items = block
             .items()
             .children()
             .map(|node| {

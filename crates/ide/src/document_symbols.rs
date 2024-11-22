@@ -39,9 +39,9 @@ pub(crate) fn document_symbols(db: &RootDb, file_id: FileId) -> Vec<DocumentSymb
     let (file, src_map) = db.hir_file_with_source_map(file_id);
     let (file, src_map) = (file.as_ref(), src_map.as_ref());
 
-    let mut res = Vec::with_capacity(file.items.len() + file.decls.len());
+    let mut res = Vec::with_capacity(src_map.items.len() + file.decls.len());
 
-    for &member in file.items.iter() {
+    for &member in src_map.items.iter() {
         match member {
             FileItem::LocalModuleId(idx) => {
                 let module_id = ModuleId::new(file_id, idx);
@@ -72,7 +72,7 @@ fn collect_module_items(
     let (module, src_map) = (module.as_ref(), src_map.as_ref());
 
     let mut children =
-        Vec::with_capacity(module.items.len() + module.decls.len() + module.stmts.len());
+        Vec::with_capacity(src_map.items.len() + module.decls.len() + module.stmts.len());
     let module_name = module.name.as_ref().map(|s| s.as_str());
 
     if let Some(params) = &module.param_ports {
@@ -96,7 +96,7 @@ fn collect_module_items(
         }
     }
 
-    for item in module.items.iter() {
+    for item in src_map.items.iter() {
         match *item {
             ModuleItem::DeclarationId(declaration_id) => {
                 build_declaration(&mut children, declaration_id, module_name, module, src_map)
@@ -135,10 +135,10 @@ fn collect_block_items(
     let (block, src_map) = db.block_with_source_map(block_id);
     let (block, src_map) = (block.as_ref(), src_map.as_ref());
 
-    let mut children = Vec::with_capacity(block.items.len() + block.decls.len());
+    let mut children = Vec::with_capacity(src_map.items.len() + block.decls.len());
     let block_name = block.name.as_ref().map(|s| s.as_str());
 
-    for item in block.items.iter() {
+    for item in src_map.items.iter() {
         match *item {
             BlockItem::DeclarationId(declaration_id) => {
                 build_declaration(&mut children, declaration_id, block_name, block, src_map)
@@ -306,7 +306,7 @@ fn build_with_children(
     children: Vec<DocumentSymbol>,
 ) -> DocumentSymbol {
     let full_range = src.range();
-    let focus_range = src.name_range().unwrap_or(full_range);
+    let focus_range = src.name_or_full_range();
     DocumentSymbol {
         name: name.as_ref().unwrap_or(&DEFAULT_NAME).to_string(),
         focus_range,

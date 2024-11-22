@@ -47,7 +47,6 @@ define_container! {
     #[derive(Default, Debug, PartialEq, Eq, Clone)]
     pub struct Module {
         name: Option<Ident>,
-        items: Vec<ModuleItem>,
 
         param_ports: Option<IdxRange<Declaration>>,
         ports: Ports => {
@@ -79,6 +78,8 @@ define_container! {
 define_container! {
     #[derive(Default, Debug, PartialEq, Eq, Clone)]
     pub struct ModuleSourceMap {
+        items: Vec<ModuleItem>,
+
         port_srcs: PortSrcs => {
             [NonAnsiPortId | NonAnsiPortSrc],
             [PortRefId | PortRefSrc],
@@ -210,7 +211,7 @@ impl LowerModuleCtx<'_> {
                 EmptyMember(_) => continue,
                 _ => unimplemented!("unhandled module member: {:?}", member.syntax().kind()),
             };
-            self.module.items.push(idx);
+            self.module_source_map.items.push(idx);
         }
     }
 }
