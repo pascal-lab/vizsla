@@ -27,3 +27,25 @@ macro_rules! match_ast {
         }
     }}
 }
+
+#[macro_export]
+macro_rules! match_ast_kind {
+    ($kind:expr , _ => $body:expr,) => { $body };
+
+    ($kind:expr , $path:ty $(where $cond:expr)? => $body:expr, $($rest:tt)* ) => {{
+        if <$path as $crate::ast::AstNode>::can_cast($kind)
+        $( && ($cond) )? {
+            $body
+        } else {
+            match_ast_kind!($kind , $($rest)*)
+        }
+    }};
+
+    ($kind:expr , $path:ty $(| $paths:ty)* => $body:expr, $($rest:tt)* ) => {{
+        if <$path as $crate::ast::AstNode>::can_cast($kind).is_some() $(|| <$paths as $crate::ast::AstNode>::can_cast($kind).is_some())* {
+            $body
+        } else {
+            match_ast_kind!($kind , $($rest)*)
+        }
+    }}
+}

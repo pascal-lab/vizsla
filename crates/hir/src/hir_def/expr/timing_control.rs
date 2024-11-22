@@ -103,7 +103,7 @@ impl LowerEventExprCtx<'_> {
         let left = self.lower_event_expr(event_expr.left());
         let right = self.lower_event_expr(event_expr.right());
         match event_expr.operator_token().unwrap().kind() {
-            TokenKind::OR => EventExpr::Or(left, right),
+            TokenKind::OR_KEYWORD => EventExpr::Or(left, right),
             TokenKind::COMMA => EventExpr::And(left, right),
             _ => unreachable!(),
         }

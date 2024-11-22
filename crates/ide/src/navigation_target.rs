@@ -89,7 +89,7 @@ impl ToNav for InModule<NonAnsiPortId> {
         let cont_name = module.name.clone();
 
         let file_id = file_id.file_id();
-        build(file_id, src.name_range(), src.range(), name, SymbolKind::PortLabel, cont_name)
+        build(file_id, src.name_range(), src.range(), name, SymbolKind::NonAnsiPortLabel, cont_name)
     }
 }
 

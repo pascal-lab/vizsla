@@ -49,9 +49,8 @@ pub(crate) fn document_symbol(
     line_info: &LineInfo,
     symbol: ide::document_symbols::DocumentSymbol,
 ) -> lsp_types::DocumentSymbol {
-    let children = symbol
-        .children
-        .map(|it| it.into_iter().map(|child| document_symbol(line_info, child)).collect());
+    let children =
+        symbol.children.into_iter().map(|child| document_symbol(line_info, child)).collect_vec();
 
     lsp_types::DocumentSymbol {
         name: symbol.name,
@@ -61,7 +60,7 @@ pub(crate) fn document_symbol(
         deprecated: None,
         range: self::range(line_info, symbol.full_range),
         selection_range: self::range(line_info, symbol.focus_range),
-        children,
+        children: if children.is_empty() { None } else { Some(children) },
     }
 }
 
@@ -80,10 +79,8 @@ pub(crate) fn document_symbol_information(
         container_name: symbol.container_name,
     });
 
-    if let Some(children) = symbol.children {
-        for child in children {
-            document_symbol_information(child, url.clone(), line_info, res);
-        }
+    for child in symbol.children {
+        document_symbol_information(child, url.clone(), line_info, res);
     }
 }
 
@@ -106,7 +103,7 @@ fn symbol_kind(symbol_kind: SymbolKind) -> lsp_types::SymbolKind {
     use lsp_types::SymbolKind as LspSymbolKind;
     match symbol_kind {
         SymbolKind::Module => LspSymbolKind::MODULE,
-        SymbolKind::PortLabel => LspSymbolKind::FIELD,
+        SymbolKind::NonAnsiPortLabel => LspSymbolKind::FIELD,
         SymbolKind::Decl => LspSymbolKind::VARIABLE,
         SymbolKind::Instance => LspSymbolKind::OBJECT,
         SymbolKind::Block => LspSymbolKind::NAMESPACE,

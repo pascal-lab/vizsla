@@ -2,30 +2,25 @@ use hir::{
     db::HirDb,
     file::HirFileId,
     hir_def::{
-        block::{BlockId, BlockInfo, BlockSrc, LocalBlockId},
-        expr::declarator::{DeclId, Declarator, DeclaratorSrc},
-        module::{ModuleId, ModuleSrc, instantiation::InstanceSrc},
-        stmt::{Stmt, StmtId, StmtSrc},
+        block::{BlockId, BlockInfo, BlockItem, BlockSrc, LocalBlockId},
+        declaration::{Declaration, DeclarationId},
+        expr::declarator::{DeclId, Declarator, DeclaratorSrc, DeclsRange},
+        file::FileItem,
+        module::{ModuleId, ModuleItem, ModuleSrc, port::Ports},
+        stmt::{CaseItem, ForInit, Stmt, StmtId, StmtKind, StmtSrc},
     },
-    semantics::Semantics,
-    source_map::IsSrc,
+    source_map::IsNamedSrc,
 };
 use ide_db::root_db::RootDb;
+use la_arena::Idx;
 use line_index::TextRange;
 use smol_str::SmolStr;
-use syntax::{
-    ast::{self, AstNode, PortList},
-    has_name::HasName,
-    has_text_range::HasTextRange,
-    match_ast,
-};
-use triomphe::Arc;
 use utils::get::{Get, GetRef};
 use vfs::FileId;
 
 use crate::SymbolKind;
 
-const DEFAULT_NAME: SmolStr = SmolStr::new_static("<unnamed>");
+const DEFAULT_NAME: SmolStr = SmolStr::new_static("unnamed");
 
 #[derive(Debug, Clone)]
 pub struct DocumentSymbol {
@@ -35,287 +30,290 @@ pub struct DocumentSymbol {
     pub kind: SymbolKind,
     pub detail: Option<String>,
     pub container_name: Option<String>,
-    pub children: Option<Vec<DocumentSymbol>>,
+    pub children: Vec<DocumentSymbol>,
 }
 
 // TODO: add ty info in detail
 pub(crate) fn document_symbols(db: &RootDb, file_id: FileId) -> Vec<DocumentSymbol> {
-    let sema = Semantics::new(db);
-    let root = sema.parse(file_id);
-
     let file_id = HirFileId(file_id);
     let (file, src_map) = db.hir_file_with_source_map(file_id);
+    let (file, src_map) = (file.as_ref(), src_map.as_ref());
 
-    let mut res = Vec::default();
+    let mut res = Vec::with_capacity(file.items.len() + file.decls.len());
 
-    // We iterate over the syntax tree, to avoid converting SyntaxNodePtr to AST
-    // node, which is expensive.
-    for member in root.members().children() {
-        use ast::Member::*;
+    for &member in file.items.iter() {
         match member {
-            ModuleDeclaration(decl) => {
-                let src = ModuleSrc::from(decl);
-                let module_id = ModuleId::new(file_id, src_map.get(src));
-                collect_module_items(&sema, module_id, decl, &mut res);
+            FileItem::LocalModuleId(idx) => {
+                let module_id = ModuleId::new(file_id, idx);
+                let module_src = src_map.get(idx);
+                collect_module_items(db, module_id, module_src, &mut res);
             }
-            ProceduralBlock(proc) => {
-                let stmt = proc.statement();
-                build_stmt(&sema, &mut res, stmt, None, &file, &src_map);
+            FileItem::ProcId(proc_id) => {
+                let proc = file.get(proc_id);
+                let stmt_id = proc.stmt;
+                build_stmt(db, &mut res, stmt_id, None, file, src_map);
             }
-            DataDeclaration(data_decl) => {
-                build_decls(&mut res, data_decl.declarators(), None, &file, &src_map);
+            FileItem::DeclarationId(declaration_id) => {
+                build_declaration(&mut res, declaration_id, None, file, src_map);
             }
-            NetDeclaration(net_decl) => {
-                build_decls(&mut res, net_decl.declarators(), None, &file, &src_map);
-            }
-            _ => unimplemented!(),
-        };
+        }
     }
 
     res
 }
 
 fn collect_module_items(
-    sema: &Semantics<RootDb>,
+    db: &RootDb,
     module_id: ModuleId,
-    decl: ast::ModuleDeclaration,
+    module_src: ModuleSrc,
     res: &mut Vec<DocumentSymbol>,
 ) {
-    let db = sema.db;
     let (module, src_map) = db.module_with_source_map(module_id);
-    let header = decl.header();
-    let mut module_sym = build(module.name.clone(), decl, None, None);
+    let (module, src_map) = (module.as_ref(), src_map.as_ref());
 
-    let children = &mut Vec::default();
-    let cont_name = module.name.clone().map(|it| it.to_string());
-    let cont_name = cont_name.as_ref();
+    let mut children =
+        Vec::with_capacity(module.items.len() + module.decls.len() + module.stmts.len());
+    let module_name = module.name.as_ref().map(|s| s.as_str());
 
-    // ports
-    if let Some(params) = header.parameters() {
-        for decl in params.declarations().children() {
-            use ast::ParameterDeclarationBase::*;
-            match decl {
-                ParameterDeclaration(param) => {
-                    let decls = param.declarators();
-                    build_decls(children, decls, cont_name, &module, &src_map);
-                }
-                TypeParameterDeclaration(_) => unimplemented!(),
+    if let Some(params) = &module.param_ports {
+        for declaration_id in params.clone() {
+            build_declaration(&mut children, declaration_id, module_name, module, src_map);
+        }
+    }
+
+    match &module.ports {
+        Ports::NonAnsi { ports, .. } => {
+            for (port_id, port) in ports.iter() {
+                let src = src_map.get(port_id);
+                let sym = build(&port.label, src, module_name, None);
+                children.push(sym);
+            }
+        }
+        Ports::Ansi(port_decls) => {
+            for port_decl in port_decls.values() {
+                build_decls(&mut children, &port_decl.decls, module_name, module, src_map);
             }
         }
     }
 
-    if let Some(PortList::AnsiPortList(port_list)) = header.ports() {
-        for port in port_list.ports().children() {
-            use ast::Member::*;
-            match port {
-                ImplicitAnsiPort(port) => {
-                    let decl = port.declarator();
-                    let hir = DeclaratorSrc::from(decl).hir(&module, &src_map);
-                    let sym = build(hir.name.clone(), decl, cont_name.cloned(), None);
-                    children.push(sym);
-                }
-                ExplicitAnsiPort(_port) => unimplemented!(),
-                _ => unreachable!(),
+    for item in module.items.iter() {
+        match *item {
+            ModuleItem::DeclarationId(declaration_id) => {
+                build_declaration(&mut children, declaration_id, module_name, module, src_map)
             }
-        }
-    }
-
-    for member in decl.members().children() {
-        use ast::Member::*;
-        match member {
-            ContinuousAssign(_) => {}
-            DataDeclaration(data_decl) => {
-                build_decls(children, data_decl.declarators(), cont_name, &module, &src_map);
-            }
-            NetDeclaration(net_decl) => {
-                build_decls(children, net_decl.declarators(), cont_name, &module, &src_map);
-            }
-            ParameterDeclarationStatement(param_decl) => {
-                use ast::ParameterDeclarationBase::*;
-                match param_decl.parameter() {
-                    ParameterDeclaration(param) => {
-                        build_decls(children, param.declarators(), cont_name, &module, &src_map);
-                    }
-                    TypeParameterDeclaration(_) => unimplemented!(),
-                }
-            }
-            HierarchyInstantiation(instantiation) => {
-                for instance in instantiation.instances().children() {
-                    let hir = InstanceSrc::from(instance).hir(&module, &src_map);
-                    let sym = build(hir.name.clone(), instance, cont_name.cloned(), None);
+            ModuleItem::InstantiationId(instantiation_id) => {
+                for &instance_id in module.get(instantiation_id).instances.iter() {
+                    let hir = module.get(instance_id);
+                    let src = src_map.get(instance_id);
+                    let sym = build(&hir.name, src, module_name, None);
                     children.push(sym);
                 }
             }
-            FunctionDeclaration(_fn_decl) => todo!(),
-            ProceduralBlock(proc) => {
-                let stmt = proc.statement();
-                build_stmt(sema, children, stmt, cont_name, &module, &src_map);
+            ModuleItem::ProcId(proc_id) => {
+                let proc = module.get(proc_id);
+                let stmt_id = proc.stmt;
+                build_stmt(db, &mut children, stmt_id, module_name, module, src_map);
             }
-            // Ports
-            PortDeclaration(port) => {
-                build_decls(children, port.declarators(), cont_name, &module, &src_map);
+            ModuleItem::PortDeclId(port_decl) => {
+                let port_decl = module.get(port_decl);
+                build_decls(&mut children, &port_decl.decls, module_name, module, src_map)
             }
-            _ => unimplemented!("unhandled member: {:?}", member.syntax().kind()),
+            ModuleItem::ContAssignId(_) => {}
         }
     }
 
-    if !children.is_empty() {
-        module_sym.children = Some(std::mem::take(children));
-    }
-    res.push(module_sym);
+    res.push(build_with_children(&module.name, module_src, None, None, children));
 }
 
 fn collect_block_items(
-    sema: &Semantics<RootDb>,
+    db: &RootDb,
     block_id: BlockId,
-    decl: ast::BlockStatement,
-    cont_name: Option<String>,
+    block_src: BlockSrc,
+    cont_name: Option<&str>,
     res: &mut Vec<DocumentSymbol>,
 ) {
-    let db = sema.db;
     let (block, src_map) = db.block_with_source_map(block_id);
-    let mut block_sym = build(block.name.clone(), decl, cont_name, None);
+    let (block, src_map) = (block.as_ref(), src_map.as_ref());
 
-    let children = &mut Vec::default();
-    let cont_name = block.name.clone().map(|it| it.to_string());
-    let cont_name = cont_name.as_ref();
+    let mut children = Vec::with_capacity(block.items.len() + block.decls.len());
+    let block_name = block.name.as_ref().map(|s| s.as_str());
 
-    for node in decl.items().children() {
-        match_ast! { node.syntax(),
-            ast::Statement[it] => build_stmt(sema, res, it, cont_name, &block, &src_map),
-            ast::DataDeclaration[it] => {
-                build_decls(children, it.declarators(), cont_name, &block, &src_map);
-            },
-            _ => unimplemented!("{:?}", node.syntax().kind()),
+    for item in block.items.iter() {
+        match *item {
+            BlockItem::DeclarationId(declaration_id) => {
+                build_declaration(&mut children, declaration_id, block_name, block, src_map)
+            }
+            BlockItem::StmtId(stmt_id) => {
+                build_stmt(db, &mut children, stmt_id, block_name, block, src_map)
+            }
         }
     }
 
-    if !children.is_empty() {
-        block_sym.children = Some(std::mem::take(children));
+    if block.name.is_some() || !children.is_empty() {
+        res.push(build_with_children(&block.name, block_src, cont_name, None, children));
     }
-    res.push(block_sym);
 }
 
-fn build_stmt<'a, Arn, SrcMap>(
-    sema: &Semantics<RootDb>,
+fn build_stmt<Arn, SrcMap>(
+    db: &RootDb,
     res: &mut Vec<DocumentSymbol>,
-    stmt: ast::Statement<'a>,
-    container_name: Option<&String>,
-    arena: &'a Arc<Arn>,
-    src_map: &'a Arc<SrcMap>,
+    stmt_id: Idx<Stmt>,
+    container_name: Option<&str>,
+    arena: &Arn,
+    src_map: &SrcMap,
 ) where
-    Arn: GetRef<StmtId, Output = Stmt> + GetRef<LocalBlockId, Output = BlockInfo>,
-    SrcMap: Get<StmtSrc, Output = StmtId> + Get<BlockSrc, Output = LocalBlockId>,
+    Arn: GetRef<StmtId, Output = Stmt>
+        + GetRef<DeclId, Output = Declarator>
+        + GetRef<LocalBlockId, Output = BlockInfo>,
+    SrcMap: Get<StmtId, Output = StmtSrc>
+        + Get<DeclId, Output = DeclaratorSrc>
+        + Get<LocalBlockId, Output = BlockSrc>,
 {
-    if stmt.name().is_some() {
-        let hir = StmtSrc::from(stmt).hir(arena, src_map);
-        let sym = build(hir.label.clone(), stmt, container_name.cloned(), None);
-        res.push(sym);
+    let stmt = arena.get(stmt_id);
+
+    if let StmtKind::Block(block_info) = &stmt.kind {
+        let block_id = block_info.block_id;
+        let block_src = src_map.get(stmt_id).into();
+        collect_block_items(db, block_id, block_src, container_name, res);
+        return;
     }
 
-    use ast::Statement::*;
-    match stmt {
-        TimingControlStatement(stmt) => {
-            build_stmt(sema, res, stmt.statement(), container_name, arena, src_map);
+    let mut children = Vec::with_capacity(5);
+    let stmt_name = stmt.label.as_ref().map(|s| s.as_str());
+    match &stmt.kind {
+        StmtKind::Wait(_, stmt_id)
+        | StmtKind::TimingCtrl(_, stmt_id)
+        | StmtKind::Forever(stmt_id)
+        | StmtKind::DoWhile(stmt_id, _)
+        | StmtKind::While(_, stmt_id) => {
+            build_stmt(db, &mut children, *stmt_id, stmt_name, arena, src_map)
         }
-
-        WaitStatement(stmt) => {
-            build_stmt(sema, res, stmt.statement(), container_name, arena, src_map);
-        }
-
-        ConditionalStatement(stmt) => {
-            build_stmt(sema, res, stmt.statement(), container_name, arena, src_map);
-            if let Some(stmt) =
-                stmt.else_clause().and_then(|clause| ast::Statement::cast(clause.clause().syntax()))
-            {
-                build_stmt(sema, res, stmt, container_name, arena, src_map);
+        StmtKind::Cond { then_stmt, else_stmt, .. } => {
+            build_stmt(db, &mut children, *then_stmt, stmt_name, arena, src_map);
+            if let Some(else_stmt) = else_stmt {
+                build_stmt(db, &mut children, *else_stmt, stmt_name, arena, src_map);
             }
         }
-        CaseStatement(stmt) => {
-            for item in stmt.items().children() {
-                use ast::CaseItem::*;
-                match item {
-                    StandardCaseItem(item) => {
-                        if let Some(stmt) = ast::Statement::cast(item.clause().syntax()) {
-                            build_stmt(sema, res, stmt, container_name, arena, src_map);
-                        }
-                    }
-                    DefaultCaseItem(item) => {
-                        if let Some(stmt) = ast::Statement::cast(item.clause().syntax()) {
-                            build_stmt(sema, res, stmt, container_name, arena, src_map);
-                        }
-                    }
-                    PatternCaseItem(_) => unimplemented!(),
+        StmtKind::Case { items, .. } => {
+            for item in items {
+                let stmt_id = match item {
+                    CaseItem::Case { clause, .. } => clause,
+                    CaseItem::Default(stmt) => stmt,
+                };
+                build_stmt(db, &mut children, *stmt_id, stmt_name, arena, src_map);
+            }
+        }
+        StmtKind::For { inits, stmt, .. } => match inits {
+            ForInit::Init(inits) => {
+                for (_, decl_id) in inits {
+                    build_decl(&mut children, *decl_id, stmt_name, arena, src_map);
                 }
+                build_stmt(db, &mut children, *stmt, stmt_name, arena, src_map);
             }
-        }
+            ForInit::Assign(_) => {}
+        },
 
-        DoWhileStatement(stmt) => {
-            build_stmt(sema, res, stmt.statement(), container_name, arena, src_map);
-        }
-        ForeverStatement(stmt) => {
-            build_stmt(sema, res, stmt.statement(), container_name, arena, src_map);
-        }
-        LoopStatement(stmt) => {
-            build_stmt(sema, res, stmt.statement(), container_name, arena, src_map);
-        }
-        ForLoopStatement(stmt) => {
-            build_stmt(sema, res, stmt.statement(), container_name, arena, src_map);
-        }
+        StmtKind::Empty
+        | StmtKind::Expr(_)
+        | StmtKind::Jump(_)
+        | StmtKind::ProcAssign(_)
+        | StmtKind::Disable(_) => {}
 
-        BlockStatement(stmt) => {
-            let hir = BlockSrc::from(stmt).hir(arena, src_map);
-            collect_block_items(sema, hir.block_id, stmt, container_name.cloned(), res);
-        }
+        StmtKind::Block(_) => unreachable!(),
+    }
 
-        EmptyStatement(_) => {}
-
-        ProceduralAssignStatement(_)
-        | ProceduralDeassignStatement(_)
-        | DisableStatement(_)
-        | ReturnStatement(_)
-        | JumpStatement(_)
-        | ExpressionStatement(_) => {}
-        _ => unimplemented!("{:?}", stmt.syntax().kind()),
-    };
+    if stmt.label.is_some() || !children.is_empty() {
+        let stmt_src = src_map.get(stmt_id);
+        res.push(build_with_children(&stmt.label, stmt_src, container_name, None, children));
+    }
 }
 
 #[inline]
-fn build_decls<'a, Arn, SrcMap>(
+fn build_declaration<Arn, SrcMap>(
     res: &mut Vec<DocumentSymbol>,
-    decls: ast::SeparatedList<'a, ast::Declarator<'a>>,
-    container_name: Option<&String>,
-    arena: &'a Arc<Arn>,
-    src_map: &'a Arc<SrcMap>,
+    declaration_id: DeclarationId,
+    container_name: Option<&str>,
+    arena: &Arn,
+    src_map: &SrcMap,
+) where
+    Arn: GetRef<DeclId, Output = Declarator> + GetRef<DeclarationId, Output = Declaration>,
+    SrcMap: Get<DeclId, Output = DeclaratorSrc>,
+{
+    let declaration = arena.get(declaration_id);
+    build_decls(res, &declaration.decls(), container_name, arena, src_map);
+}
+
+#[inline]
+fn build_decls<Arn, SrcMap>(
+    res: &mut Vec<DocumentSymbol>,
+    decls: &DeclsRange,
+    container_name: Option<&str>,
+    arena: &Arn,
+    src_map: &SrcMap,
 ) where
     Arn: GetRef<DeclId, Output = Declarator>,
-    SrcMap: Get<DeclaratorSrc, Output = DeclId>,
+    SrcMap: Get<DeclId, Output = DeclaratorSrc>,
 {
-    for decl in decls.children() {
-        let hir = DeclaratorSrc::from(decl).hir(arena, src_map);
-        let sym = build(hir.name.clone(), decl, container_name.cloned(), None);
-        res.push(sym);
+    for decl in decls.clone() {
+        build_decl(res, decl, container_name, arena, src_map);
     }
 }
 
 #[inline]
-fn build<'a>(
-    name: Option<SmolStr>,
-    node: impl HasName<'a>,
-    container_name: Option<String>,
+fn build_decl<Arn, SrcMap>(
+    res: &mut Vec<DocumentSymbol>,
+    decl: Idx<Declarator>,
+    container_name: Option<&str>,
+    arena: &Arn,
+    src_map: &SrcMap,
+) where
+    Arn: GetRef<DeclId, Output = Declarator>,
+    SrcMap: Get<DeclId, Output = DeclaratorSrc>,
+{
+    let hir = arena.get(decl);
+    let src = src_map.get(decl);
+    let sym = build(&hir.name, src, container_name, None);
+    dbg!(&hir.name);
+    res.push(sym);
+}
+
+#[inline]
+fn build(
+    name: &Option<SmolStr>,
+    src: impl IsNamedSrc,
+    container_name: Option<&str>,
     detail: Option<String>,
 ) -> DocumentSymbol {
-    let focus_range = node
-        .name()
-        .and_then(|name| name.text_range())
-        .unwrap_or_else(|| node.syntax().text_range().unwrap());
+    let full_range = src.range();
+    let focus_range = src.name_range().unwrap_or(full_range);
     DocumentSymbol {
-        name: name.unwrap_or(DEFAULT_NAME).to_string(),
+        name: name.as_ref().unwrap_or(&DEFAULT_NAME).to_string(),
         focus_range,
-        full_range: node.syntax().text_range().unwrap(),
-        kind: SymbolKind::from_node(node.syntax()),
+        full_range,
+        kind: SymbolKind::from_syntax_kind(src.kind()),
         detail,
-        container_name,
-        children: None,
+        container_name: container_name.map(|s| s.to_owned()),
+        children: Vec::new(),
+    }
+}
+
+#[inline]
+fn build_with_children(
+    name: &Option<SmolStr>,
+    src: impl IsNamedSrc,
+    container_name: Option<&str>,
+    detail: Option<String>,
+    children: Vec<DocumentSymbol>,
+) -> DocumentSymbol {
+    let full_range = src.range();
+    let focus_range = src.name_range().unwrap_or(full_range);
+    DocumentSymbol {
+        name: name.as_ref().unwrap_or(&DEFAULT_NAME).to_string(),
+        focus_range,
+        full_range,
+        kind: SymbolKind::from_syntax_kind(src.kind()),
+        detail,
+        container_name: container_name.map(|s| s.to_owned()),
+        children,
     }
 }

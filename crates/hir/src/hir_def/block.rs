@@ -77,6 +77,7 @@ impl From<BlockSrc> for StmtSrc {
 
 impl From<StmtSrc> for BlockSrc {
     fn from(StmtSrc { node, name }: StmtSrc) -> Self {
+        assert!(ast::BlockStatement::can_cast(node.kind()));
         BlockSrc { node, name }
     }
 }

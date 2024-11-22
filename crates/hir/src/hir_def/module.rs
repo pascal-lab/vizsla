@@ -48,7 +48,7 @@ define_container! {
     #[derive(Default, Debug, PartialEq, Eq, Clone)]
     pub struct Module | ModuleSourceMap {
         name: Option<Ident>,
-        items: Arena<ModuleItem>,
+        items: Vec<ModuleItem>,
 
         param_ports: Option<IdxRange<Declaration>>,
         ports | port_srcs: Ports[_ | PortSrcs] => {
@@ -86,6 +86,7 @@ define_enum_deriving_from! {
         DeclarationId,
         InstantiationId,
         ProcId,
+        PortDeclId,
     }
 }
 
@@ -176,15 +177,12 @@ impl LowerModuleCtx<'_> {
                 FunctionDeclaration(_fn_decl) => todo!(),
                 ProceduralBlock(proc) => self.proc_ctx().lower_proc(proc).into(),
                 // Ports
-                PortDeclaration(port) => {
-                    self.lower_port_decl(port);
-                    continue;
-                }
+                PortDeclaration(port) => self.lower_port_decl(port).into(),
                 ExplicitAnsiPort(_) | ImplicitAnsiPort(_) => unreachable!(),
                 EmptyMember(_) => continue,
                 _ => unimplemented!("unhandled module member: {:?}", member.syntax().kind()),
             };
-            self.module.items.alloc(idx);
+            self.module.items.push(idx);
         }
     }
 }

@@ -10,7 +10,7 @@ use hir::hir_def::{
     module::{ModuleId, instantiation::InstanceId, port::NonAnsiPortId},
     stmt::StmtId,
 };
-use syntax::{SyntaxNode, ast, match_ast};
+use syntax::{SyntaxKind, ast, match_ast_kind};
 pub type Cancellable<T> = Result<T, Cancelled>;
 
 pub mod analysis;
@@ -31,7 +31,7 @@ pub mod selection_ranges;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum SymbolKind {
     Module,
-    PortLabel,
+    NonAnsiPortLabel,
     Decl,
     Instance,
     Block,
@@ -42,32 +42,18 @@ pub enum SymbolKind {
 }
 
 impl SymbolKind {
-    pub fn from_node(node: SyntaxNode) -> SymbolKind {
-        match_ast! { node,
-            ast::ModuleHeader[it] => {
-                use ast::ModuleHeader::*;
-                match it {
-                    ModuleHeader(_) => SymbolKind::Module,
-                    InterfaceHeader(_) => SymbolKind::Interface,
-                    _ => unimplemented!(),
-                }
-            },
-            ast::ModuleDeclaration[it] => {
-                use ast::ModuleDeclaration::*;
-                match it {
-                    ModuleDeclaration(_) => SymbolKind::Module,
-                    InterfaceDeclaration(_) => SymbolKind::Interface,
-                    _ => unimplemented!(),
-                }
-            },
-            ast::NonAnsiPort => SymbolKind::PortLabel,
+    pub fn from_syntax_kind(kind: SyntaxKind) -> Self {
+        match_ast_kind! { kind,
+            ast::ModuleDeclaration where kind == SyntaxKind::MODULE_DECLARATION => SymbolKind::Module,
+            ast::NonAnsiPort => SymbolKind::NonAnsiPortLabel,
             ast::Declarator => SymbolKind::Decl,
             ast::HierarchicalInstance => SymbolKind::Instance,
+
             ast::BlockStatement => SymbolKind::Block,
-            ast::Statement => SymbolKind::Stmt,
+            ast::Statement => SymbolKind::Stmt, // the order of these two is important
+
             ast::FunctionDeclaration => SymbolKind::Fn,
-            ast::GenerateBlock => SymbolKind::Generate,
-            _ => unreachable!("unexpected node: {:?}", node),
+            _ => unreachable!(),
         }
     }
 }
@@ -87,7 +73,7 @@ impl From<BlockId> for SymbolKind {
 
 impl From<NonAnsiPortId> for SymbolKind {
     fn from(_: NonAnsiPortId) -> Self {
-        SymbolKind::PortLabel
+        SymbolKind::NonAnsiPortLabel
     }
 }
 

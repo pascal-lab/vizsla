@@ -341,7 +341,7 @@ impl LowerModuleCtx<'_> {
             PortSrcs::NonAnsi { ports: port_srcs, refs: ref_srcs, decls: SourceMap::default() };
     }
 
-    pub(crate) fn lower_port_decl(&mut self, decl: ast::PortDeclaration) {
+    pub(crate) fn lower_port_decl(&mut self, decl: ast::PortDeclaration) -> PortDeclId {
         let header = self.lower_port_header(decl.header(), None);
 
         let parent = match &self.module.ports {
@@ -362,7 +362,7 @@ impl LowerModuleCtx<'_> {
         alloc_idx_and_src! {
             PortDecl { header, decls } => port_decls,
             decl => srcs,
-        };
+        }
     }
 
     // Port header may inherit properties from the previous port header, so we
