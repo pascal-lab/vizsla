@@ -1,12 +1,10 @@
-use std::iter;
-
 use hir::semantics::Semantics;
 use ide_db::root_db::RootDb;
 use itertools::Itertools;
-use line_index::{TextRange, TextSize};
+use line_index::TextRange;
 use span::FilePosition;
 use syntax::{
-    SyntaxCursor, SyntaxCursorExt, SyntaxElement, SyntaxNode, SyntaxNodeExt, TokenKind,
+    SyntaxCursorExt, SyntaxNodeExt, TokenKind,
     ast::AstNode,
     has_text_range::HasTextRange,
     token::{SyntaxTokenExt, TokenKindExt},

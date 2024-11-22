@@ -5,7 +5,7 @@ use hir::{
     hir_def::{
         block::{BlockId, BlockLoc},
         expr::declarator::DeclId,
-        module::{instantiation::InstanceId, port::NonAnsiPortId, ModuleId},
+        module::{ModuleId, instantiation::InstanceId, port::NonAnsiPortId},
         stmt::StmtId,
     },
     source_map::{IsNamedSrc, IsSrc},

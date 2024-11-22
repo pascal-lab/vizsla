@@ -24,7 +24,7 @@ pub(crate) fn goto_declaration(
         DefinitionClass::PortConnShorthand { port, data } => port.declaration_origins(),
     };
 
-    let navs = origins.into_iter().unique().map(|def| def.to_nav(db)).collect_vec().into();
+    let navs = origins.into_iter().unique().map(|def| def.to_nav(db)).collect_vec();
 
     Some(RangeInfo::new(token.text_range()?, navs))
 }

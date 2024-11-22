@@ -5,10 +5,10 @@ use hir::{
     hir_def::{
         block::{BlockId, BlockLoc},
         expr::declarator::DeclId,
-        module::{instantiation::InstanceId, port::NonAnsiPortId, ModuleId},
+        module::{ModuleId, instantiation::InstanceId, port::NonAnsiPortId},
         stmt::StmtId,
     },
-    semantics::{pathres::PathResolution, Semantics},
+    semantics::{Semantics, pathres::PathResolution},
     source_map::{IsNamedSrc, IsSrc},
 };
 use ide_db::root_db::RootDb;

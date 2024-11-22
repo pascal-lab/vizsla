@@ -276,7 +276,7 @@ pub(crate) fn selection_ranges(
         .into_iter()
         .rfold(None, |parent, range| {
             Some(lsp_types::SelectionRange {
-                range: self::range(&line_info, range),
+                range: self::range(line_info, range),
                 parent: parent.map(Box::new),
             })
         })

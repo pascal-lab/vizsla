@@ -1,8 +1,5 @@
-use std::iter;
-
 use ide::references::References;
 use itertools::Itertools;
-use line_index::TextRange;
 use lsp_types::{PrepareRenameResponse, RenameParams, WorkspaceEdit};
 use span::{FilePosition, FileRange};
 

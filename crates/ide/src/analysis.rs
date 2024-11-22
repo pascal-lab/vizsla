@@ -1,7 +1,7 @@
 use base_db::{Cancelled, salsa};
 use ide_db::{line_index_db::LineIndexDb, root_db::RootDb};
 use line_index::{LineIndex, TextRange};
-use span::{FilePosition, FileRange, RangeInfo};
+use span::{FilePosition, RangeInfo};
 use triomphe::Arc;
 use utils::{lines::LineInfo, text_edit::TextEdit};
 use vfs::FileId;

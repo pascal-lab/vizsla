@@ -13,11 +13,8 @@ use itertools::Itertools;
 use line_index::{TextRange, TextSize};
 use span::FilePosition;
 use syntax::{
-    SyntaxCursor, SyntaxCursorExt, SyntaxKind, SyntaxTrivia, Trivia,
-    ast::AstNode,
-    has_text_range::{HasTextRange, SourceRangeExt},
-    token::SyntaxTokenExt,
-    trivia::TriviaKindExt,
+    SyntaxCursor, SyntaxCursorExt, SyntaxKind, SyntaxTrivia, Trivia, ast::AstNode,
+    has_text_range::HasTextRange, token::SyntaxTokenExt, trivia::TriviaKindExt,
 };
 use utils::{
     lines::{LineEnding, LineInfo},
