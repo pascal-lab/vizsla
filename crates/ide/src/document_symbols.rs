@@ -3,13 +3,13 @@ use hir::{
     file::HirFileId,
     hir_def::{
         block::{BlockId, BlockInfo, BlockItem, BlockSrc, LocalBlockId},
-        declaration::{Declaration, DeclarationId},
+        declaration::{Declaration, DeclarationId, DeclarationSrc},
         expr::declarator::{DeclId, Declarator, DeclaratorSrc, DeclsRange},
         file::FileItem,
         module::{ModuleId, ModuleItem, ModuleSrc, port::Ports},
         stmt::{CaseItem, ForInit, Stmt, StmtId, StmtKind, StmtSrc},
     },
-    source_map::IsNamedSrc,
+    source_map::{IsNamedSrc, IsSrc},
 };
 use ide_db::root_db::RootDb;
 use la_arena::Idx;
@@ -31,6 +31,50 @@ pub struct DocumentSymbol {
     pub detail: Option<String>,
     pub container_name: Option<String>,
     pub children: Vec<DocumentSymbol>,
+}
+
+#[derive(Debug, Clone)]
+struct SymbolBuilder {
+    sym: DocumentSymbol,
+}
+
+impl SymbolBuilder {
+    pub fn new(name: &Option<SmolStr>, src: impl IsNamedSrc, container_name: Option<&str>) -> Self {
+        Self::new_with_child(name, src, container_name, Vec::new())
+    }
+
+    pub fn new_with_child(
+        name: &Option<SmolStr>,
+        src: impl IsNamedSrc,
+        container_name: Option<&str>,
+        children: Vec<DocumentSymbol>,
+    ) -> Self {
+        Self {
+            sym: DocumentSymbol {
+                name: name.as_ref().unwrap_or(&DEFAULT_NAME).to_string(),
+                focus_range: src.name_or_full_range(),
+                full_range: src.range(),
+                kind: SymbolKind::from_syntax_kind(src.kind()),
+                detail: None,
+                container_name: container_name.map(|s| s.to_owned()),
+                children,
+            },
+        }
+    }
+
+    pub fn detail(mut self, detail: String) -> Self {
+        self.sym.detail = Some(detail);
+        self
+    }
+
+    pub fn kind(mut self, kind: SymbolKind) -> Self {
+        self.sym.kind = kind;
+        self
+    }
+
+    pub fn finish(self) -> DocumentSymbol {
+        self.sym
+    }
 }
 
 // TODO: add ty info in detail
@@ -85,13 +129,20 @@ fn collect_module_items(
         Ports::NonAnsi { ports, .. } => {
             for (port_id, port) in ports.iter() {
                 let src = src_map.get(port_id);
-                let sym = build(&port.label, src, module_name, None);
-                children.push(sym);
+                let builder = SymbolBuilder::new(&port.label, src, module_name);
+                children.push(builder.finish());
             }
         }
         Ports::Ansi(port_decls) => {
             for port_decl in port_decls.values() {
-                build_decls(&mut children, &port_decl.decls, module_name, module, src_map);
+                build_decls(
+                    &mut children,
+                    &port_decl.decls,
+                    SymbolKind::PortDecl,
+                    module_name,
+                    module,
+                    src_map,
+                );
             }
         }
     }
@@ -105,8 +156,8 @@ fn collect_module_items(
                 for &instance_id in module.get(instantiation_id).instances.iter() {
                     let hir = module.get(instance_id);
                     let src = src_map.get(instance_id);
-                    let sym = build(&hir.name, src, module_name, None);
-                    children.push(sym);
+                    let builder = SymbolBuilder::new(&hir.name, src, module_name);
+                    children.push(builder.finish());
                 }
             }
             ModuleItem::ProcId(proc_id) => {
@@ -116,13 +167,21 @@ fn collect_module_items(
             }
             ModuleItem::PortDeclId(port_decl) => {
                 let port_decl = module.get(port_decl);
-                build_decls(&mut children, &port_decl.decls, module_name, module, src_map)
+                build_decls(
+                    &mut children,
+                    &port_decl.decls,
+                    SymbolKind::PortDecl,
+                    module_name,
+                    module,
+                    src_map,
+                )
             }
             ModuleItem::ContAssignId(_) => {}
         }
     }
 
-    res.push(build_with_children(&module.name, module_src, None, None, children));
+    let builder = SymbolBuilder::new_with_child(&module.name, module_src, None, children);
+    res.push(builder.finish());
 }
 
 fn collect_block_items(
@@ -150,7 +209,8 @@ fn collect_block_items(
     }
 
     if block.name.is_some() || !children.is_empty() {
-        res.push(build_with_children(&block.name, block_src, cont_name, None, children));
+        let builder = SymbolBuilder::new_with_child(&block.name, block_src, cont_name, children);
+        res.push(builder.finish());
     }
 }
 
@@ -206,7 +266,14 @@ fn build_stmt<Arn, SrcMap>(
         StmtKind::For { inits, stmt, .. } => match inits {
             ForInit::Init(inits) => {
                 for (_, decl_id) in inits {
-                    build_decl(&mut children, *decl_id, stmt_name, arena, src_map);
+                    build_decl(
+                        &mut children,
+                        *decl_id,
+                        SymbolKind::DataDecl,
+                        stmt_name,
+                        arena,
+                        src_map,
+                    );
                 }
                 build_stmt(db, &mut children, *stmt, stmt_name, arena, src_map);
             }
@@ -224,7 +291,9 @@ fn build_stmt<Arn, SrcMap>(
 
     if stmt.label.is_some() || !children.is_empty() {
         let stmt_src = src_map.get(stmt_id);
-        res.push(build_with_children(&stmt.label, stmt_src, container_name, None, children));
+        let builder =
+            SymbolBuilder::new_with_child(&stmt.label, stmt_src, container_name, children);
+        res.push(builder.finish());
     }
 }
 
@@ -237,16 +306,25 @@ fn build_declaration<Arn, SrcMap>(
     src_map: &SrcMap,
 ) where
     Arn: GetRef<DeclId, Output = Declarator> + GetRef<DeclarationId, Output = Declaration>,
-    SrcMap: Get<DeclId, Output = DeclaratorSrc>,
+    SrcMap: Get<DeclId, Output = DeclaratorSrc> + Get<DeclarationId, Output = DeclarationSrc>,
 {
     let declaration = arena.get(declaration_id);
-    build_decls(res, &declaration.decls(), container_name, arena, src_map);
+    let src = src_map.get(declaration_id);
+    build_decls(
+        res,
+        &declaration.decls(),
+        SymbolKind::from_syntax_kind(src.kind()),
+        container_name,
+        arena,
+        src_map,
+    );
 }
 
 #[inline]
 fn build_decls<Arn, SrcMap>(
     res: &mut Vec<DocumentSymbol>,
     decls: &DeclsRange,
+    kind: SymbolKind,
     container_name: Option<&str>,
     arena: &Arn,
     src_map: &SrcMap,
@@ -255,7 +333,7 @@ fn build_decls<Arn, SrcMap>(
     SrcMap: Get<DeclId, Output = DeclaratorSrc>,
 {
     for decl in decls.clone() {
-        build_decl(res, decl, container_name, arena, src_map);
+        build_decl(res, decl, kind, container_name, arena, src_map);
     }
 }
 
@@ -263,6 +341,7 @@ fn build_decls<Arn, SrcMap>(
 fn build_decl<Arn, SrcMap>(
     res: &mut Vec<DocumentSymbol>,
     decl: Idx<Declarator>,
+    kind: SymbolKind,
     container_name: Option<&str>,
     arena: &Arn,
     src_map: &SrcMap,
@@ -272,48 +351,6 @@ fn build_decl<Arn, SrcMap>(
 {
     let hir = arena.get(decl);
     let src = src_map.get(decl);
-    let sym = build(&hir.name, src, container_name, None);
-    dbg!(&hir.name);
-    res.push(sym);
-}
-
-#[inline]
-fn build(
-    name: &Option<SmolStr>,
-    src: impl IsNamedSrc,
-    container_name: Option<&str>,
-    detail: Option<String>,
-) -> DocumentSymbol {
-    let full_range = src.range();
-    let focus_range = src.name_range().unwrap_or(full_range);
-    DocumentSymbol {
-        name: name.as_ref().unwrap_or(&DEFAULT_NAME).to_string(),
-        focus_range,
-        full_range,
-        kind: SymbolKind::from_syntax_kind(src.kind()),
-        detail,
-        container_name: container_name.map(|s| s.to_owned()),
-        children: Vec::new(),
-    }
-}
-
-#[inline]
-fn build_with_children(
-    name: &Option<SmolStr>,
-    src: impl IsNamedSrc,
-    container_name: Option<&str>,
-    detail: Option<String>,
-    children: Vec<DocumentSymbol>,
-) -> DocumentSymbol {
-    let full_range = src.range();
-    let focus_range = src.name_or_full_range();
-    DocumentSymbol {
-        name: name.as_ref().unwrap_or(&DEFAULT_NAME).to_string(),
-        focus_range,
-        full_range,
-        kind: SymbolKind::from_syntax_kind(src.kind()),
-        detail,
-        container_name: container_name.map(|s| s.to_owned()),
-        children,
-    }
+    let builder = SymbolBuilder::new(&hir.name, src, container_name).kind(kind);
+    res.push(builder.finish());
 }

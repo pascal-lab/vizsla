@@ -104,7 +104,10 @@ fn symbol_kind(symbol_kind: SymbolKind) -> lsp_types::SymbolKind {
     match symbol_kind {
         SymbolKind::Module => LspSymbolKind::MODULE,
         SymbolKind::NonAnsiPortLabel => LspSymbolKind::FIELD,
-        SymbolKind::Decl => LspSymbolKind::VARIABLE,
+        SymbolKind::PortDecl => LspSymbolKind::FIELD,
+        SymbolKind::ParamDecl => LspSymbolKind::TYPE_PARAMETER,
+        SymbolKind::NetDecl => LspSymbolKind::VARIABLE,
+        SymbolKind::DataDecl => LspSymbolKind::VARIABLE,
         SymbolKind::Instance => LspSymbolKind::OBJECT,
         SymbolKind::Block => LspSymbolKind::NAMESPACE,
         SymbolKind::Stmt => LspSymbolKind::NAMESPACE,

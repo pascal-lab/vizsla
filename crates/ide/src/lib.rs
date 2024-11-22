@@ -32,7 +32,10 @@ pub mod selection_ranges;
 pub enum SymbolKind {
     Module,
     NonAnsiPortLabel,
-    Decl,
+    PortDecl,
+    ParamDecl,
+    NetDecl,
+    DataDecl,
     Instance,
     Block,
     Stmt,
@@ -46,7 +49,11 @@ impl SymbolKind {
         match_ast_kind! { kind,
             ast::ModuleDeclaration where kind == SyntaxKind::MODULE_DECLARATION => SymbolKind::Module,
             ast::NonAnsiPort => SymbolKind::NonAnsiPortLabel,
-            ast::Declarator => SymbolKind::Decl,
+            ast::PortDeclaration => SymbolKind::PortDecl,
+            ast::ParameterDeclaration => SymbolKind::ParamDecl,
+            ast::NetDeclaration => SymbolKind::NetDecl,
+            ast::DataDeclaration => SymbolKind::DataDecl,
+            ast::Declarator => SymbolKind::DataDecl,
             ast::HierarchicalInstance => SymbolKind::Instance,
 
             ast::BlockStatement => SymbolKind::Block,
@@ -79,7 +86,7 @@ impl From<NonAnsiPortId> for SymbolKind {
 
 impl From<DeclId> for SymbolKind {
     fn from(_: DeclId) -> Self {
-        SymbolKind::Decl
+        SymbolKind::DataDecl
     }
 }
 

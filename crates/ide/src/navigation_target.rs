@@ -4,7 +4,8 @@ use hir::{
     db::HirDb,
     hir_def::{
         block::{BlockId, BlockLoc},
-        expr::declarator::DeclId,
+        declaration::Declaration,
+        expr::declarator::{DeclId, DeclaratorParent},
         module::{ModuleId, instantiation::InstanceId, port::NonAnsiPortId},
         stmt::StmtId,
     },
@@ -101,10 +102,22 @@ impl ToNav for InContainer<DeclId> {
         let src = cont_id.to_container_src_map(db).get(decl_id);
 
         let cont = cont_id.to_container(db);
-        let name = cont.get(decl_id).name.clone();
+        let decl = cont.get(decl_id);
+
+        let kind = match decl.parent {
+            DeclaratorParent::PortDeclId(_) => SymbolKind::PortDecl,
+            DeclaratorParent::DeclarationId(idx) => match cont.get(idx) {
+                Declaration::DataDecl(_) => SymbolKind::DataDecl,
+                Declaration::NetDecl(_) => SymbolKind::NetDecl,
+                Declaration::ParamDecl(_) => SymbolKind::ParamDecl,
+            },
+            DeclaratorParent::StmtId(_) => SymbolKind::DataDecl,
+        };
+
+        let name = decl.name.clone();
         let cont_name = cont.name().cloned();
 
-        build(file_id, src.name_range(), src.range(), name, SymbolKind::Decl, cont_name)
+        build(file_id, src.name_range(), src.range(), name, SymbolKind::DataDecl, cont_name)
     }
 }
 

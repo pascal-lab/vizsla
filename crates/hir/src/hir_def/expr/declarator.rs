@@ -27,7 +27,7 @@ define_enum_deriving_from! {
     pub enum DeclaratorParent {
         PortDeclId,
         DeclarationId, // ParamDecl, NetDecl, DataDecl
-        StmtId,
+        StmtId, // similar to DataDecl
     }
 }
 
