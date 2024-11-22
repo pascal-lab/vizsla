@@ -24,14 +24,12 @@ pub trait IsSrc: PartialEq + Eq + Hash + Copy + Clone + Debug {
     fn kind(&self) -> SyntaxKind;
 
     fn range(&self) -> TextRange;
+}
 
-    fn name_kind(&self) -> Option<TokenKind> {
-        None
-    }
+pub trait IsNamedSrc: IsSrc {
+    fn name_kind(&self) -> Option<TokenKind>;
 
-    fn name_range(&self) -> Option<TextRange> {
-        None
-    }
+    fn name_range(&self) -> Option<TextRange>;
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -181,7 +179,9 @@ macro_rules! define_src_with_name {
             fn range(&self) -> utils::text_edit::TextRange {
                 self.node.range()
             }
+        }
 
+        impl $crate::source_map::IsNamedSrc for $name {
             fn name_kind(&self) -> Option<syntax::TokenKind> {
                 self.name.map(|name| name.kind())
             }
@@ -251,7 +251,9 @@ macro_rules! define_src_with_name {
                     )*
                 }
             }
+        }
 
+        impl $crate::source_map::IsNamedSrc for $name {
             fn name_kind(&self) -> Option<syntax::TokenKind> {
                 match self {
                     $(

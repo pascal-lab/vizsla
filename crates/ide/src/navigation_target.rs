@@ -5,10 +5,10 @@ use hir::{
     hir_def::{
         block::{BlockId, BlockLoc},
         expr::declarator::DeclId,
-        module::{ModuleId, instantiation::InstanceId, port::NonAnsiPortId},
+        module::{instantiation::InstanceId, port::NonAnsiPortId, ModuleId},
         stmt::StmtId,
     },
-    source_map::IsSrc,
+    source_map::{IsNamedSrc, IsSrc},
 };
 use ide_db::root_db::RootDb;
 use line_index::TextRange;
