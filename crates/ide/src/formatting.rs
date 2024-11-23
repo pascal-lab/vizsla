@@ -1,9 +1,9 @@
-use core::str;
 use std::{
     io::Write,
     iter,
-    ops::ControlFlow,
+    ops::{ControlFlow, Range},
     process::{Command, Stdio},
+    str,
 };
 
 use base_db::source_db::SourceDb;
@@ -309,9 +309,7 @@ fn format_previous<'a>(
         let idx = cursor.idx().unwrap();
         cursor.goto_parent();
         if cursor.to_node().unwrap().child_count() == idx + 1 {
-            let start: usize = token_range.start().into();
-            let end: usize = token_range.end().into();
-            text.replace_range(start..end, "");
+            text.replace_range(Range::<usize>::from(token_range), "");
         }
     }
 
