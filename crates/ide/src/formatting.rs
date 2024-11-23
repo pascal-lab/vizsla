@@ -1,3 +1,4 @@
+use core::str;
 use std::{
     io::Write,
     iter,
@@ -228,7 +229,7 @@ fn format_in_bc(
     block_start: TextSize,
     offset: TextSize,
 ) -> anyhow::Result<Option<TextEdit>> {
-    let text = comment.get_raw_text().to_string();
+    let text = str::from_utf8(comment.get_raw_text().as_bytes())?;
 
     let (prev, line_start) = text
         .lines()
