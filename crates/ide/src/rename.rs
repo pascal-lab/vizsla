@@ -96,7 +96,7 @@ fn edits_from_refs(
     let text = sema.db.file_text(file_id);
 
     for ReferenceToken { token: SyntaxTokenWithParent { parent, tok } } in toks.into_iter() {
-        let range = tok.range().unwrap().to_text_range();
+        let range = tok.text_range()?;
 
         let conn_data_range = |it: ast::NamedPortConnection| it.expr()?.syntax().text_range();
 

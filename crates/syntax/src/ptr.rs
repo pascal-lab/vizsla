@@ -81,7 +81,7 @@ impl SyntaxElementPtr {
     pub fn to_elem<'a>(&self, tree: &'a SyntaxTree) -> Option<SyntaxElement<'a>> {
         match self {
             SyntaxElementPtr::Node(node) => node.to_node(tree).map(SyntaxElement::from_node),
-            SyntaxElementPtr::Token { parent, tok } => {
+            SyntaxElementPtr::Token { tok, .. } => {
                 Some(SyntaxElement::from_token(tok.to_token(tree)?))
             }
         }

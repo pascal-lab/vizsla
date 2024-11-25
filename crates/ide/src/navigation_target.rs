@@ -117,7 +117,7 @@ impl ToNav for InContainer<DeclId> {
         let name = decl.name.clone();
         let cont_name = cont.name().cloned();
 
-        build(file_id, src.name_range(), src.range(), name, SymbolKind::DataDecl, cont_name)
+        build(file_id, src.name_range(), src.range(), name, kind, cont_name)
     }
 }
 

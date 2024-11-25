@@ -111,7 +111,7 @@ fn symbol_kind(symbol_kind: SymbolKind) -> lsp_types::SymbolKind {
         SymbolKind::NonAnsiPortLabel => LspSymbolKind::FIELD,
         SymbolKind::PortDecl => LspSymbolKind::FIELD,
         SymbolKind::ParamDecl => LspSymbolKind::TYPE_PARAMETER,
-        SymbolKind::NetDecl => LspSymbolKind::VARIABLE,
+        SymbolKind::NetDecl => LspSymbolKind::PROPERTY,
         SymbolKind::DataDecl => LspSymbolKind::VARIABLE,
         SymbolKind::Instance => LspSymbolKind::OBJECT,
         SymbolKind::Block => LspSymbolKind::NAMESPACE,
