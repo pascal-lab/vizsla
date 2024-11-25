@@ -17,7 +17,7 @@ use walkdir::WalkDir;
 pub struct NotifyHandle {
     // Relative order of fields below is significant.
     sender: Sender<ServerMsg>,
-    thread_handler: thread::JoinHandle,
+    _handler: thread::JoinHandle,
 }
 
 #[derive(Debug)]
@@ -34,7 +34,7 @@ impl loader::Handle for NotifyHandle {
             .name("VfsLoader".to_owned())
             .spawn(move || actor.run(receiver))
             .expect("failed to spawn thread");
-        NotifyHandle { sender, thread_handler: thread }
+        NotifyHandle { sender, _handler: thread }
     }
 
     fn set_config(&mut self, config: loader::Config) {
