@@ -233,7 +233,7 @@ fn build_stmt<Arn, SrcMap>(
 
     if let StmtKind::Block(block_info) = &stmt.kind {
         let block_id = block_info.block_id;
-        let block_src = src_map.get(stmt_id).into();
+        let block_src = src_map.get(stmt_id).try_into().unwrap();
         collect_block_items(db, block_id, block_src, container_name, res);
         return;
     }

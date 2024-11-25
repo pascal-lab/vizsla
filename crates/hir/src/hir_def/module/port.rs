@@ -165,6 +165,8 @@ pub enum PortSrcs {
     Ansi(SourceMap<PortDeclSrc, PortDecl>),
 }
 
+define_src!(PortListSrc(ast::PortList));
+
 impl Default for PortSrcs {
     fn default() -> Self {
         PortSrcs::Ansi(SourceMap::default())

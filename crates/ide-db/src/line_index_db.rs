@@ -22,6 +22,7 @@ pub trait LineIndexExt {
 impl LineIndexExt for LineIndex {
     #[inline]
     fn line_ranges(&self, range: TextRange) -> Range<usize> {
+        // TODO: calculate only lines
         let start = self.line_col(range.start());
         let end = self.line_col(range.end());
         (start.line as usize)..(end.line as usize + 1)

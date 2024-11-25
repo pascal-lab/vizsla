@@ -46,6 +46,11 @@ impl GlobalStateSnapshot {
         Ok(res)
     }
 
+    pub(crate) fn file_text(&self, file_id: FileId) -> Cancellable<Arc<str>> {
+        let text = self.analysis.file_text(file_id)?;
+        Ok(text)
+    }
+
     pub(crate) fn url(&self, id: FileId) -> Url {
         let vfs = &self.vfs_read();
         let path = vfs.file_path(id);

@@ -7,7 +7,7 @@ use syntax::{
 
 use super::{
     HirData, Ident,
-    block::{BlockInfo, BlockLoc, BlockSrc},
+    block::{BlockInfo, BlockLoc},
     expr::{
         Expr, ExprId, ExprSrc, LowerExpr,
         data_ty::DataTy,
@@ -183,15 +183,10 @@ impl LowerStmtCtx<'_> {
 
     pub(crate) fn lower_stmt(&mut self, stmt: ast::Statement) -> StmtId {
         let hir_stmt = self.lower_stmt_inner(stmt);
-        let hir_idx = alloc_idx_and_src! {
+        alloc_idx_and_src! {
             hir_stmt => self.stmts,
             stmt => self.stmt_srcs,
-        };
-        if let Some(block) = ast::BlockStatement::cast(stmt.syntax()) {
-            let block = BlockSrc::from(block);
-            self.stmt_srcs.insert(block.into(), hir_idx);
         }
-        hir_idx
     }
 
     fn lower_stmt_inner(&mut self, stmt: ast::Statement) -> Stmt {

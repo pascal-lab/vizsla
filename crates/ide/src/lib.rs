@@ -21,6 +21,7 @@ pub mod source_change;
 
 pub mod document_highlight;
 pub mod document_symbols;
+pub mod folding_ranges;
 pub mod formatting;
 pub mod goto_declaration;
 pub mod goto_definition;

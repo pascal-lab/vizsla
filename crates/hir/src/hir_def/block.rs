@@ -36,7 +36,7 @@ use crate::{
 };
 
 define_container! {
-    #[derive(Default, Debug, PartialEq, Eq, Clone)]
+    #[derive(Default, Debug, PartialEq, Eq)]
     pub struct Block {
         name: Option<Ident>,
         kind: BlockKind,
@@ -53,7 +53,7 @@ define_container! {
 }
 
 define_container! {
-    #[derive(Default, Debug, PartialEq, Eq, Clone)]
+    #[derive(Default, Debug, PartialEq, Eq)]
     pub struct BlockSourceMap {
         items: SmallVec<[BlockItem; 2]>,
 
@@ -90,10 +90,15 @@ impl From<BlockSrc> for StmtSrc {
     }
 }
 
-impl From<StmtSrc> for BlockSrc {
-    fn from(StmtSrc { node, name }: StmtSrc) -> Self {
-        assert!(ast::BlockStatement::can_cast(node.kind()));
-        BlockSrc { node, name }
+impl TryFrom<StmtSrc> for BlockSrc {
+    type Error = ();
+
+    fn try_from(StmtSrc { node, name }: StmtSrc) -> Result<Self, Self::Error> {
+        if !ast::BlockStatement::can_cast(node.kind()) {
+            return Err(());
+        }
+
+        Ok(BlockSrc { node, name })
     }
 }
 
@@ -102,7 +107,7 @@ impl Get<LocalBlockId> for SourceMap<StmtSrc, Stmt> {
 
     fn get(&self, block_id: LocalBlockId) -> Self::Output {
         let stmt_id = block_id.0;
-        self.get(stmt_id).into()
+        self.get(stmt_id).try_into().unwrap()
     }
 }
 

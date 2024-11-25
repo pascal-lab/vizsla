@@ -5,7 +5,8 @@ use instantiation::{
 };
 use la_arena::{Arena, Idx, IdxRange, RawIdx};
 use port::{
-    NonAnsiPort, NonAnsiPortId, NonAnsiPortSrc, PortDecl, PortDeclId, PortDeclSrc, PortRef, PortRefId, PortRefSrc, PortSrcs, Ports
+    NonAnsiPort, NonAnsiPortId, NonAnsiPortSrc, PortDecl, PortDeclId, PortDeclSrc, PortListSrc,
+    PortRef, PortRefId, PortRefSrc, PortSrcs, Ports,
 };
 use proc_macro_utils::define_container;
 use syntax::ast::{self, AstNode, PortList};
@@ -17,7 +18,7 @@ use utils::{
 
 use super::{
     HirData, Ident,
-    block::{BlockSrc, LocalBlockId, BlockInfo},
+    block::{BlockInfo, BlockSrc, LocalBlockId},
     declaration::{
         Declaration, DeclarationId, DeclarationSrc, LowerDeclaration, impl_lower_declaration,
     },
@@ -44,7 +45,7 @@ pub mod instantiation;
 pub mod port;
 
 define_container! {
-    #[derive(Default, Debug, PartialEq, Eq, Clone)]
+    #[derive(Default, Debug, PartialEq, Eq)]
     pub struct Module {
         name: Option<Ident>,
 
@@ -76,10 +77,11 @@ define_container! {
 }
 
 define_container! {
-    #[derive(Default, Debug, PartialEq, Eq, Clone)]
+    #[derive(Default, Debug, PartialEq, Eq)]
     pub struct ModuleSourceMap {
         items: Vec<ModuleItem>,
 
+        port_list_src: Option<PortListSrc>,
         port_srcs: PortSrcs => {
             [NonAnsiPortId | NonAnsiPortSrc],
             [PortRefId | PortRefSrc],
@@ -182,6 +184,7 @@ impl LowerModuleCtx<'_> {
             }
         }
 
+        self.module_source_map.port_list_src = header.ports().map(|list| list.into());
         match header.ports() {
             Some(PortList::AnsiPortList(port_list)) => self.lower_ansi_ports(port_list),
             Some(PortList::NonAnsiPortList(port_list)) => self.lower_nonansi_port(port_list),

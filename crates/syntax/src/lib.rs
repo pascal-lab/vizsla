@@ -1,3 +1,5 @@
+#![feature(precise_capturing_in_traits)]
+
 pub mod has_name;
 pub mod has_text_range;
 pub mod ptr;

@@ -143,7 +143,7 @@ pub fn format_on_type(
 
     cursor.goto_first_tok_after_or_last(offset);
     let right = cursor.to_token().unwrap();
-    let trivias = right.trivias_with_range().unwrap().collect_vec();
+    let trivias = right.trivias_with_range().collect_vec();
     let idx = trivias.iter().position(|(range, _)| range.contains(offset));
 
     // region: inside comments

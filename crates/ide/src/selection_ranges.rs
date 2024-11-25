@@ -29,7 +29,7 @@ pub(crate) fn selection_ranges(
         None => {
             cursor.goto_first_tok_after_or_last(offset);
             let token = cursor.to_token().unwrap();
-            let trivias = token.trivias_with_range().unwrap().collect_vec();
+            let trivias = token.trivias_with_range().collect_vec();
             let range = trivias.iter().find(|(range, _)| range.contains(offset)).unwrap();
             res.push(range.0);
 

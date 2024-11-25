@@ -1,7 +1,12 @@
 use anyhow::Error;
 use ide::{
-    Cancellable, SymbolKind, document_highlight::DocumentHighlight, navigation_target::NavTarget,
-    references::ReferenceCategory, rename::RenameError, source_change::SourceChange,
+    Cancellable, SymbolKind,
+    document_highlight::DocumentHighlight,
+    folding_ranges::{Fold, FoldingConfig},
+    navigation_target::NavTarget,
+    references::ReferenceCategory,
+    rename::RenameError,
+    source_change::SourceChange,
 };
 use itertools::Itertools;
 use line_index::{TextRange, TextSize};
@@ -281,4 +286,82 @@ pub(crate) fn selection_ranges(
             })
         })
         .unwrap()
+}
+
+pub(crate) fn folding_range(
+    text: &str,
+    line_info: &LineInfo,
+    FoldingConfig { line_fold_only }: &FoldingConfig,
+    Fold { range, kind, collapsed_text }: Fold,
+) -> lsp_types::FoldingRange {
+    use ide::folding_ranges::FoldKind;
+    let kind = match kind {
+        FoldKind::Comment => Some(lsp_types::FoldingRangeKind::Comment),
+        FoldKind::Imports => Some(lsp_types::FoldingRangeKind::Imports),
+        FoldKind::Region => Some(lsp_types::FoldingRangeKind::Region),
+        _ => None,
+    };
+
+    let lsp_types::Range { start, end } = self::range(line_info, range);
+
+    if *line_fold_only {
+        // Clients with `line_folding_only` will fold the whole end line even if
+        // it contains text not in the folding range. So we should exclude the end
+        // line if there is more text after the end character on the same line.
+        let end_line = if has_more_text_in_line(&text[range.end().into()..]) {
+            end.line
+        } else {
+            end.line.saturating_sub(1)
+        };
+
+        lsp_types::FoldingRange {
+            start_line: start.line,
+            start_character: None,
+            end_line,
+            end_character: None,
+            kind,
+            collapsed_text: Some(text[range.start().into()..range.end().into()].to_string()),
+        }
+    } else {
+        lsp_types::FoldingRange {
+            start_line: start.line,
+            start_character: Some(start.character),
+            end_line: end.line,
+            end_character: Some(end.character),
+            kind,
+            collapsed_text,
+        }
+    }
+}
+
+fn has_more_text_in_line(text: &str) -> bool {
+    let mut iter = text.chars().peekable();
+
+    let mut met_first_punct = false;
+    while let Some(c) = iter.next() {
+        match c {
+            ',' | ';' => {
+                if met_first_punct {
+                    return false;
+                } else {
+                    met_first_punct = true;
+                }
+            }
+            '\n' => return true,
+            '/' if iter.next_if_eq(&'/').is_some() => return true,
+            '/' if iter.next_if_eq(&'*').is_some() => {
+                while let Some(c) = iter.next() {
+                    if c == '*' && iter.next_if_eq(&'/').is_some() {
+                        break;
+                    } else if c == '\n' {
+                        return false;
+                    }
+                }
+            }
+            _ if c.is_whitespace() => {}
+            _ => return false,
+        }
+    }
+
+    true
 }

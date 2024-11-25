@@ -7,7 +7,7 @@ use utils::define_enum_deriving_from;
 
 use super::{
     alloc_idx_and_src,
-    block::{BlockSrc, LocalBlockId, BlockInfo},
+    block::{BlockInfo, BlockSrc, LocalBlockId},
     declaration::{
         Declaration, DeclarationId, DeclarationSrc, LowerDeclaration, impl_lower_declaration,
     },
@@ -29,7 +29,7 @@ use crate::{
 };
 
 define_container! {
-    #[derive(Default, Debug, PartialEq, Eq, Clone)]
+    #[derive(Default, Debug, PartialEq, Eq)]
     pub struct HirFile {
         modules: [ModuleInfo],
         procs: [Proc],
@@ -46,7 +46,7 @@ define_container! {
 }
 
 define_container! {
-    #[derive(Default, Debug, PartialEq, Eq, Clone)]
+    #[derive(Default, Debug, PartialEq, Eq)]
     pub struct FileSourceMap {
         items: SmallVec<[FileItem; 3]>,
 

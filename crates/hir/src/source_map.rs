@@ -52,6 +52,10 @@ impl<Src: IsSrc, Hir> SourceMap<Src, Hir> {
         self.src2hir.shrink_to_fit();
         self.hir2src.shrink_to_fit();
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = (Idx<Hir>, &Src)> {
+        self.hir2src.iter()
+    }
 }
 
 impl<Src: IsSrc, Hir> Get<Src> for SourceMap<Src, Hir> {
@@ -235,7 +239,7 @@ macro_rules! define_src_with_name {
                 $ty {
                     node: syntax::ptr::SyntaxNodePtr,
                     name: Option<syntax::ptr::SyntaxTokenPtr>,
-                }
+                },
             )*
         }
 
@@ -285,16 +289,6 @@ macro_rules! define_src_with_name {
                                 node = node.child_node(0).unwrap();
                             }
                             <ast::$ty<'a> as syntax::ast::AstNode>::cast(node)
-                        }
-                        _ => None,
-                    }
-                }
-
-                fn to_name_tok(&self, tree: &'a syntax::SyntaxTree) -> Option<SyntaxTokenWithParent<'a>> {
-                    match self {
-                        $name::$ty { name, .. } => {
-                            let mut name = name?.to_token(tree)?;
-                            (name.tok.kind() == name.unwrap().kind()).then(|| name)
                         }
                         _ => None,
                     }

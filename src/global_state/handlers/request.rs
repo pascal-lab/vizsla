@@ -1,4 +1,4 @@
-use ide::references::References;
+use ide::{folding_ranges::FoldingConfig, references::References};
 use itertools::Itertools;
 use lsp_types::{PrepareRenameResponse, RenameParams, WorkspaceEdit};
 use span::{FilePosition, FileRange};
@@ -206,4 +206,23 @@ pub(crate) fn handle_selection_range(
         .collect::<anyhow::Result<Vec<_>>>()?;
 
     Ok(Some(res))
+}
+
+pub(crate) fn handle_folding_ranges(
+    snap: GlobalStateSnapshot,
+    params: lsp_types::FoldingRangeParams,
+) -> anyhow::Result<Option<Vec<lsp_types::FoldingRange>>> {
+    let file_id = from_proto::file_id(&snap, &params.text_document.uri)?;
+    let config = FoldingConfig { line_fold_only: snap.config.cli_line_folding_only() };
+    let text = snap.file_text(file_id)?;
+    let line_info = snap.line_info(file_id)?;
+
+    let folds = snap
+        .analysis
+        .folding_ranges(file_id, &config)?
+        .into_iter()
+        .map(|fold| to_proto::folding_range(&text, &line_info, &config, fold))
+        .collect();
+
+    Ok(Some(folds))
 }

@@ -1,4 +1,6 @@
-use base_db::{Cancelled, salsa};
+use std::ops::Range;
+
+use base_db::{Cancelled, salsa, source_db::SourceDb};
 use ide_db::{line_index_db::LineIndexDb, root_db::RootDb};
 use line_index::{LineIndex, TextRange};
 use span::{FilePosition, RangeInfo};
@@ -10,6 +12,7 @@ use crate::{
     Cancellable,
     document_highlight::{self, DocumentHighlight, DocumentHighlightConfig},
     document_symbols::{self, DocumentSymbol},
+    folding_ranges::{self, Fold, FoldingConfig},
     formatting::{self, FmtConfig},
     goto_declaration, goto_definition,
     navigation_target::NavTarget,
@@ -34,6 +37,10 @@ impl Analysis {
 
     pub fn line_index(&self, file_id: FileId) -> Cancellable<Arc<LineIndex>> {
         self.with_db(|db| db.line_index(file_id))
+    }
+
+    pub fn file_text(&self, file_id: FileId) -> Cancellable<Arc<str>> {
+        self.with_db(|db| db.file_text(file_id))
     }
 }
 
@@ -107,5 +114,13 @@ impl Analysis {
 
     pub fn selection_ranges(&self, position: FilePosition) -> Cancellable<Vec<TextRange>> {
         self.with_db(|db| selection_ranges::selection_ranges(db, position))
+    }
+
+    pub fn folding_ranges(
+        &self,
+        file_id: FileId,
+        config: &FoldingConfig,
+    ) -> Cancellable<Vec<Fold>> {
+        self.with_db(|db| folding_ranges::folding_ranges(db, file_id, config))
     }
 }

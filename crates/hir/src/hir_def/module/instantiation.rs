@@ -6,7 +6,7 @@ use super::LowerModuleCtx;
 use crate::{
     define_src, define_src_with_name,
     hir_def::{
-        Ident, alloc_idx_and_src,
+        HirData, Ident, alloc_idx_and_src,
         expr::{ExprId, LowerExpr, data_ty::Dimension},
         lower_ident_opt,
     },
@@ -28,6 +28,7 @@ pub struct Instance {
     pub name: Option<Ident>,
     pub dimensions: SmallVec<[Option<Dimension>; 2]>,
     pub connections: Vec<PortConnId>,
+    pub parent: InstantiationId,
 }
 
 pub type InstanceId = Idx<Instance>;
@@ -63,8 +64,13 @@ impl LowerModuleCtx<'_> {
     ) -> InstantiationId {
         let ty = lower_ident_opt(instance.type_());
         let param_assigns = self.lower_param_assign(instance.parameters());
-        let instances =
-            instance.instances().children().map(|inst| self.lower_instance(inst)).collect();
+
+        let next_instantiation_id = self.module.instantiations.nxt_idx();
+        let instances = instance
+            .instances()
+            .children()
+            .map(|inst| self.lower_instance(inst, next_instantiation_id))
+            .collect();
         alloc_idx_and_src! {
             Instantiation { ty, param_assigns, instances } => self.module.instantiations,
             instance => self.module_source_map.instantiation_srcs,
@@ -102,7 +108,11 @@ impl LowerModuleCtx<'_> {
             .collect()
     }
 
-    fn lower_instance(&mut self, instance: ast::HierarchicalInstance) -> InstanceId {
+    fn lower_instance(
+        &mut self,
+        instance: ast::HierarchicalInstance,
+        parent: InstantiationId,
+    ) -> InstanceId {
         let connections = instance
             .connections()
             .children()
@@ -143,7 +153,7 @@ impl LowerModuleCtx<'_> {
             .unwrap_or_default();
 
         alloc_idx_and_src! {
-            Instance { name, dimensions, connections } => self.module.instances,
+            Instance { name, dimensions, connections, parent } => self.module.instances,
             instance => self.module_source_map.instance_srcs,
         }
     }

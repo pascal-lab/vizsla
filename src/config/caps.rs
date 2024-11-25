@@ -84,6 +84,15 @@ impl Config {
         try_or_default!(self.client_caps.window.as_ref()?.work_done_progress?)
     }
 
+    pub fn cli_line_folding_only(&self) -> bool {
+        try_or_default! {
+            self.client_caps
+            .text_document.as_ref()?
+            .folding_range.as_ref()?
+            .line_folding_only?
+        }
+    }
+
     pub(crate) fn negotiated_encoding(&self) -> PositionEncoding {
         let client_encodings = match &self.client_caps.general {
             Some(general) => general.position_encodings.as_deref().unwrap_or_default(),
