@@ -116,7 +116,10 @@ impl<'a> SyntaxNodeExt<'a> for SyntaxNode<'a> {
         cursor.goto_last_tok_before(offset);
         let left = cursor.to_tok_with_parent();
         let left_range = left.and_then(|left| left.text_range());
-        let left_ok = left_range.map(|range| range.contains_inclusive(offset)).unwrap_or(false);
+        if left_range.is_some_and(|range| range.contains(offset)) {
+            return TokenAtOffset::Single(left.unwrap());
+        }
+        let left_ok = left_range.map(|range| range.end() == offset).unwrap_or(false);
 
         cursor.reset_to_root();
         cursor.goto_first_tok_after(offset);
@@ -126,9 +129,9 @@ impl<'a> SyntaxNodeExt<'a> for SyntaxNode<'a> {
 
         match (left_ok, right_ok) {
             (true, true) => TokenAtOffset::Between(left.unwrap(), right.unwrap()),
-            (true, false) => TokenAtOffset::Single(left.unwrap()),
             (false, true) => TokenAtOffset::Single(right.unwrap()),
             (false, false) => TokenAtOffset::None,
+            _ => unreachable!(),
         }
     }
 

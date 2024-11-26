@@ -133,6 +133,8 @@ impl ReferenceToken<'_> {
 }
 
 impl<'a, 'b> ReferencesCtx<'a, 'b> {
+    const FILE_REF_CAPACITY: usize = 8;
+
     pub(crate) fn new(
         sema: &'a Semantics<'a, RootDb>,
         def: &'b Definition,
@@ -164,7 +166,11 @@ impl<'a, 'b> ReferencesCtx<'a, 'b> {
             Self::match_text(&text, finder, range)
                 .filter_map(|offset| Self::filter_token(*root, file_id, &def_ranges, offset))
                 .filter(|tp| self.classify_and_filter(sema, tp))
-                .for_each(|token| res.entry(file_id).or_default().push(ReferenceToken { token }));
+                .for_each(|token| {
+                    res.entry(file_id)
+                        .or_insert_with(|| Vec::with_capacity(Self::FILE_REF_CAPACITY))
+                        .push(ReferenceToken { token })
+                });
         }
 
         res

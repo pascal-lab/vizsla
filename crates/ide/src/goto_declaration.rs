@@ -21,7 +21,7 @@ pub(crate) fn goto_declaration(
 
     let origins = match DefinitionClass::resolve(&sema, token)? {
         DefinitionClass::Definition(definition) => definition.declaration_origins(),
-        DefinitionClass::PortConnShorthand { port, data } => port.declaration_origins(),
+        DefinitionClass::PortConnShorthand { port, .. } => port.declaration_origins(),
     };
 
     let navs = origins.into_iter().unique().map(|def| def.to_nav(db)).collect_vec();

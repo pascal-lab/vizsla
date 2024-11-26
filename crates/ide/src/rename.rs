@@ -6,7 +6,7 @@ use span::FilePosition;
 use syntax::{
     SyntaxAncestors, SyntaxNode, SyntaxNodeExt, SyntaxTokenWithParent,
     ast::{self, AstNode},
-    has_text_range::{HasTextRange, SourceRangeExt},
+    has_text_range::HasTextRange,
     match_ast,
     token::TokenKindExt,
 };
@@ -96,7 +96,7 @@ fn edits_from_refs(
     let text = sema.db.file_text(file_id);
 
     for ReferenceToken { token: SyntaxTokenWithParent { parent, tok } } in toks.into_iter() {
-        let range = tok.text_range()?;
+        let range = tok.text_range().unwrap();
 
         let conn_data_range = |it: ast::NamedPortConnection| it.expr()?.syntax().text_range();
 

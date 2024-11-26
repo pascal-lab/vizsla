@@ -238,7 +238,7 @@ fn build_stmt<Arn, SrcMap>(
         return;
     }
 
-    let mut children = Vec::with_capacity(5);
+    let mut children = Vec::with_capacity(2);
     let stmt_name = stmt.label.as_ref().map(|s| s.as_str());
     match &stmt.kind {
         StmtKind::Wait(_, stmt_id)

@@ -232,7 +232,7 @@ pub(crate) fn workspace_edit(
     snap: &GlobalStateSnapshot,
     source_change: SourceChange,
 ) -> Cancellable<lsp_types::WorkspaceEdit> {
-    let mut document_changes = Vec::new();
+    let mut document_changes = Vec::with_capacity(source_change.text_edits.len());
 
     for (file_id, edit) in source_change.text_edits {
         let text_document = optional_versioned_text_document_identifier(snap, file_id);

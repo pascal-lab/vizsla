@@ -248,8 +248,8 @@ fn format_in_bc(
         return Ok(None);
     }
 
-    let mut res = String::with_capacity(prev.len());
     let indent = prev.chars().take_while(|&c| c == ' ').count();
+    let mut res = String::with_capacity(prev.len() + 2);
     res.extend(iter::repeat(' ').take(indent));
     if prev[indent..].strip_prefix('*').is_some() {
         res.push_str("* ");
