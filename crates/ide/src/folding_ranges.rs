@@ -13,6 +13,7 @@ use hir::{
 use ide_db::{line_index_db::LineIndexDb, root_db::RootDb};
 use la_arena::Arena;
 use memchr::memmem::Finder;
+use rustc_hash::FxHashSet;
 use syntax::{
     SyntaxCursor, SyntaxCursorExt, SyntaxTrivia, SyntaxTriviaIter, Trivia,
     token::SyntaxTokenExt,
@@ -143,8 +144,8 @@ fn collect_comments(
     let mut cursor = root.walk();
 
     let text = db.file_text(file_id.file_id());
-    collect_line_comments(&text, &mut cursor, line_index, folds);
-    collect_block_comments(&text, &mut cursor, line_index, folds);
+    let visited_ranges = collect_line_comments(&text, &mut cursor, line_index, folds);
+    collect_block_comments(&text, &mut cursor, line_index, visited_ranges, folds);
 }
 
 fn collect_line_comments(
@@ -152,10 +153,12 @@ fn collect_line_comments(
     cursor: &mut SyntaxCursor<'_>,
     line_index: &LineIndex,
     folds: &mut Vec<Fold>,
-) {
+) -> FxHashSet<usize> {
     let finder = Finder::new("//");
     let mut it = finder.find_iter(text.as_bytes());
     let mut last_pos = 0;
+
+    let mut visited_ranges = FxHashSet::default();
 
     while let Some(start) = it.next() {
         if start < last_pos {
@@ -165,6 +168,7 @@ fn collect_line_comments(
         cursor.reset_to_root();
         cursor.goto_first_tok_after_or_last(TextSize::from(start as u32));
         let tok = cursor.to_token().unwrap();
+        visited_ranges.insert(tok.range().unwrap().start());
         let mut trivias = tok.trivias_with_range().peekable();
 
         let check_lc = |t: &SyntaxTrivia| {
@@ -173,25 +177,27 @@ fn collect_line_comments(
 
         // (1 eol + 1 whitespace (optional) + 1 line comment){>=2}
         while let Some((range, t)) = trivias.next() {
-            if !check_lc(&t) {
-                continue;
-            }
+            if check_lc(&t) {
+                let comment_start = range.start();
+                let mut comment_end = None;
 
-            let comment_start = range.start();
-            let mut comment_end = None;
+                while trivias.next_if(|(_, t)| t.kind().is_eol()).is_some() {
+                    trivias.next_if(|(_, t)| t.kind().is_whitespace());
 
-            while trivias.next_if(|(_, t)| t.kind().is_eol()).is_some() {
-                trivias.next_if(|(_, t)| t.kind().is_whitespace());
-
-                if let Some((range, _)) = trivias.next_if(|(_, t)| check_lc(t)) {
-                    comment_end = Some(range.end());
-                } else {
-                    break;
+                    if let Some((range, _)) = trivias.next_if(|(_, t)| check_lc(t)) {
+                        comment_end = Some(range.end());
+                    } else {
+                        break;
+                    }
                 }
-            }
 
-            if let Some(comment_end) = comment_end {
-                let range = TextRange::new(comment_start, comment_end);
+                if let Some(comment_end) = comment_end {
+                    let range = TextRange::new(comment_start, comment_end);
+                    let fold = Fold::try_build(range, FoldKind::Comment, line_index).unwrap();
+                    folds.push(fold);
+                }
+            } else if t.kind().is_bc() {
+                let range = TextRange::new(range.start(), range.end());
                 let fold = Fold::try_build(range, FoldKind::Comment, line_index).unwrap();
                 folds.push(fold);
             }
@@ -199,12 +205,15 @@ fn collect_line_comments(
 
         last_pos = tok.range().unwrap().start();
     }
+
+    visited_ranges
 }
 
 fn collect_block_comments<'a>(
     text: &str,
     cursor: &mut SyntaxCursor<'_>,
     line_index: &LineIndex,
+    visited_ranges: FxHashSet<usize>,
     folds: &mut Vec<Fold>,
 ) {
     let finder = Finder::new("/*");
@@ -212,7 +221,7 @@ fn collect_block_comments<'a>(
     let mut last_pos = 0;
 
     while let Some(start) = it.next() {
-        if start < last_pos {
+        if start < last_pos || visited_ranges.contains(&start) {
             continue;
         }
 
