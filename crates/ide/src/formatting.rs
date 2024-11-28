@@ -150,7 +150,7 @@ pub fn format_on_type(
     if config.in_comments {
         if let Some(idx) = idx
             && let (_, trivia) = trivias[idx]
-            && trivia.kind() == Trivia![bc]
+            && trivia.kind().is_bc()
         {
             return format_in_bc(trivia, trivias[idx].0.start(), offset);
         }
@@ -208,7 +208,7 @@ fn format_in_lc(
     let indent = prev_eol
         .checked_sub(2)
         .and_then(|idx| trivias.get(idx))
-        .filter(|(_, t)| t.kind() == Trivia![ws])
+        .filter(|(_, t)| t.kind().is_whitespace())
         .map_or(0, |(range, _)| range.len().into());
 
     if let Some(indent_exists) = offset.checked_sub(line_start)

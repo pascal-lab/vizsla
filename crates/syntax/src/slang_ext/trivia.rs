@@ -7,6 +7,8 @@ pub trait TriviaKindExt {
     fn is_whitespace(&self) -> bool;
     fn is_eol(&self) -> bool;
     fn is_comment(&self) -> bool;
+    fn is_lc(&self) -> bool;
+    fn is_bc(&self) -> bool;
 }
 
 impl TriviaKindExt for TriviaKind {
@@ -20,6 +22,14 @@ impl TriviaKindExt for TriviaKind {
 
     fn is_comment(&self) -> bool {
         matches!(*self, Trivia![bc] | Trivia![lc])
+    }
+
+    fn is_lc(&self) -> bool {
+        matches!(*self, Trivia![lc])
+    }
+
+    fn is_bc(&self) -> bool {
+        matches!(*self, Trivia![bc])
     }
 }
 
