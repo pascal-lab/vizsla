@@ -8,7 +8,6 @@ use hir::{
 };
 use ide_db::root_db::RootDb;
 use itertools::Itertools;
-use line_index::{TextRange, TextSize};
 use memchr::memmem::Finder;
 use nohash_hasher::IntMap;
 use rustc_hash::FxHashMap;
@@ -18,7 +17,10 @@ use syntax::{
     token::TokenKindExt,
 };
 use triomphe::Arc;
-use utils::get::Get;
+use utils::{
+    get::Get,
+    line_index::{TextRange, TextSize},
+};
 use vfs::FileId;
 
 use super::{ReferenceCategory, ReferencesConfig};

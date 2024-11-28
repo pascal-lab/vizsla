@@ -1,13 +1,15 @@
 use std::{mem, ops::Range};
 
-use line_index::LineIndex;
 use lsp_types::{
     DidChangeConfigurationParams, DidChangeTextDocumentParams, DidChangeWatchedFilesParams,
     DidChangeWorkspaceFoldersParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
     DidSaveTextDocumentParams,
 };
 use triomphe::Arc;
-use utils::lines::{LineEnding, LineInfo, PositionEncoding};
+use utils::{
+    line_index::LineIndex,
+    lines::{LineEnding, LineInfo, PositionEncoding},
+};
 use vfs::loader::LoadResult;
 
 use crate::{

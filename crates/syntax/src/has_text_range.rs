@@ -1,5 +1,5 @@
-use line_index::TextRange;
 use slang::{SourceRange, SyntaxElement, SyntaxNode, SyntaxToken};
+use utils::line_index::TextRange;
 
 pub trait SourceRangeExt {
     fn to_text_range(self) -> TextRange;

@@ -1,8 +1,8 @@
 use hir::{container::InFile, semantics::Semantics};
 use ide_db::root_db::RootDb;
-use line_index::TextRange;
 use span::FilePosition;
 use syntax::{SyntaxNodeExt, SyntaxTokenWithParent, TokenKind, ast::AstNode, token::TokenKindExt};
+use utils::line_index::TextRange;
 use vfs::FileId;
 
 use crate::{

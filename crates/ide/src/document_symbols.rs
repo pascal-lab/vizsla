@@ -13,9 +13,11 @@ use hir::{
 };
 use ide_db::root_db::RootDb;
 use la_arena::Idx;
-use line_index::TextRange;
 use smol_str::SmolStr;
-use utils::get::{Get, GetRef};
+use utils::{
+    get::{Get, GetRef},
+    line_index::TextRange,
+};
 use vfs::FileId;
 
 use crate::SymbolKind;

@@ -1,7 +1,6 @@
 use base_db::source_db::SourceDb;
 use hir::{container::InFile, hir_def::lower_ident, semantics::Semantics};
 use ide_db::root_db::RootDb;
-use line_index::{TextRange, TextSize};
 use span::FilePosition;
 use syntax::{
     SyntaxAncestors, SyntaxNode, SyntaxNodeExt, SyntaxTokenWithParent,
@@ -11,7 +10,10 @@ use syntax::{
     token::TokenKindExt,
 };
 use thiserror::Error;
-use utils::text_edit::TextEdit;
+use utils::{
+    line_index::{TextRange, TextSize},
+    text_edit::TextEdit,
+};
 use vfs::FileId;
 
 use crate::{

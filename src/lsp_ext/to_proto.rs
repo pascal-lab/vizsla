@@ -9,9 +9,9 @@ use ide::{
     source_change::SourceChange,
 };
 use itertools::Itertools;
-use line_index::{TextRange, TextSize};
 use span::FileRange;
 use utils::{
+    line_index::{TextRange, TextSize},
     lines::{LineEnding, LineInfo, PositionEncoding},
     paths::{
         AbsPath,

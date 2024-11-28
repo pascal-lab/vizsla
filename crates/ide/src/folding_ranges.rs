@@ -9,13 +9,12 @@ use hir::{
     },
     source_map::{IsNamedSrc, IsSrc, SourceMap},
 };
-use ide_db::{
-    line_index_db::{LineIndexDb, LineIndexExt},
-    root_db::RootDb,
-};
+use ide_db::{line_index_db::LineIndexDb, root_db::RootDb};
 use la_arena::Arena;
-use line_index::{LineIndex, TextRange};
-use utils::get::{Get, GetRef};
+use utils::{
+    get::{Get, GetRef},
+    line_index::{LineIndex, TextRange},
+};
 use vfs::FileId;
 
 #[derive(Debug, Clone, Copy)]
@@ -138,8 +137,7 @@ fn collect_module(
             .as_ref()
             .and_then(|port_list| {
                 let line = line_index.line_col(port_list.range.end()).line + 1;
-                // TODO: line maybe out of range
-                line_index.line(line)
+                line_index.range_for_line(line.min(line_index.lines_len().saturating_sub(1)))
             })
             .unwrap_or(module_src.range());
 

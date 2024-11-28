@@ -1,6 +1,7 @@
-use line_index::{LineIndex, WideEncoding};
 use memchr::memmem;
 use triomphe::Arc;
+
+use crate::line_index::{LineIndex, WideEncoding};
 
 #[derive(Clone, Copy)]
 pub enum PositionEncoding {

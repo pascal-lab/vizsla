@@ -14,7 +14,6 @@ hir.workspace = true
 ide-db.workspace = true
 itertools.workspace = true
 la-arena.workspace = true
-line-index.workspace = true
 memchr.workspace = true
 nohash-hasher.workspace = true
 rustc-hash.workspace = true

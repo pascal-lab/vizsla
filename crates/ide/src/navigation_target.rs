@@ -12,10 +12,12 @@ use hir::{
     source_map::{IsNamedSrc, IsSrc},
 };
 use ide_db::root_db::RootDb;
-use line_index::TextRange;
 use smol_str::SmolStr;
 use syntax::{SyntaxTokenWithParent, has_text_range::HasTextRange};
-use utils::get::{Get, GetRef};
+use utils::{
+    get::{Get, GetRef},
+    line_index::TextRange,
+};
 use vfs::FileId;
 
 use crate::{SymbolKind, definitions::DefinitionOrigins};

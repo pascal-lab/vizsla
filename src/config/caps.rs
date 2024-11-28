@@ -1,4 +1,3 @@
-use line_index::WideEncoding;
 use lsp_types::{
     CodeActionKind, CodeActionOptions, CodeLensOptions, CompletionOptions,
     CompletionOptionsCompletionItem, DeclarationCapability, DocumentOnTypeFormattingOptions,
@@ -10,7 +9,7 @@ use lsp_types::{
     WorkspaceFileOperationsServerCapabilities, WorkspaceFoldersServerCapabilities,
     WorkspaceServerCapabilities,
 };
-use utils::{lines::PositionEncoding, try_, try_or_default};
+use utils::{line_index::WideEncoding, lines::PositionEncoding, try_, try_or_default};
 
 use crate::config::Config;
 

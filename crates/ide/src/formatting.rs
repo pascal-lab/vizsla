@@ -9,15 +9,15 @@ use std::{
 use base_db::source_db::SourceDb;
 use dissimilar::Chunk;
 use hir::semantics::Semantics;
-use ide_db::{line_index_db::LineIndexExt, root_db::RootDb};
+use ide_db::root_db::RootDb;
 use itertools::Itertools;
-use line_index::{TextRange, TextSize};
 use span::FilePosition;
 use syntax::{
     SyntaxCursor, SyntaxCursorExt, SyntaxKind, SyntaxTrivia, Trivia, ast::AstNode,
     has_text_range::HasTextRange, token::SyntaxTokenExt, trivia::TriviaKindExt,
 };
 use utils::{
+    line_index::{TextRange, TextSize},
     lines::{LineEnding, LineInfo},
     paths::Utf8PathBuf,
     text_edit::TextEdit,

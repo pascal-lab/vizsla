@@ -1,8 +1,8 @@
-use line_index::TextRange;
 use slang::{
     SyntaxElement, SyntaxElementKind, SyntaxKind, SyntaxNode, SyntaxToken, SyntaxTokenWithParent,
     SyntaxTree, TokenKind,
 };
+use utils::line_index::TextRange;
 
 use crate::{SyntaxNodeExt, has_text_range::HasTextRange};
 

@@ -1,6 +1,6 @@
-use line_index::{LineCol, TextRange, TextSize, WideLineCol};
 use span::FilePosition;
 use utils::{
+    line_index::{LineCol, TextRange, TextSize, WideLineCol},
     lines::{LineInfo, PositionEncoding},
     paths::AbsPathBuf,
 };

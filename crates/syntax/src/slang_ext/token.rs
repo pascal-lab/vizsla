@@ -1,9 +1,9 @@
 use either::Either;
-use line_index::{TextRange, TextSize};
 use slang::{
     SyntaxToken, SyntaxTokenWithParent, SyntaxTrivia, Token, TokenKind,
     ast::{self, AstNode},
 };
+use utils::line_index::{TextRange, TextSize};
 
 use crate::support;
 

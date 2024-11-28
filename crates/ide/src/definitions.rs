@@ -12,13 +12,13 @@ use hir::{
     source_map::{IsNamedSrc, IsSrc},
 };
 use ide_db::root_db::RootDb;
-use line_index::TextRange;
 use smallvec::{SmallVec, smallvec};
 use smol_str::SmolStr;
 use syntax::{SyntaxTokenWithParent, ast, match_ast, token::TokenKindExt};
 use utils::{
     get::{Get, GetRef},
     impl_from,
+    line_index::TextRange,
 };
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]

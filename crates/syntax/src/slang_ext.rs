@@ -1,12 +1,12 @@
 use std::iter;
 
 use either::Either;
-use line_index::{TextRange, TextSize};
 use slang::{
     SyntaxAncestors, SyntaxCursor, SyntaxElement, SyntaxNode, SyntaxTokenWithParent, SyntaxTrivia,
     TokenKind, ast::AstNode,
 };
 use token::SyntaxTokenExt;
+use utils::line_index::{TextRange, TextSize};
 
 use crate::{has_text_range::HasTextRange, ptr::SyntaxNodePtr};
 
@@ -208,7 +208,7 @@ impl SyntaxCursorExt for SyntaxCursor<'_> {
 
     fn goto_first_tok_after_or_last(&mut self, offset: TextSize) -> bool {
         if !self.goto_first_tok_after(offset) {
-            if self.to_elem().range().is_some_and(|range| range.end() == offset.into()) {
+            if self.to_elem().range().is_some_and(|range| range.end() == usize::from(offset)) {
                 while self.to_node().is_some() {
                     let success = self.goto_last_child();
                     debug_assert!(success);

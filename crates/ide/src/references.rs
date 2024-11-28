@@ -1,7 +1,6 @@
 use hir::semantics::Semantics;
 use ide_db::root_db::RootDb;
 use itertools::Itertools;
-use line_index::TextRange;
 use nohash_hasher::IntMap;
 use search::{ReferencesCtx, SearchScope};
 use span::FilePosition;
@@ -11,6 +10,7 @@ use syntax::{
     has_text_range::HasTextRange,
     token::{TokenKindExt, pair_token},
 };
+use utils::line_index::TextRange;
 use vfs::FileId;
 
 use crate::{

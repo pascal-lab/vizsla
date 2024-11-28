@@ -9,7 +9,6 @@ edition.workspace = true
 
 [dependencies]
 either.workspace = true
-line-index.workspace = true
 serde.workspace = true
 smol_str.workspace = true
 slang.workspace = true

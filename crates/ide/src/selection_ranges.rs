@@ -1,7 +1,6 @@
 use hir::semantics::Semantics;
 use ide_db::root_db::RootDb;
 use itertools::Itertools;
-use line_index::TextRange;
 use span::FilePosition;
 use syntax::{
     SyntaxCursorExt, SyntaxNodeExt, TokenKind,
@@ -9,6 +8,7 @@ use syntax::{
     has_text_range::HasTextRange,
     token::{SyntaxTokenExt, TokenKindExt},
 };
+use utils::line_index::TextRange;
 
 pub(crate) fn selection_ranges(
     db: &RootDb,
