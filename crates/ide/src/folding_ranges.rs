@@ -1,3 +1,4 @@
+use base_db::source_db::SourceDb;
 use hir::{
     db::HirDb,
     doc_tree::DocTree,
@@ -11,9 +12,16 @@ use hir::{
 };
 use ide_db::{line_index_db::LineIndexDb, root_db::RootDb};
 use la_arena::Arena;
+use memchr::memmem::Finder;
+use syntax::{
+    SyntaxCursor, SyntaxCursorExt, SyntaxTrivia, SyntaxTriviaIter, Trivia,
+    token::SyntaxTokenExt,
+    trivia::{TriviaExt, TriviaKindExt},
+};
 use utils::{
     get::{Get, GetRef},
     line_index::{LineIndex, TextRange},
+    text_edit::TextSize,
 };
 use vfs::FileId;
 
@@ -107,6 +115,8 @@ pub(crate) fn folding_ranges(db: &RootDb, file_id: FileId, _config: &FoldingConf
 
     let mut folds = Vec::default();
 
+    collect_comments(db, file_id, line_index, &mut folds);
+
     folds.collect_docs(&src_map.doc_tree, line_index);
 
     src_map.module_srcs.iter().for_each(|(idx, src)| {
@@ -118,6 +128,111 @@ pub(crate) fn folding_ranges(db: &RootDb, file_id: FileId, _config: &FoldingConf
     collect_stmt(db, &mut folds, &file.stmts, &src_map.stmt_srcs, line_index);
 
     folds
+}
+
+fn collect_comments(
+    db: &RootDb,
+    file_id: HirFileId,
+    line_index: &LineIndex,
+    folds: &mut Vec<Fold>,
+) {
+    let tree = db.parse(file_id);
+    let Some(root) = tree.root() else {
+        return;
+    };
+    let mut cursor = root.walk();
+
+    let text = db.file_text(file_id.file_id());
+    collect_line_comments(&text, &mut cursor, line_index, folds);
+    collect_block_comments(&text, &mut cursor, line_index, folds);
+}
+
+fn collect_line_comments(
+    text: &str,
+    cursor: &mut SyntaxCursor<'_>,
+    line_index: &LineIndex,
+    folds: &mut Vec<Fold>,
+) {
+    let finder = Finder::new("//");
+    let mut it = finder.find_iter(text.as_bytes());
+    let mut last_pos = 0;
+
+    while let Some(start) = it.next() {
+        if start < last_pos {
+            continue;
+        }
+
+        cursor.reset_to_root();
+        cursor.goto_first_tok_after_or_last(TextSize::from(start as u32));
+        let tok = cursor.to_token().unwrap();
+        let mut trivias = tok.trivias_with_range().peekable();
+
+        let check_lc = |t: &SyntaxTrivia| {
+            t.kind().is_lc() && t.is_region_begin().is_none() && !t.is_region_end()
+        };
+
+        // (1 eol + 1 whitespace (optional) + 1 line comment){>=2}
+        while let Some((range, t)) = trivias.next() {
+            if !check_lc(&t) {
+                continue;
+            }
+
+            let comment_start = range.start();
+            let mut comment_end = None;
+
+            while trivias.next_if(|(_, t)| t.kind().is_eol()).is_some() {
+                trivias.next_if(|(_, t)| t.kind().is_whitespace());
+
+                if let Some((range, _)) = trivias.next_if(|(_, t)| check_lc(t)) {
+                    comment_end = Some(range.end());
+                } else {
+                    break;
+                }
+            }
+
+            if let Some(comment_end) = comment_end {
+                let range = TextRange::new(comment_start, comment_end);
+                let fold = Fold::try_build(range, FoldKind::Comment, line_index).unwrap();
+                folds.push(fold);
+            }
+        }
+
+        last_pos = tok.range().unwrap().start();
+    }
+}
+
+fn collect_block_comments<'a>(
+    text: &str,
+    cursor: &mut SyntaxCursor<'_>,
+    line_index: &LineIndex,
+    folds: &mut Vec<Fold>,
+) {
+    let finder = Finder::new("/*");
+    let mut it = finder.find_iter(text.as_bytes());
+    let mut last_pos = 0;
+
+    while let Some(start) = it.next() {
+        if start < last_pos {
+            continue;
+        }
+
+        cursor.reset_to_root();
+        cursor.goto_first_tok_after_or_last(TextSize::from(start as u32));
+        let tok = cursor.to_token().unwrap();
+
+        let trivias = tok.trivias_with_range();
+        for (range, trivia) in trivias {
+            if !trivia.kind().is_bc() {
+                continue;
+            }
+
+            let range = TextRange::new(range.start(), range.end());
+            let fold = Fold::try_build(range, FoldKind::Comment, line_index).unwrap();
+            folds.push(fold);
+        }
+
+        last_pos = tok.range().unwrap().start();
+    }
 }
 
 fn collect_module(
