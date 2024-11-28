@@ -5,6 +5,7 @@
 
 pub mod container;
 pub mod db;
+pub mod doc_tree;
 pub mod file;
 pub mod has_source;
 pub mod hir_def;

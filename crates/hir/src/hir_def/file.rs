@@ -23,6 +23,7 @@ use super::{
 };
 use crate::{
     db::{HirDb, InternDb},
+    doc_tree::{DocTree, DocTreeBuilder},
     file::HirFileId,
     hir_def::lower_ident_opt,
     source_map::SourceMap,
@@ -49,6 +50,7 @@ define_container! {
     #[derive(Default, Debug, PartialEq, Eq)]
     pub struct FileSourceMap {
         items: SmallVec<[FileItem; 3]>,
+        doc_tree: DocTree,
 
         module_srcs: [ModuleInfo | ModuleSrc],
         proc_srcs: [Proc | ProcSrc],
@@ -79,6 +81,8 @@ pub(crate) struct LowerFileCtx<'a> {
 
     pub(crate) file: &'a mut HirFile,
     pub(crate) file_source_map: &'a mut FileSourceMap,
+
+    pub(crate) doc_tree: DocTreeBuilder,
 }
 
 impl_lower_expr!(LowerFileCtx<'_>, file, file_source_map);
@@ -93,6 +97,7 @@ impl LowerProc for LowerFileCtx<'_> {
             db: self.db,
             file_id: self.file_id,
             cont_id: self.file_id.into(),
+            doc_tree: &mut self.doc_tree,
             procs: &mut self.file.procs,
             proc_srcs: &mut self.file_source_map.proc_srcs,
 
@@ -133,7 +138,12 @@ impl LowerFileCtx<'_> {
                 _ => unimplemented!(),
             };
             self.file_source_map.items.push(idx);
+            self.doc_tree.handle_node(member.syntax());
         }
+        self.doc_tree.check_empty();
+
+        self.doc_tree.handle_tok(root.end_of_file());
+        self.file_source_map.doc_tree = self.doc_tree.finish();
     }
 }
 
@@ -149,8 +159,13 @@ pub(crate) fn hir_file_with_source_map_query(
         return (Arc::new(hir_file), Arc::new(source_map));
     };
 
-    let mut lower_ctx =
-        LowerFileCtx { db, file_id, file: &mut hir_file, file_source_map: &mut source_map };
+    let mut lower_ctx = LowerFileCtx {
+        db,
+        file_id,
+        file: &mut hir_file,
+        file_source_map: &mut source_map,
+        doc_tree: DocTreeBuilder::new(),
+    };
     lower_ctx.lower_file(root);
 
     hir_file.shrink_to_fit();

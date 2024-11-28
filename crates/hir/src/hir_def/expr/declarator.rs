@@ -1,12 +1,13 @@
 use la_arena::{Arena, Idx, IdxRange};
 use smallvec::SmallVec;
-use syntax::ast;
+use syntax::ast::{self, AstNode};
 use utils::define_enum_deriving_from;
 
 use super::{Expr, ExprId, ExprSrc, LowerExpr, data_ty::Dimension, impl_lower_expr};
 use crate::{
     db::InternDb,
     define_src_with_name,
+    doc_tree::DocTreeBuilder,
     hir_def::{
         HirData, Ident, alloc_idx_and_src, declaration::DeclarationId, lower_ident_opt,
         module::port::PortDeclId, stmt::StmtId,
@@ -43,6 +44,7 @@ pub(crate) struct LowerDeclCtx<'a> {
 
     pub(crate) exprs: &'a mut Arena<Expr>,
     pub(crate) expr_srcs: &'a mut SourceMap<ExprSrc, Expr>,
+    pub(crate) doc_tree: &'a mut DocTreeBuilder,
 }
 
 pub(crate) trait LowerDecl: LowerExpr {
@@ -59,6 +61,7 @@ pub(in crate::hir_def) macro impl_lower_decl {
                     decl_srcs: &mut self.$($src_map.)?decl_srcs,
                     exprs: &mut self.$($data.)?exprs,
                     expr_srcs: &mut self.$($src_map.)?expr_srcs,
+                    doc_tree: &mut self.doc_tree,
                 }
             }
         }
@@ -94,7 +97,7 @@ impl LowerDeclCtx<'_> {
             .collect();
         let initializer =
             declarator.initializer().map(|init| self.expr_ctx().lower_expr(init.expr()));
-
+        self.doc_tree.handle_node(declarator.syntax());
         alloc_idx_and_src! {
             Declarator { name, dimensions, initializer, parent } => self.decls,
             declarator => self.decl_srcs,

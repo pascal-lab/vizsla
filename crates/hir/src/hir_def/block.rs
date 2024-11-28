@@ -31,6 +31,7 @@ use crate::{
     container::{ContainerId, InFile},
     db::{HirDb, InternDb},
     define_src_with_name,
+    doc_tree::{DocTree, DocTreeBuilder},
     file::HirFileId,
     source_map::{SourceMap, ToAstNode},
 };
@@ -56,6 +57,7 @@ define_container! {
     #[derive(Default, Debug, PartialEq, Eq)]
     pub struct BlockSourceMap {
         items: SmallVec<[BlockItem; 2]>,
+        doc_tree: DocTree,
 
         declaration_srcs: [Declaration | DeclarationSrc],
         expr_srcs: [Expr | ExprSrc],
@@ -164,6 +166,8 @@ pub(crate) struct LowerBlockCtx<'a> {
 
     pub(crate) block: &'a mut Block,
     pub(crate) block_source_map: &'a mut BlockSourceMap,
+
+    pub(crate) doc_tree: DocTreeBuilder,
 }
 
 impl_lower_expr!(LowerBlockCtx<'_>, block, block_source_map);
@@ -182,17 +186,19 @@ impl LowerBlockCtx<'_> {
             Some(TokenKind::JOIN_NONE_KEYWORD) => BlockKind::Parallel(ParBlockKind::JoinNone),
             _ => BlockKind::Sequential, // Some(TokenKind::END_KEYWORD) | None | Others
         };
-        self.block_source_map.items = block
-            .items()
-            .children()
-            .map(|node| {
-                match_ast! { node.syntax(),
-                    ast::Statement[it] => self.stmt_ctx().lower_stmt(it).into(),
-                    ast::DataDeclaration[it] => self.declaration_ctx().lower_data_decl(it).into(),
-                    _ => unimplemented!("{:?}", node.syntax().kind()),
-                }
-            })
-            .collect();
+
+        for node in block.items().children() {
+            let idx = match_ast! { node.syntax(),
+                ast::Statement[it] => self.stmt_ctx().lower_stmt(it).into(),
+                ast::DataDeclaration[it] => self.declaration_ctx().lower_data_decl(it).into(),
+                _ => unimplemented!("{:?}", node.syntax().kind()),
+            };
+            self.block_source_map.items.push(idx);
+            self.doc_tree.handle_node(node.syntax());
+        }
+
+        self.doc_tree.handle_tok(block.end());
+        self.block_source_map.doc_tree = self.doc_tree.finish();
     }
 }
 
@@ -215,6 +221,7 @@ pub(crate) fn block_with_source_map_query(
         block_id,
         block: &mut block,
         block_source_map: &mut block_source_map,
+        doc_tree: DocTreeBuilder::new(),
     };
     lower_ctx.lower_block(ast_block);
 

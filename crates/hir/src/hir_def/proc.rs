@@ -9,6 +9,7 @@ use crate::{
     container::ContainerId,
     db::InternDb,
     define_src,
+    doc_tree::DocTreeBuilder,
     file::HirFileId,
     hir_def::{
         alloc_idx_and_src,
@@ -57,6 +58,8 @@ pub(crate) struct LowerProcCtx<'a> {
     pub(crate) db: &'a dyn InternDb,
     pub(crate) file_id: HirFileId,
     pub(crate) cont_id: ContainerId,
+    pub(crate) doc_tree: &'a mut DocTreeBuilder,
+
     pub(crate) procs: &'a mut Arena<Proc>,
     pub(crate) proc_srcs: &'a mut SourceMap<ProcSrc, Proc>,
 

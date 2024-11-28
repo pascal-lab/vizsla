@@ -1,15 +1,14 @@
 use la_arena::{Arena, Idx};
+use smol_str::SmolStr;
 use syntax::{
-    SyntaxElemPreorder, SyntaxNode, SyntaxNodeExt, SyntaxToken, SyntaxTrivia,
-    token::SyntaxTokenExt, trivia::TriviaExt,
+    SyntaxNode, SyntaxNodeExt, SyntaxToken, SyntaxTrivia, token::SyntaxTokenExt, trivia::TriviaExt,
 };
 use utils::text_edit::{TextRange, TextSize};
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum DocKind {
-    Region,
-    Segment { doc: Option<Idx<DocNode>> },
-    Doc,
+    Region(SmolStr),
+    PseudoRegion,
 }
 
 // 1. region .. endregion
@@ -28,7 +27,7 @@ pub struct DocNode {
 }
 
 impl DocTree {
-    pub fn add_node(
+    pub(crate) fn add_node(
         &mut self,
         range: TextRange,
         kind: DocKind,
@@ -51,18 +50,18 @@ pub(crate) struct DocTreeBuilder {
 }
 
 impl DocTreeBuilder {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self { tree: DocTree::default(), stack: Vec::new() }
     }
 
-    fn open_node(&mut self, start: usize, kind: DocKind) {
+    fn open_region(&mut self, start: usize, kind: DocKind) {
         let parent = self.stack.last().copied();
         let range = TextRange::empty(TextSize::new(start as u32));
         let node = self.tree.add_node(range, kind, parent);
         self.stack.push(node);
     }
 
-    fn finish_node(&mut self, end: usize) {
+    fn finish_region(&mut self, end: usize) {
         let node = &mut self.tree.nodes[*self.stack.last().unwrap()];
         let start = node.range.start();
         let end = TextSize::new(end as u32);
@@ -75,28 +74,34 @@ impl DocTreeBuilder {
     }
 
     // TODO: diagnostics for !is_empty
-    pub fn is_empty(&self) -> bool {
-        self.stack.is_empty()
+    pub(crate) fn check_empty(&self) {}
+
+    pub(crate) fn finish(&mut self) -> DocTree {
+        self.check_empty();
+        self.tree.nodes.shrink_to_fit();
+        self.tree.roots.shrink_to_fit();
+        std::mem::take(&mut self.tree)
     }
 
-    pub fn finish(self) -> DocTree {
-        self.tree
-    }
-
-    pub fn handle_node(&mut self, node: SyntaxNode) {
+    #[inline]
+    pub(crate) fn handle_node(&mut self, node: SyntaxNode) {
         node.trivias_with_range().for_each(|(range, trivia)| self.handle_trivia(range, trivia));
     }
 
-    pub fn handle_tok(&mut self, token: SyntaxToken) {
+    #[inline]
+    pub(crate) fn handle_tok(&mut self, token: Option<SyntaxToken>) {
+        let Some(token) = token else {
+            return;
+        };
         token.trivias_with_range().for_each(|(range, trivia)| self.handle_trivia(range, trivia));
     }
 
     #[inline]
     fn handle_trivia(&mut self, range: TextRange, trivia: SyntaxTrivia) {
-        if trivia.is_region_begin() {
-            self.open_node(range.start().into(), DocKind::Region);
+        if let Some(name) = trivia.is_region_begin() {
+            self.open_region(range.start().into(), DocKind::Region(name));
         } else if trivia.is_region_end() {
-            self.finish_node(range.end().into());
+            self.finish_region(range.end().into());
         } else {
             // TODO: handle doc comments
         }

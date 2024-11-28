@@ -2,7 +2,7 @@ use itertools::Either;
 use la_arena::{Arena, Idx, IdxRange};
 use syntax::{
     SyntaxToken, TokenKind,
-    ast::{self, PortExpression},
+    ast::{self, AstNode, PortExpression},
 };
 use utils::get::{Get, GetRef};
 
@@ -276,6 +276,7 @@ impl LowerModuleCtx<'_> {
                 ExplicitAnsiPort(_port) => unimplemented!(),
                 _ => unreachable!(),
             };
+            self.doc_tree.handle_node(port.syntax());
         }
 
         self.module.ports = Ports::Ansi(ports);
@@ -332,6 +333,7 @@ impl LowerModuleCtx<'_> {
                 EmptyNonAnsiPort(_) => NonAnsiPort { label: None, refs: None },
             };
 
+            self.doc_tree.handle_node(port.syntax());
             alloc_idx_and_src! {
                 hir_port => ports,
                 port => port_srcs,

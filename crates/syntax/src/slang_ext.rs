@@ -129,9 +129,9 @@ impl<'a> SyntaxNodeExt<'a> for SyntaxNode<'a> {
 
         match (left_ok, right_ok) {
             (true, true) => TokenAtOffset::Between(left.unwrap(), right.unwrap()),
+            (true, false) => TokenAtOffset::Single(left.unwrap()),
             (false, true) => TokenAtOffset::Single(right.unwrap()),
             (false, false) => TokenAtOffset::None,
-            _ => unreachable!(),
         }
     }
 

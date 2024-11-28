@@ -1,5 +1,6 @@
 use hir::{
     db::HirDb,
+    doc_tree::DocTree,
     file::HirFileId,
     hir_def::{
         block::{BlockId, BlockSrc},
@@ -64,6 +65,8 @@ trait FoldCollector {
     );
 
     fn collect_fold(&mut self, src: impl IsSrc, kind: FoldKind, line_index: &LineIndex);
+
+    fn collect_docs(&mut self, docs: &DocTree, line_index: &LineIndex);
 }
 
 impl FoldCollector for Vec<Fold> {
@@ -85,6 +88,15 @@ impl FoldCollector for Vec<Fold> {
             self.push(fold);
         }
     }
+
+    #[inline]
+    fn collect_docs(&mut self, docs: &DocTree, line_index: &LineIndex) {
+        self.extend(
+            docs.nodes
+                .values()
+                .filter_map(|node| Fold::try_build(node.range, FoldKind::Region, line_index)),
+        );
+    }
 }
 
 pub(crate) fn folding_ranges(db: &RootDb, file_id: FileId, _config: &FoldingConfig) -> Vec<Fold> {
@@ -95,6 +107,8 @@ pub(crate) fn folding_ranges(db: &RootDb, file_id: FileId, _config: &FoldingConf
     let (file, src_map) = db.hir_file_with_source_map(file_id);
 
     let mut folds = Vec::default();
+
+    folds.collect_docs(&src_map.doc_tree, line_index);
 
     src_map.module_srcs.iter().for_each(|(idx, src)| {
         collect_module(db, &mut folds, ModuleId::new(file_id, idx), *src, line_index)
@@ -115,6 +129,8 @@ fn collect_module(
     line_index: &LineIndex,
 ) {
     let (module, src_map) = db.module_with_source_map(module_id);
+
+    folds.collect_docs(&src_map.doc_tree, line_index);
 
     if let Some(port_list_src) = src_map.port_list_src {
         let port_list_fold = Fold::try_build(port_list_src.range(), FoldKind::PortList, line_index);
@@ -162,6 +178,8 @@ fn collect_block(
     line_index: &LineIndex,
 ) {
     let (block, src_map) = db.block_with_source_map(block_id);
+
+    folds.collect_docs(&src_map.doc_tree, line_index);
 
     folds.collect_fold(block_src, FoldKind::Block, line_index);
     folds.collect_folds(&src_map.declaration_srcs, FoldKind::Declaration, line_index);

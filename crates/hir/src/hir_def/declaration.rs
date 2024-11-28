@@ -10,6 +10,7 @@ use super::expr::{
 use crate::{
     db::InternDb,
     define_src,
+    doc_tree::DocTreeBuilder,
     hir_def::{
         HirData, alloc_idx_and_src,
         expr::{
@@ -79,6 +80,7 @@ pub struct ParamDecl {
 
 pub(crate) struct LowerDeclarationCtx<'a> {
     pub(crate) db: &'a dyn InternDb,
+    pub(crate) doc_tree: &'a mut DocTreeBuilder,
     pub(crate) declarations: &'a mut Arena<Declaration>,
     pub(crate) declaration_srcs: &'a mut SourceMap<DeclarationSrc, Declaration>,
 
@@ -101,6 +103,7 @@ pub(in crate::hir_def) macro impl_lower_declaration($ctx:ty, $data:ident, $src_m
         fn declaration_ctx(&mut self) -> $crate::hir_def::declaration::LowerDeclarationCtx {
             $crate::hir_def::declaration::LowerDeclarationCtx {
                 db: self.db,
+                doc_tree: &mut self.doc_tree,
                 declarations: &mut self.$data.declarations,
                 declaration_srcs: &mut self.$src_map.declaration_srcs,
                 decls: &mut self.$data.decls,
