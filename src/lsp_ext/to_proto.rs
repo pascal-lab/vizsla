@@ -119,6 +119,7 @@ fn symbol_kind(symbol_kind: SymbolKind) -> lsp_types::SymbolKind {
         SymbolKind::Fn => LspSymbolKind::FUNCTION,
         SymbolKind::Generate => LspSymbolKind::NAMESPACE,
         SymbolKind::Interface => LspSymbolKind::INTERFACE,
+        SymbolKind::Region => LspSymbolKind::NAMESPACE,
     }
 }
 
@@ -210,7 +211,7 @@ pub(crate) fn position(
     LineInfo { index, encoding, .. }: &LineInfo,
     offset: TextSize,
 ) -> lsp_types::Position {
-    let line_col = index.line_col(offset);
+    let line_col = index.line_col(offset.min(index.text_len()));
     match *encoding {
         PositionEncoding::Utf8 => lsp_types::Position::new(line_col.line, line_col.col),
         PositionEncoding::Wide(enc) => {
@@ -308,7 +309,8 @@ pub(crate) fn folding_range(
         // Clients with `line_folding_only` will fold the whole end line even if
         // it contains text not in the folding range. So we should exclude the end
         // line if there is more text after the end character on the same line.
-        let end_line = if has_more_text_in_line(&text[range.end().into()..]) {
+        let range_end = range.end().into();
+        let end_line = if range_end < text.len() && has_more_text_in_line(&text[range_end..]) {
             end.line
         } else {
             end.line.saturating_sub(1)
@@ -320,7 +322,7 @@ pub(crate) fn folding_range(
             end_line,
             end_character: None,
             kind,
-            collapsed_text: Some(text[range.start().into()..range.end().into()].to_string()),
+            collapsed_text,
         }
     } else {
         lsp_types::FoldingRange {

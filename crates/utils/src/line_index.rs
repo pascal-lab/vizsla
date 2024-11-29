@@ -215,7 +215,7 @@ impl LineIndex {
     /// # Panics
     pub fn line_ranges(&self, range: TextRange) -> Range<usize> {
         let start = self.line_for_offset(range.start()).unwrap();
-        let end = self.line_for_offset(range.end().checked_sub(1.into()).unwrap()).unwrap();
+        let end = self.line_for_offset(range.end().min(self.len)).unwrap();
         (start as usize)..(end as usize) + 1
     }
 }
