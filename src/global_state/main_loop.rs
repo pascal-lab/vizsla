@@ -180,18 +180,18 @@ impl GlobalState {
         use handlers::request::*;
         use lsp_types::request::*;
         dispatcher
-            .on::<GotoDefinition>(handle_goto_definition)
-            .on::<GotoDeclaration>(handle_goto_declaration)
             .on::<DocumentSymbolRequest>(handle_document_symbol)
-            .on::<DocumentHighlightRequest>(handle_document_highlight)
-            .on::<References>(handle_references)
-            .on::<PrepareRenameRequest>(handle_prepare_rename)
-            .on::<Rename>(handle_rename)
-            .on::<Formatting>(handle_formatting)
-            .on::<RangeFormatting>(handle_range_formatting)
-            .on::<OnTypeFormatting>(handle_on_type_formatting)
-            .on::<SelectionRangeRequest>(handle_selection_range)
             .on::<FoldingRangeRequest>(handle_folding_ranges)
+            .on_no_retry::<GotoDefinition>(handle_goto_definition)
+            .on_no_retry::<GotoDeclaration>(handle_goto_declaration)
+            .on_no_retry::<DocumentHighlightRequest>(handle_document_highlight)
+            .on_no_retry::<References>(handle_references)
+            .on_no_retry::<PrepareRenameRequest>(handle_prepare_rename)
+            .on_no_retry::<Rename>(handle_rename)
+            .on_fmt_thread::<Formatting>(handle_formatting)
+            .on_fmt_thread::<RangeFormatting>(handle_range_formatting)
+            .on_sync::<OnTypeFormatting>(handle_on_type_formatting)
+            .on::<SelectionRangeRequest>(handle_selection_range)
             .finish();
     }
 

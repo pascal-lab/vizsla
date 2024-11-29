@@ -118,6 +118,24 @@ impl ReqDispatcher<'_> {
         })
     }
 
+    pub(crate) fn on_fmt_thread<R>(
+        &mut self,
+        f: fn(GlobalStateSnapshot, R::Params) -> anyhow::Result<R::Result>,
+    ) -> &mut Self
+    where
+        R: lsp_types::request::Request + 'static,
+        R::Params: DeserializeOwned + panic::UnwindSafe + Send + fmt::Debug,
+        R::Result: Serialize,
+    {
+        self.on_with_intent_and_err_handler::<R>(ThreadIntent::LatencySensitive, f, |req| {
+            Task::Response(Response::new_err(
+                req.id,
+                lsp_server::ErrorCode::InternalError as i32,
+                "internal error".to_string(),
+            ))
+        })
+    }
+
     fn on_with_intent_and_err_handler<R>(
         &mut self,
         intent: ThreadIntent,
