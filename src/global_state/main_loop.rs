@@ -151,6 +151,8 @@ impl GlobalState {
             );
         }
 
+        tracing::debug!("{loop_start:?} [handle_event]: {event_dbg_msg} done in {loop_duration:?}");
+
         Ok(())
     }
 
