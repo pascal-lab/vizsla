@@ -1,9 +1,12 @@
 use la_arena::Arena;
 use proc_macro_utils::define_container;
 use smallvec::SmallVec;
-use syntax::ast::{self, AstNode};
+use syntax::{
+    ast::{self, AstNode},
+    ptr::SyntaxNodePtr,
+};
 use triomphe::Arc;
-use utils::define_enum_deriving_from;
+use utils::{define_enum_deriving_from, get::Get};
 
 use super::{
     alloc_idx_and_src,
@@ -23,9 +26,9 @@ use super::{
 };
 use crate::{
     db::{HirDb, InternDb},
-    doc_tree::{DocTree, DocTreeBuilder},
     file::HirFileId,
     hir_def::lower_ident_opt,
+    region_tree::{RegionTree, RegionTreeBuilder},
     source_map::SourceMap,
 };
 
@@ -50,7 +53,7 @@ define_container! {
     #[derive(Default, Debug, PartialEq, Eq)]
     pub struct FileSourceMap {
         items: SmallVec<[FileItem; 3]>,
-        doc_tree: DocTree,
+        doc_tree: RegionTree,
 
         module_srcs: [ModuleInfo | ModuleSrc],
         proc_srcs: [Proc | ProcSrc],
@@ -75,6 +78,16 @@ define_enum_deriving_from! {
     }
 }
 
+impl FileSourceMap {
+    pub fn item_to_ptr(&self, item: &FileItem) -> SyntaxNodePtr {
+        match item {
+            FileItem::LocalModuleId(idx) => self.get(*idx).node,
+            FileItem::ProcId(idx) => self.get(*idx).0,
+            FileItem::DeclarationId(idx) => self.get(*idx).ptr(),
+        }
+    }
+}
+
 pub(crate) struct LowerFileCtx<'a> {
     pub(crate) db: &'a dyn InternDb,
     pub(crate) file_id: HirFileId,
@@ -82,7 +95,7 @@ pub(crate) struct LowerFileCtx<'a> {
     pub(crate) file: &'a mut HirFile,
     pub(crate) file_source_map: &'a mut FileSourceMap,
 
-    pub(crate) doc_tree: DocTreeBuilder,
+    pub(crate) doc_tree: RegionTreeBuilder,
 }
 
 impl_lower_expr!(LowerFileCtx<'_>, file, file_source_map);
@@ -97,7 +110,6 @@ impl LowerProc for LowerFileCtx<'_> {
             db: self.db,
             file_id: self.file_id,
             cont_id: self.file_id.into(),
-            doc_tree: &mut self.doc_tree,
             procs: &mut self.file.procs,
             proc_srcs: &mut self.file_source_map.proc_srcs,
 
@@ -140,9 +152,8 @@ impl LowerFileCtx<'_> {
             self.file_source_map.items.push(idx);
             self.doc_tree.handle_node(member.syntax());
         }
-        self.doc_tree.check_empty();
 
-        self.doc_tree.handle_tok(root.end_of_file());
+        self.doc_tree.stage(root.end_of_file());
         self.file_source_map.doc_tree = self.doc_tree.finish();
     }
 }
@@ -164,7 +175,7 @@ pub(crate) fn hir_file_with_source_map_query(
         file_id,
         file: &mut hir_file,
         file_source_map: &mut source_map,
-        doc_tree: DocTreeBuilder::new(),
+        doc_tree: RegionTreeBuilder::new(),
     };
     lower_ctx.lower_file(root);
 

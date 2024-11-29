@@ -34,7 +34,7 @@ impl TriviaKindExt for TriviaKind {
 }
 
 pub trait TriviaExt {
-    fn is_region_begin(&self) -> Option<SmolStr>;
+    fn is_region_begin(&self) -> Option<Option<SmolStr>>;
     fn is_region_end(&self) -> bool;
 }
 
@@ -43,7 +43,7 @@ const REGION_END: &str = "endregion";
 
 impl TriviaExt for SyntaxTrivia<'_> {
     #[inline]
-    fn is_region_begin(&self) -> Option<SmolStr> {
+    fn is_region_begin(&self) -> Option<Option<SmolStr>> {
         if !matches!(self.kind(), Trivia![lc]) {
             return None;
         }
@@ -52,15 +52,17 @@ impl TriviaExt for SyntaxTrivia<'_> {
         debug_assert!(str::from_utf8(bytes).is_ok());
 
         let text = unsafe { str::from_utf8_unchecked(bytes) };
-        let captions = text
-            .strip_prefix("//")
-            .unwrap()
-            .trim()
-            .strip_prefix(REGION_BEGIN)?
-            .strip_prefix(":")
-            .unwrap_or(text)
-            .trim();
-        Some(captions.to_smolstr())
+        let text = text.strip_prefix("//").unwrap().trim().strip_prefix(REGION_BEGIN)?;
+        if text.starts_with(|c: char| c.is_alphanumeric() || c == '_') {
+            return None;
+        }
+        let caption = text.strip_prefix(":").unwrap_or(text).trim();
+
+        if caption.is_empty() {
+            return Some(None);
+        }
+
+        Some(Some(caption.to_smolstr()))
     }
 
     #[inline]

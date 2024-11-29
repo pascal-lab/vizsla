@@ -3,9 +3,7 @@ use la_arena::Arena;
 use proc_macro_utils::define_container;
 use smallvec::SmallVec;
 use syntax::{
-    TokenKind,
-    ast::{self, AstNode},
-    match_ast,
+    ast::{self, AstNode}, match_ast, ptr::SyntaxNodePtr, TokenKind
 };
 use triomphe::Arc;
 use utils::{
@@ -31,8 +29,8 @@ use crate::{
     container::{ContainerId, InFile},
     db::{HirDb, InternDb},
     define_src_with_name,
-    doc_tree::{DocTree, DocTreeBuilder},
     file::HirFileId,
+    region_tree::{RegionTree, RegionTreeBuilder},
     source_map::{SourceMap, ToAstNode},
 };
 
@@ -57,7 +55,7 @@ define_container! {
     #[derive(Default, Debug, PartialEq, Eq)]
     pub struct BlockSourceMap {
         items: SmallVec<[BlockItem; 2]>,
-        doc_tree: DocTree,
+        doc_tree: RegionTree,
 
         declaration_srcs: [Declaration | DeclarationSrc],
         expr_srcs: [Expr | ExprSrc],
@@ -66,6 +64,15 @@ define_container! {
         stmt_srcs: [Stmt | StmtSrc] => {
             [StmtId | StmtSrc],
             [LocalBlockId | BlockSrc],
+        }
+    }
+}
+
+impl BlockSourceMap {
+    pub fn item_to_ptr(&self, item: &BlockItem) -> SyntaxNodePtr {
+        match item {
+            BlockItem::DeclarationId(idx) => self.get(*idx).ptr(),
+            BlockItem::StmtId(idx) => self.get(*idx).node,
         }
     }
 }
@@ -167,7 +174,7 @@ pub(crate) struct LowerBlockCtx<'a> {
     pub(crate) block: &'a mut Block,
     pub(crate) block_source_map: &'a mut BlockSourceMap,
 
-    pub(crate) doc_tree: DocTreeBuilder,
+    pub(crate) doc_tree: RegionTreeBuilder,
 }
 
 impl_lower_expr!(LowerBlockCtx<'_>, block, block_source_map);
@@ -197,7 +204,7 @@ impl LowerBlockCtx<'_> {
             self.doc_tree.handle_node(node.syntax());
         }
 
-        self.doc_tree.handle_tok(block.end());
+        self.doc_tree.stage(block.end());
         self.block_source_map.doc_tree = self.doc_tree.finish();
     }
 }
@@ -221,7 +228,7 @@ pub(crate) fn block_with_source_map_query(
         block_id,
         block: &mut block,
         block_source_map: &mut block_source_map,
-        doc_tree: DocTreeBuilder::new(),
+        doc_tree: RegionTreeBuilder::new(),
     };
     lower_ctx.lower_block(ast_block);
 

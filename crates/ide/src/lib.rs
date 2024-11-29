@@ -43,6 +43,7 @@ pub enum SymbolKind {
     Fn,
     Generate,
     Interface,
+    Region,
 }
 
 impl SymbolKind {

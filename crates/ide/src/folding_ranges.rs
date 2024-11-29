@@ -1,13 +1,13 @@
 use base_db::source_db::SourceDb;
 use hir::{
     db::HirDb,
-    doc_tree::DocTree,
     file::HirFileId,
     hir_def::{
         block::{BlockId, BlockSrc},
         module::{ModuleId, ModuleSrc},
         stmt::{Stmt, StmtKind, StmtSrc},
     },
+    region_tree::RegionTree,
     source_map::{IsNamedSrc, IsSrc, SourceMap},
 };
 use ide_db::{line_index_db::LineIndexDb, root_db::RootDb};
@@ -15,7 +15,7 @@ use la_arena::Arena;
 use memchr::memmem::Finder;
 use rustc_hash::FxHashSet;
 use syntax::{
-    SyntaxCursor, SyntaxCursorExt, SyntaxTrivia, SyntaxTriviaIter, Trivia,
+    SyntaxCursor, SyntaxCursorExt, SyntaxTrivia,
     token::SyntaxTokenExt,
     trivia::{TriviaExt, TriviaKindExt},
 };
@@ -74,7 +74,7 @@ trait FoldCollector {
 
     fn collect_fold(&mut self, src: impl IsSrc, kind: FoldKind, line_index: &LineIndex);
 
-    fn collect_docs(&mut self, docs: &DocTree, line_index: &LineIndex);
+    fn collect_docs(&mut self, docs: &RegionTree, line_index: &LineIndex);
 }
 
 impl FoldCollector for Vec<Fold> {
@@ -98,7 +98,7 @@ impl FoldCollector for Vec<Fold> {
     }
 
     #[inline]
-    fn collect_docs(&mut self, docs: &DocTree, line_index: &LineIndex) {
+    fn collect_docs(&mut self, docs: &RegionTree, line_index: &LineIndex) {
         self.extend(
             docs.nodes
                 .values()

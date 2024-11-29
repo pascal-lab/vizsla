@@ -3,6 +3,7 @@ use la_arena::{Arena, Idx, IdxRange};
 use syntax::{
     SyntaxToken, TokenKind,
     ast::{self, AstNode, PortExpression},
+    ptr::SyntaxNodePtr,
 };
 use utils::get::{Get, GetRef};
 
@@ -44,6 +45,14 @@ pub struct PortDecl {
 pub type PortDeclId = Idx<PortDecl>;
 
 define_src!(PortDeclSrc(ast::ImplicitAnsiPort, ast::PortDeclaration));
+
+impl PortDeclSrc {
+    pub fn ptr(&self) -> SyntaxNodePtr {
+        match self {
+            PortDeclSrc::ImplicitAnsiPort(ptr) | PortDeclSrc::PortDeclaration(ptr) => *ptr,
+        }
+    }
+}
 
 #[derive(Default, Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub enum PortDirection {
@@ -279,6 +288,8 @@ impl LowerModuleCtx<'_> {
             self.doc_tree.handle_node(port.syntax());
         }
 
+        self.doc_tree.stage(port_list.close_paren());
+
         self.module.ports = Ports::Ansi(ports);
         self.module_source_map.port_srcs = PortSrcs::Ansi(srcs);
     }
@@ -339,6 +350,8 @@ impl LowerModuleCtx<'_> {
                 port => port_srcs,
             };
         }
+
+        self.doc_tree.stage(port_list.close_paren());
 
         self.module.ports = Ports::NonAnsi { ports, refs, decls: Arena::default() };
         self.module_source_map.port_srcs =

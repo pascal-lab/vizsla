@@ -1,5 +1,5 @@
 use la_arena::{Arena, Idx};
-use syntax::{TokenKind, ast};
+use syntax::{TokenKind, ast, ptr::SyntaxNodePtr};
 use utils::define_enum_deriving_from;
 
 use super::expr::{
@@ -10,7 +10,6 @@ use super::expr::{
 use crate::{
     db::InternDb,
     define_src,
-    doc_tree::DocTreeBuilder,
     hir_def::{
         HirData, alloc_idx_and_src,
         expr::{
@@ -37,6 +36,16 @@ define_enum_deriving_from! {
 
 pub type DeclarationId = Idx<Declaration>;
 define_src!(DeclarationSrc(ast::DataDeclaration, ast::NetDeclaration, ast::ParameterDeclaration));
+
+impl DeclarationSrc {
+    pub fn ptr(&self) -> SyntaxNodePtr {
+        match self {
+            DeclarationSrc::DataDeclaration(ptr)
+            | DeclarationSrc::NetDeclaration(ptr)
+            | DeclarationSrc::ParameterDeclaration(ptr) => *ptr,
+        }
+    }
+}
 
 impl Declaration {
     pub fn decls(&self) -> DeclsRange {
@@ -80,7 +89,6 @@ pub struct ParamDecl {
 
 pub(crate) struct LowerDeclarationCtx<'a> {
     pub(crate) db: &'a dyn InternDb,
-    pub(crate) doc_tree: &'a mut DocTreeBuilder,
     pub(crate) declarations: &'a mut Arena<Declaration>,
     pub(crate) declaration_srcs: &'a mut SourceMap<DeclarationSrc, Declaration>,
 
@@ -103,7 +111,6 @@ pub(in crate::hir_def) macro impl_lower_declaration($ctx:ty, $data:ident, $src_m
         fn declaration_ctx(&mut self) -> $crate::hir_def::declaration::LowerDeclarationCtx {
             $crate::hir_def::declaration::LowerDeclarationCtx {
                 db: self.db,
-                doc_tree: &mut self.doc_tree,
                 declarations: &mut self.$data.declarations,
                 declaration_srcs: &mut self.$src_map.declaration_srcs,
                 decls: &mut self.$data.decls,

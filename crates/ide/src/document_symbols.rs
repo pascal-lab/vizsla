@@ -1,3 +1,5 @@
+use std::iter::Peekable;
+
 use hir::{
     db::HirDb,
     file::HirFileId,
@@ -9,11 +11,13 @@ use hir::{
         module::{ModuleId, ModuleItem, ModuleSrc, port::Ports},
         stmt::{CaseItem, ForInit, Stmt, StmtId, StmtKind, StmtSrc},
     },
+    region_tree::{RegionNode, RegionTreeIterator},
     source_map::{IsNamedSrc, IsSrc},
 };
 use ide_db::root_db::RootDb;
 use la_arena::Idx;
 use smol_str::SmolStr;
+use syntax::WalkEvent;
 use utils::{
     get::{Get, GetRef},
     line_index::TextRange,
@@ -36,46 +40,138 @@ pub struct DocumentSymbol {
 }
 
 #[derive(Debug, Clone)]
-struct SymbolBuilder {
-    sym: DocumentSymbol,
+struct SymbolCollecter {
+    res: Vec<DocumentSymbol>,
+    stack: Vec<DocumentSymbol>,
 }
 
-impl SymbolBuilder {
-    pub fn new(name: &Option<SmolStr>, src: impl IsNamedSrc, container_name: Option<&str>) -> Self {
-        Self::new_with_child(name, src, container_name, Vec::new())
+impl SymbolCollecter {
+    pub fn new(len: usize) -> Self {
+        Self { res: Vec::with_capacity(len), stack: Vec::with_capacity(len) }
     }
 
-    pub fn new_with_child(
+    pub fn push_symbol<F: FnOnce(&mut Self)>(
+        &mut self,
         name: &Option<SmolStr>,
         src: impl IsNamedSrc,
-        container_name: Option<&str>,
-        children: Vec<DocumentSymbol>,
-    ) -> Self {
-        Self {
-            sym: DocumentSymbol {
-                name: name.as_ref().unwrap_or(&DEFAULT_NAME).to_string(),
-                focus_range: src.name_or_full_range(),
-                full_range: src.range(),
-                kind: SymbolKind::from_syntax_kind(src.kind()),
-                detail: None,
-                container_name: container_name.map(|s| s.to_owned()),
-                children,
-            },
+        f: F,
+    ) {
+        let container_name = self.stack.last().map(|sym| sym.name.to_owned());
+        let sym = DocumentSymbol {
+            name: name.as_ref().unwrap_or(&DEFAULT_NAME).to_string(),
+            focus_range: src.name_or_full_range(),
+            full_range: src.range(),
+            kind: SymbolKind::from_syntax_kind(src.kind()),
+            detail: None,
+            container_name,
+            children: Vec::new(),
+        };
+        self.stack.push(sym);
+        f(self);
+        self.pop();
+    }
+
+    pub fn push_symbol_with_kind<F: FnOnce(&mut Self)>(
+        &mut self,
+        name: &Option<SmolStr>,
+        src: impl IsNamedSrc,
+        kind: SymbolKind,
+        f: F,
+    ) {
+        self.push_symbol(name, src, |this| {
+            this.stack.last_mut().unwrap().kind = kind;
+            f(this);
+        });
+    }
+
+    pub fn push_symbol_with_children<F: FnOnce(&mut Self)>(
+        &mut self,
+        name: &Option<SmolStr>,
+        src: impl IsNamedSrc,
+        len: usize,
+        f: F,
+    ) {
+        self.push_symbol(name, src, |this| {
+            if let Some(parent) = this.stack.last_mut() {
+                parent.children.reserve(len);
+            } else {
+                this.res.reserve(len);
+            }
+
+            f(this);
+        });
+    }
+
+    pub fn push_region(&mut self, region: &RegionNode) {
+        let container_name = self.stack.last().map(|sym| sym.name.to_owned());
+        let sym = DocumentSymbol {
+            name: region.name().to_string(),
+            focus_range: region.focus_range(),
+            full_range: region.range,
+            kind: SymbolKind::Region,
+            detail: None,
+            container_name,
+            children: Vec::new(),
+        };
+        self.stack.push(sym);
+    }
+
+    #[inline]
+    pub fn pop(&mut self) {
+        let mut sym = self.stack.pop().unwrap();
+
+        if (sym.kind == SymbolKind::Block || sym.kind == SymbolKind::Stmt)
+            && sym.name == DEFAULT_NAME
+            && sym.children.is_empty()
+        {
+            return;
+        }
+
+        sym.children.shrink_to_fit();
+
+        if let Some(parent) = self.stack.last_mut() {
+            parent.children.push(sym);
+        } else {
+            self.res.push(sym);
         }
     }
 
-    pub fn detail(mut self, detail: String) -> Self {
-        self.sym.detail = Some(detail);
-        self
+    pub fn finish(self) -> Vec<DocumentSymbol> {
+        assert!(self.stack.is_empty(), "{:?}", &self.stack);
+        self.res
+    }
+}
+
+trait AddRegionSymbol {
+    fn add_region_symbol<'a>(&mut self, node_range: TextRange, collector: &mut SymbolCollecter);
+    fn finish_all(&mut self, collector: &mut SymbolCollecter);
+}
+
+impl AddRegionSymbol for Peekable<RegionTreeIterator<'_>> {
+    #[inline]
+    fn add_region_symbol<'a>(&mut self, node_range: TextRange, collector: &mut SymbolCollecter) {
+        loop {
+            match self.peek() {
+                Some(WalkEvent::Enter(region)) if region.range.start() <= node_range.start() => {
+                    collector.push_region(region);
+                }
+                Some(WalkEvent::Leave(region)) if region.range.end() <= node_range.start() => {
+                    collector.pop();
+                }
+                _ => break,
+            }
+            self.next().unwrap();
+        }
     }
 
-    pub fn kind(mut self, kind: SymbolKind) -> Self {
-        self.sym.kind = kind;
-        self
-    }
-
-    pub fn finish(self) -> DocumentSymbol {
-        self.sym
+    #[inline]
+    fn finish_all(&mut self, collector: &mut SymbolCollecter) {
+        while let Some(event) = self.next() {
+            match event {
+                WalkEvent::Enter(region) => collector.push_region(region),
+                WalkEvent::Leave(region) => collector.pop(),
+            }
+        }
     }
 }
 
@@ -84,143 +180,153 @@ pub(crate) fn document_symbols(db: &RootDb, file_id: FileId) -> Vec<DocumentSymb
     let file_id = HirFileId(file_id);
     let (file, src_map) = db.hir_file_with_source_map(file_id);
     let (file, src_map) = (file.as_ref(), src_map.as_ref());
+    let mut regions = src_map.doc_tree.walk().peekable();
 
-    let mut res = Vec::with_capacity(src_map.items.len() + file.decls.len());
+    let mut collector =
+        SymbolCollecter::new(src_map.items.len() + src_map.doc_tree.roots.len() + file.decls.len());
 
-    for &member in src_map.items.iter() {
-        match member {
+    for &item in src_map.items.iter() {
+        regions.add_region_symbol(src_map.item_to_ptr(&item).range(), &mut collector);
+
+        match item {
             FileItem::LocalModuleId(idx) => {
                 let module_id = ModuleId::new(file_id, idx);
                 let module_src = src_map.get(idx);
-                collect_module_items(db, module_id, module_src, &mut res);
+                collect_module_items(db, module_id, module_src, &mut collector);
             }
             FileItem::ProcId(proc_id) => {
                 let proc = file.get(proc_id);
                 let stmt_id = proc.stmt;
-                build_stmt(db, &mut res, stmt_id, None, file, src_map);
+                build_stmt(db, &mut collector, stmt_id, file, src_map);
             }
             FileItem::DeclarationId(declaration_id) => {
-                build_declaration(&mut res, declaration_id, None, file, src_map);
+                build_declaration(&mut collector, declaration_id, file, src_map);
             }
         }
     }
 
-    res
+    regions.finish_all(&mut collector);
+    collector.finish()
 }
 
 fn collect_module_items(
     db: &RootDb,
     module_id: ModuleId,
     module_src: ModuleSrc,
-    res: &mut Vec<DocumentSymbol>,
+    collector: &mut SymbolCollecter,
 ) {
     let (module, src_map) = db.module_with_source_map(module_id);
     let (module, src_map) = (module.as_ref(), src_map.as_ref());
+    let mut regions = src_map.doc_tree.walk().peekable();
 
-    let mut children =
-        Vec::with_capacity(src_map.items.len() + module.decls.len() + module.stmts.len());
-    let module_name = module.name.as_ref().map(|s| s.as_str());
-
-    if let Some(params) = &module.param_ports {
-        for declaration_id in params.clone() {
-            build_declaration(&mut children, declaration_id, module_name, module, src_map);
-        }
-    }
-
-    match &module.ports {
-        Ports::NonAnsi { ports, .. } => {
-            for (port_id, port) in ports.iter() {
-                let src = src_map.get(port_id);
-                let builder = SymbolBuilder::new(&port.label, src, module_name);
-                children.push(builder.finish());
-            }
-        }
-        Ports::Ansi(port_decls) => {
-            for port_decl in port_decls.values() {
-                build_decls(
-                    &mut children,
-                    &port_decl.decls,
-                    SymbolKind::PortDecl,
-                    module_name,
-                    module,
-                    src_map,
-                );
-            }
-        }
-    }
-
-    for item in src_map.items.iter() {
-        match *item {
-            ModuleItem::DeclarationId(declaration_id) => {
-                build_declaration(&mut children, declaration_id, module_name, module, src_map)
-            }
-            ModuleItem::InstantiationId(instantiation_id) => {
-                for &instance_id in module.get(instantiation_id).instances.iter() {
-                    let hir = module.get(instance_id);
-                    let src = src_map.get(instance_id);
-                    let builder = SymbolBuilder::new(&hir.name, src, module_name);
-                    children.push(builder.finish());
+    collector.push_symbol_with_children(
+        &module.name,
+        module_src,
+        src_map.items.len() + module.decls.len() + module.stmts.len(),
+        |collector| {
+            if let Some(params) = &module.param_ports {
+                for declaration_id in params.clone() {
+                    let src = src_map.get(declaration_id);
+                    regions.add_region_symbol(src.range(), collector);
+                    build_declaration(collector, declaration_id, module, src_map);
                 }
             }
-            ModuleItem::ProcId(proc_id) => {
-                let proc = module.get(proc_id);
-                let stmt_id = proc.stmt;
-                build_stmt(db, &mut children, stmt_id, module_name, module, src_map);
-            }
-            ModuleItem::PortDeclId(port_decl) => {
-                let port_decl = module.get(port_decl);
-                build_decls(
-                    &mut children,
-                    &port_decl.decls,
-                    SymbolKind::PortDecl,
-                    module_name,
-                    module,
-                    src_map,
-                )
-            }
-            ModuleItem::ContAssignId(_) => {}
-        }
-    }
 
-    let builder = SymbolBuilder::new_with_child(&module.name, module_src, None, children);
-    res.push(builder.finish());
+            match &module.ports {
+                Ports::NonAnsi { ports, .. } => {
+                    for (port_id, port) in ports.iter() {
+                        let src = src_map.get(port_id);
+                        regions.add_region_symbol(src.range(), collector);
+                        collector.push_symbol(&port.label, src, |_| {});
+                    }
+                }
+                Ports::Ansi(port_decls) => {
+                    for (port_id, port_decl) in port_decls.iter() {
+                        let src = src_map.get(port_id);
+                        regions.add_region_symbol(src.range(), collector);
+                        build_decls(
+                            collector,
+                            &port_decl.decls,
+                            SymbolKind::PortDecl,
+                            module,
+                            src_map,
+                        );
+                    }
+                }
+            }
+
+            for item in src_map.items.iter() {
+                regions.add_region_symbol(src_map.item_to_ptr(&item).range(), collector);
+                match *item {
+                    ModuleItem::DeclarationId(declaration_id) => {
+                        build_declaration(collector, declaration_id, module, src_map)
+                    }
+                    ModuleItem::InstantiationId(instantiation_id) => {
+                        for &instance_id in module.get(instantiation_id).instances.iter() {
+                            let hir = module.get(instance_id);
+                            let src = src_map.get(instance_id);
+                            collector.push_symbol(&hir.name, src, |_| {});
+                        }
+                    }
+                    ModuleItem::ProcId(proc_id) => {
+                        let proc = module.get(proc_id);
+                        let stmt_id = proc.stmt;
+                        build_stmt(db, collector, stmt_id, module, src_map);
+                    }
+                    ModuleItem::PortDeclId(port_decl) => {
+                        let port_decl = module.get(port_decl);
+                        build_decls(
+                            collector,
+                            &port_decl.decls,
+                            SymbolKind::PortDecl,
+                            module,
+                            src_map,
+                        )
+                    }
+                    ModuleItem::ContAssignId(_) => {}
+                }
+            }
+            regions.finish_all(collector);
+        },
+    );
 }
 
 fn collect_block_items(
     db: &RootDb,
+    collector: &mut SymbolCollecter,
     block_id: BlockId,
     block_src: BlockSrc,
-    cont_name: Option<&str>,
-    res: &mut Vec<DocumentSymbol>,
 ) {
     let (block, src_map) = db.block_with_source_map(block_id);
     let (block, src_map) = (block.as_ref(), src_map.as_ref());
+    let mut regions = src_map.doc_tree.walk().peekable();
 
-    let mut children = Vec::with_capacity(src_map.items.len() + block.decls.len());
-    let block_name = block.name.as_ref().map(|s| s.as_str());
-
-    for item in src_map.items.iter() {
-        match *item {
-            BlockItem::DeclarationId(declaration_id) => {
-                build_declaration(&mut children, declaration_id, block_name, block, src_map)
+    collector.push_symbol_with_children(
+        &block.name,
+        block_src,
+        block.decls.len() + src_map.items.len(),
+        |collector| {
+            for item in src_map.items.iter() {
+                regions.add_region_symbol(src_map.item_to_ptr(&item).range(), collector);
+                match *item {
+                    BlockItem::DeclarationId(declaration_id) => {
+                        build_declaration(collector, declaration_id, block, src_map)
+                    }
+                    BlockItem::StmtId(stmt_id) => {
+                        build_stmt(db, collector, stmt_id, block, src_map)
+                    }
+                }
             }
-            BlockItem::StmtId(stmt_id) => {
-                build_stmt(db, &mut children, stmt_id, block_name, block, src_map)
-            }
-        }
-    }
 
-    if block.name.is_some() || !children.is_empty() {
-        let builder = SymbolBuilder::new_with_child(&block.name, block_src, cont_name, children);
-        res.push(builder.finish());
-    }
+            regions.finish_all(collector);
+        },
+    );
 }
 
 fn build_stmt<Arn, SrcMap>(
     db: &RootDb,
-    res: &mut Vec<DocumentSymbol>,
+    collector: &mut SymbolCollecter,
     stmt_id: Idx<Stmt>,
-    container_name: Option<&str>,
     arena: &Arn,
     src_map: &SrcMap,
 ) where
@@ -236,24 +342,20 @@ fn build_stmt<Arn, SrcMap>(
     if let StmtKind::Block(block_info) = &stmt.kind {
         let block_id = block_info.block_id;
         let block_src = src_map.get(stmt_id).try_into().unwrap();
-        collect_block_items(db, block_id, block_src, container_name, res);
+        collect_block_items(db, collector, block_id, block_src);
         return;
     }
 
-    let mut children = Vec::with_capacity(2);
-    let stmt_name = stmt.label.as_ref().map(|s| s.as_str());
-    match &stmt.kind {
+    collector.push_symbol(&stmt.label, src_map.get(stmt_id), |collector| match &stmt.kind {
         StmtKind::Wait(_, stmt_id)
         | StmtKind::TimingCtrl(_, stmt_id)
         | StmtKind::Forever(stmt_id)
         | StmtKind::DoWhile(stmt_id, _)
-        | StmtKind::While(_, stmt_id) => {
-            build_stmt(db, &mut children, *stmt_id, stmt_name, arena, src_map)
-        }
+        | StmtKind::While(_, stmt_id) => build_stmt(db, collector, *stmt_id, arena, src_map),
         StmtKind::Cond { then_stmt, else_stmt, .. } => {
-            build_stmt(db, &mut children, *then_stmt, stmt_name, arena, src_map);
+            build_stmt(db, collector, *then_stmt, arena, src_map);
             if let Some(else_stmt) = else_stmt {
-                build_stmt(db, &mut children, *else_stmt, stmt_name, arena, src_map);
+                build_stmt(db, collector, *else_stmt, arena, src_map);
             }
         }
         StmtKind::Case { items, .. } => {
@@ -262,22 +364,15 @@ fn build_stmt<Arn, SrcMap>(
                     CaseItem::Case { clause, .. } => clause,
                     CaseItem::Default(stmt) => stmt,
                 };
-                build_stmt(db, &mut children, *stmt_id, stmt_name, arena, src_map);
+                build_stmt(db, collector, *stmt_id, arena, src_map);
             }
         }
         StmtKind::For { inits, stmt, .. } => match inits {
             ForInit::Init(inits) => {
                 for (_, decl_id) in inits {
-                    build_decl(
-                        &mut children,
-                        *decl_id,
-                        SymbolKind::DataDecl,
-                        stmt_name,
-                        arena,
-                        src_map,
-                    );
+                    build_decl(collector, *decl_id, SymbolKind::DataDecl, arena, src_map);
                 }
-                build_stmt(db, &mut children, *stmt, stmt_name, arena, src_map);
+                build_stmt(db, collector, *stmt, arena, src_map);
             }
             ForInit::Assign(_) => {}
         },
@@ -289,21 +384,13 @@ fn build_stmt<Arn, SrcMap>(
         | StmtKind::Disable(_) => {}
 
         StmtKind::Block(_) => unreachable!(),
-    }
-
-    if stmt.label.is_some() || !children.is_empty() {
-        let stmt_src = src_map.get(stmt_id);
-        let builder =
-            SymbolBuilder::new_with_child(&stmt.label, stmt_src, container_name, children);
-        res.push(builder.finish());
-    }
+    });
 }
 
 #[inline]
 fn build_declaration<Arn, SrcMap>(
-    res: &mut Vec<DocumentSymbol>,
+    collector: &mut SymbolCollecter,
     declaration_id: DeclarationId,
-    container_name: Option<&str>,
     arena: &Arn,
     src_map: &SrcMap,
 ) where
@@ -313,10 +400,9 @@ fn build_declaration<Arn, SrcMap>(
     let declaration = arena.get(declaration_id);
     let src = src_map.get(declaration_id);
     build_decls(
-        res,
+        collector,
         &declaration.decls(),
         SymbolKind::from_syntax_kind(src.kind()),
-        container_name,
         arena,
         src_map,
     );
@@ -324,10 +410,9 @@ fn build_declaration<Arn, SrcMap>(
 
 #[inline]
 fn build_decls<Arn, SrcMap>(
-    res: &mut Vec<DocumentSymbol>,
+    collector: &mut SymbolCollecter,
     decls: &DeclsRange,
     kind: SymbolKind,
-    container_name: Option<&str>,
     arena: &Arn,
     src_map: &SrcMap,
 ) where
@@ -335,16 +420,15 @@ fn build_decls<Arn, SrcMap>(
     SrcMap: Get<DeclId, Output = DeclaratorSrc>,
 {
     for decl in decls.clone() {
-        build_decl(res, decl, kind, container_name, arena, src_map);
+        build_decl(collector, decl, kind, arena, src_map);
     }
 }
 
 #[inline]
 fn build_decl<Arn, SrcMap>(
-    res: &mut Vec<DocumentSymbol>,
+    collector: &mut SymbolCollecter,
     decl: Idx<Declarator>,
     kind: SymbolKind,
-    container_name: Option<&str>,
     arena: &Arn,
     src_map: &SrcMap,
 ) where
@@ -353,6 +437,5 @@ fn build_decl<Arn, SrcMap>(
 {
     let hir = arena.get(decl);
     let src = src_map.get(decl);
-    let builder = SymbolBuilder::new(&hir.name, src, container_name).kind(kind);
-    res.push(builder.finish());
+    collector.push_symbol_with_kind(&hir.name, src, kind, |_| {});
 }

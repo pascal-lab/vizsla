@@ -9,7 +9,10 @@ use port::{
     PortRef, PortRefId, PortRefSrc, PortSrcs, Ports,
 };
 use proc_macro_utils::define_container;
-use syntax::ast::{self, AstNode, PortList};
+use syntax::{
+    ast::{self, AstNode, PortList},
+    ptr::SyntaxNodePtr,
+};
 use triomphe::Arc;
 use utils::{
     define_enum_deriving_from,
@@ -36,8 +39,8 @@ use crate::{
     container::InFile,
     db::{HirDb, InternDb},
     define_src_with_name,
-    doc_tree::{DocTree, DocTreeBuilder},
     file::HirFileId,
+    region_tree::{RegionTree, RegionTreeBuilder},
     source_map::{SourceMap, ToAstNode},
 };
 
@@ -81,7 +84,7 @@ define_container! {
     #[derive(Default, Debug, PartialEq, Eq)]
     pub struct ModuleSourceMap {
         items: Vec<ModuleItem>,
-        doc_tree: DocTree,
+        doc_tree: RegionTree,
 
         port_list_src: Option<PortListSrc>,
         port_srcs: PortSrcs => {
@@ -112,6 +115,18 @@ define_container! {
 
 define_src_with_name!(ModuleSrc(ast::ModuleDeclaration));
 
+impl ModuleSourceMap {
+    pub fn item_to_ptr(&self, item: &ModuleItem) -> SyntaxNodePtr {
+        match item {
+            ModuleItem::ContAssignId(idx) => self.get(*idx).0,
+            ModuleItem::DeclarationId(idx) => self.get(*idx).ptr(),
+            ModuleItem::InstantiationId(idx) => self.get(*idx).0,
+            ModuleItem::ProcId(idx) => self.get(*idx).0,
+            ModuleItem::PortDeclId(idx) => self.get(*idx).ptr(),
+        }
+    }
+}
+
 define_enum_deriving_from! {
     #[derive(Debug, PartialEq, Eq, Clone)]
     pub enum ModuleItem {
@@ -139,7 +154,7 @@ pub(crate) struct LowerModuleCtx<'a> {
 
     pub(crate) module: &'a mut Module,
     pub(crate) module_source_map: &'a mut ModuleSourceMap,
-    pub(crate) doc_tree: DocTreeBuilder,
+    pub(crate) doc_tree: RegionTreeBuilder,
 }
 
 impl_lower_expr!(LowerModuleCtx<'_>, module, module_source_map);
@@ -154,7 +169,6 @@ impl LowerProc for LowerModuleCtx<'_> {
             db: self.db,
             file_id: self.file_id,
             cont_id: self.module_id.into(),
-            doc_tree: &mut self.doc_tree,
 
             procs: &mut self.module.procs,
             proc_srcs: &mut self.module_source_map.proc_srcs,
@@ -188,8 +202,9 @@ impl LowerModuleCtx<'_> {
             if beg != end {
                 self.module.param_ports = Some(IdxRange::new(beg..end));
             }
+
+            self.doc_tree.stage(param_ports.close_paren());
         }
-        self.doc_tree.check_empty();
 
         self.module_source_map.port_list_src = header.ports().map(|list| list.into());
         match header.ports() {
@@ -198,7 +213,6 @@ impl LowerModuleCtx<'_> {
             Some(PortList::WildcardPortList(_)) => unimplemented!(),
             None => {}
         };
-        self.doc_tree.check_empty();
 
         for member in decl.members().children() {
             use ast::Member::*;
@@ -225,7 +239,7 @@ impl LowerModuleCtx<'_> {
             self.module_source_map.items.push(idx);
             self.doc_tree.handle_node(member.syntax());
         }
-        self.doc_tree.check_empty();
+        self.doc_tree.stage(decl.endmodule());
 
         self.doc_tree.handle_tok(decl.endmodule());
         self.module_source_map.doc_tree = self.doc_tree.finish();
@@ -253,7 +267,7 @@ pub(crate) fn module_with_source_map_query(
         module_id,
         module: &mut module,
         module_source_map: &mut module_source_map,
-        doc_tree: DocTreeBuilder::new(),
+        doc_tree: RegionTreeBuilder::new(),
     };
     lower_ctx.lower_module_decl(ast_module);
 

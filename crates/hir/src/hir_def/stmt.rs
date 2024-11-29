@@ -23,7 +23,6 @@ use crate::{
     container::{ContainerId, InFile},
     db::InternDb,
     define_src_with_name,
-    doc_tree::DocTreeBuilder,
     file::HirFileId,
     hir_def::{alloc_idx_and_src, lower_named_label_opt},
     source_map::SourceMap,
@@ -142,7 +141,6 @@ pub(in crate::hir_def) macro impl_lower_stmt {
                     db: self.db,
                     file_id: self.file_id,
                     cont_id: self.$cont_id.into(),
-                    doc_tree: &mut self.doc_tree,
                     stmts: &mut self.$($data.)?stmts,
                     stmt_srcs: &mut self.$($src_map.)?stmt_srcs,
                     event_exprs: &mut self.$($data.)?event_exprs,
@@ -161,7 +159,6 @@ pub(crate) struct LowerStmtCtx<'a> {
     pub(crate) db: &'a dyn InternDb,
     pub(crate) file_id: HirFileId,
     pub(crate) cont_id: ContainerId,
-    pub(crate) doc_tree: &'a mut DocTreeBuilder,
 
     pub(crate) stmts: &'a mut Arena<Stmt>,
     pub(crate) stmt_srcs: &'a mut SourceMap<StmtSrc, Stmt>,
