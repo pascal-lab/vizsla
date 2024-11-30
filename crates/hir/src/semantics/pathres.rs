@@ -67,7 +67,7 @@ impl SemanticsImpl<'_> {
         }
     }
 
-    pub fn find_container(&self, node: InFile<SyntaxNode>) -> ContainerId {
+    pub(in crate::semantics) fn find_container(&self, node: InFile<SyntaxNode>) -> ContainerId {
         self.with_ctx(|ctx| ctx.find_container(node))
     }
 }

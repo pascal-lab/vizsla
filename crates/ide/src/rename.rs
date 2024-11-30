@@ -112,8 +112,8 @@ fn edits_from_refs(
                         text_edit.replace(TextRange::new(range.start(), end), new_name.to_owned());
                     }
                     (None, None) => {
-                        let ref_container = sema.find_container(InFile::new(file_id.into(), it.syntax()));
-                        if def.container_id(sema.db) == ref_container {
+                        let ref_container = sema.resolve_named_port_conn(ast::PortConnection::cast(it.syntax()).unwrap());
+                        if def.container_id(sema.db) == ref_container.module_id.into() {
                             // .old => .old(new)
                             text_edit.replace(range, format!("{old_name}({new_name})"));
                         } else {

@@ -12,6 +12,7 @@ use vfs::FileId;
 use crate::{db::HirDb, file::HirFileId};
 
 pub mod pathres;
+pub mod resolver;
 mod source_to_def;
 
 pub struct Semantics<'db, DB> {
