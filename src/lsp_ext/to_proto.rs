@@ -3,6 +3,8 @@ use ide::{
     Cancellable, SymbolKind,
     document_highlight::DocumentHighlight,
     folding_ranges::{Fold, FoldingConfig},
+    hover::HoverFormat,
+    markup::Markup,
     navigation_target::NavTarget,
     references::ReferenceCategory,
     rename::RenameError,
@@ -366,4 +368,14 @@ fn has_more_text_in_line(text: &str) -> bool {
     }
 
     true
+}
+
+pub(crate) fn hover_contents(markup: Markup, format: HoverFormat) -> lsp_types::HoverContents {
+    let kind = match format {
+        HoverFormat::Markdown => lsp_types::MarkupKind::Markdown,
+        HoverFormat::PlainText => lsp_types::MarkupKind::PlainText,
+    };
+
+    let value = markup.into();
+    lsp_types::HoverContents::Markup(lsp_types::MarkupContent { kind, value })
 }

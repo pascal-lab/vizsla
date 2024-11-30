@@ -3,16 +3,19 @@ use utils::get::Get;
 
 use super::SemanticsImpl;
 use crate::{
-    container::{ContainerId, InFile, InModule},
-    hir_def::module::instantiation::{PortConnId, PortConnSrc},
+    container::{ContainerId, InContainer, InFile, InModule},
+    hir_def::{
+        expr::{ExprId, ExprSrc},
+        module::instantiation::{PortConnId, PortConnSrc},
+    },
 };
 
-impl<'db> SemanticsImpl<'db> {
+impl SemanticsImpl<'_> {
     pub fn resolve_named_port_conn(&self, conn: ast::PortConnection) -> InModule<PortConnId> {
         let db = self.db;
         let file_id = self.find_file(conn.syntax());
         let ContainerId::ModuleId(module_id) =
-            self.find_container(InFile::new(file_id.into(), conn.syntax()))
+            self.find_container(InFile::new(file_id, conn.syntax()))
         else {
             unreachable!("NamedPortConnection should be in a module");
         };
@@ -21,5 +24,16 @@ impl<'db> SemanticsImpl<'db> {
         let (_, module_src_map) = db.module_with_source_map(module_id);
         let conn_id = module_src_map.get(src);
         InModule::new(module_id, conn_id)
+    }
+
+    pub fn resolve_expr(&self, expr: ast::Expression) -> InContainer<ExprId> {
+        let db = self.db;
+        let file_id = self.find_file(expr.syntax());
+        let container_id = self.find_container(InFile::new(file_id, expr.syntax()));
+        let src_map = container_id.to_container_src_map(db);
+
+        let expr_src = ExprSrc::from(expr);
+        let expr_id = src_map.get(expr_src);
+        InContainer::new(container_id, expr_id)
     }
 }

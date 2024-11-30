@@ -17,7 +17,7 @@ use crate::{
 };
 
 impl SemanticsImpl<'_> {
-    pub fn resolve_ident_in_cont(
+    pub fn nameres_ident(
         &self,
         SyntaxTokenWithParent { parent, tok }: SyntaxTokenWithParent,
     ) -> Option<PathResolution> {
@@ -47,7 +47,10 @@ impl SemanticsImpl<'_> {
         })
     }
 
-    pub fn resolve_port_conn_name(&self, conn: ast::NamedPortConnection) -> Option<PathResolution> {
+    pub fn nameres_named_port_conn(
+        &self,
+        conn: ast::NamedPortConnection,
+    ) -> Option<PathResolution> {
         let db = self.db;
         let conn_name = lower_ident_opt(conn.name())?;
 

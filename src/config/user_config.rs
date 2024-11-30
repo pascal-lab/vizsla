@@ -1,5 +1,5 @@
 use ide::{
-    document_highlight::DocumentHighlightConfig, formatting::FmtConfig,
+    document_highlight::DocumentHighlightConfig, formatting::FmtConfig, hover::HoverConfig,
     references::ReferencesConfig, rename::RenameConfig,
 };
 use serde::{Deserialize, Serialize};
@@ -117,6 +117,10 @@ impl Config {
             on_enter: self.user_config.formatting_on_enter,
             in_comments: self.user_config.formatting_in_comments,
         }
+    }
+
+    pub(crate) fn hover_config(&self) -> HoverConfig {
+        HoverConfig { format: self.cli_hover_markdown_support() }
     }
 }
 

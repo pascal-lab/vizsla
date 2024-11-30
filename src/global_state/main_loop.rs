@@ -182,6 +182,7 @@ impl GlobalState {
         dispatcher
             .on::<DocumentSymbolRequest>(handle_document_symbol)
             .on::<FoldingRangeRequest>(handle_folding_ranges)
+            .on_no_retry::<HoverRequest>(handle_hover)
             .on_no_retry::<GotoDefinition>(handle_goto_definition)
             .on_no_retry::<GotoDeclaration>(handle_goto_declaration)
             .on_no_retry::<DocumentHighlightRequest>(handle_document_highlight)

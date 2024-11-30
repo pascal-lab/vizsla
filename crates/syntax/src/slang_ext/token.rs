@@ -42,6 +42,7 @@ impl TokenKindExt for TokenKind {
         matches!(
             *self,
             TokenKind::INTEGER_LITERAL
+                | TokenKind::INTEGER_BASE
                 | TokenKind::REAL_LITERAL
                 | TokenKind::STRING_LITERAL
                 | TokenKind::UNBASED_UNSIZED_LITERAL

@@ -21,6 +21,10 @@ impl FloatTypeWrapper {
     fn new(value: f64) -> Self {
         Self(value.to_bits())
     }
+
+    pub fn to_bits(self) -> u64 {
+        self.0
+    }
 }
 
 impl From<f64> for FloatTypeWrapper {

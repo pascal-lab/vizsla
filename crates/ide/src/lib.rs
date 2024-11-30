@@ -16,6 +16,7 @@ pub type Cancellable<T> = Result<T, Cancelled>;
 pub mod analysis;
 pub mod analysis_host;
 pub mod definitions;
+pub mod markup;
 pub mod navigation_target;
 pub mod source_change;
 
@@ -25,6 +26,7 @@ pub mod folding_ranges;
 pub mod formatting;
 pub mod goto_declaration;
 pub mod goto_definition;
+pub mod hover;
 pub mod references;
 pub mod rename;
 pub mod selection_ranges;

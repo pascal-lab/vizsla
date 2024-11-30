@@ -226,3 +226,26 @@ pub(crate) fn handle_folding_ranges(
 
     Ok(Some(folds))
 }
+
+pub(crate) fn handle_hover(
+    snap: GlobalStateSnapshot,
+    params: lsp_types::HoverParams,
+) -> anyhow::Result<Option<lsp_types::Hover>> {
+    let position = from_proto::file_position(&snap, params.text_document_position_params)?;
+
+    let config = snap.config.hover_config();
+    let hover_format = config.format;
+    let Some(hover_info) = snap.analysis.hover(position, config)? else {
+        return Ok(None);
+    };
+
+    let line_info = snap.line_info(position.file_id)?;
+    let range = to_proto::range(&line_info, hover_info.range);
+
+    let res = lsp_types::Hover {
+        contents: to_proto::hover_contents(hover_info.info, hover_format),
+        range: Some(range),
+    };
+
+    Ok(Some(res))
+}

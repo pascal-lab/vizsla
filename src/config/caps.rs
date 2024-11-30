@@ -1,3 +1,4 @@
+use ide::hover::HoverFormat;
 use lsp_types::{
     CodeActionKind, CodeActionOptions, CodeLensOptions, CompletionOptions,
     CompletionOptionsCompletionItem, DeclarationCapability, DocumentOnTypeFormattingOptions,
@@ -90,6 +91,18 @@ impl Config {
             .folding_range.as_ref()?
             .line_folding_only?
         }
+    }
+
+    pub fn cli_hover_markdown_support(&self) -> HoverFormat {
+        let support_markdown = try_or_default! {
+            self.client_caps
+            .text_document.as_ref()?
+            .hover.as_ref()?
+            .content_format.as_ref()?
+            .contains(&lsp_types::MarkupKind::Markdown)
+        };
+
+        if support_markdown { HoverFormat::Markdown } else { HoverFormat::PlainText }
     }
 
     pub(crate) fn negotiated_encoding(&self) -> PositionEncoding {

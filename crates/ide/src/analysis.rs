@@ -18,6 +18,8 @@ use crate::{
     folding_ranges::{self, Fold, FoldingConfig},
     formatting::{self, FmtConfig},
     goto_declaration, goto_definition,
+    hover::{self, HoverConfig},
+    markup::Markup,
     navigation_target::NavTarget,
     references::{self, References, ReferencesConfig},
     rename::{self, RenameConfig, RenameResult},
@@ -125,5 +127,13 @@ impl Analysis {
         config: &FoldingConfig,
     ) -> Cancellable<Vec<Fold>> {
         self.with_db(|db| folding_ranges::folding_ranges(db, file_id, config))
+    }
+
+    pub fn hover(
+        &self,
+        position: FilePosition,
+        config: HoverConfig,
+    ) -> Cancellable<Option<RangeInfo<Markup>>> {
+        self.with_db(|db| hover::hover(db, position, config))
     }
 }

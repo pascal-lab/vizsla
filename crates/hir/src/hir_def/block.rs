@@ -3,7 +3,10 @@ use la_arena::Arena;
 use proc_macro_utils::define_container;
 use smallvec::SmallVec;
 use syntax::{
-    ast::{self, AstNode}, match_ast, ptr::SyntaxNodePtr, TokenKind
+    TokenKind,
+    ast::{self, AstNode},
+    match_ast,
+    ptr::SyntaxNodePtr,
 };
 use triomphe::Arc;
 use utils::{

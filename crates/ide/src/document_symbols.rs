@@ -156,7 +156,7 @@ impl AddRegionSymbol for Peekable<RegionTreeIterator<'_>> {
         while let Some(event) = self.next() {
             match event {
                 WalkEvent::Enter(region) => collector.push_region(region),
-                WalkEvent::Leave(region) => collector.pop(),
+                WalkEvent::Leave(_) => collector.pop(),
             }
         }
     }

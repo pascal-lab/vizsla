@@ -144,7 +144,7 @@ impl Definition {
         res
     }
 
-    pub fn declaration_origins(&self) -> SmallVec<[DefinitionOrigins; 3]> {
+    pub fn declaration_origins(&self) -> SmallVec<[DefinitionOrigins; 1]> {
         let mut res = smallvec![];
         let mut add_source = |source| res.push(source);
 
@@ -227,10 +227,10 @@ impl DefinitionClass {
             ast::MemberAccessExpression => unimplemented!(),
             ast::ScopedName => unimplemented!(),
             ast::NamedPortConnection[it] if it.name() == Some(tok) => {
-                let port = sema.resolve_port_conn_name(it).map(Definition::from);
+                let port = sema.nameres_named_port_conn(it).map(Definition::from);
 
                 if it.open_paren().is_none() && it.close_paren().is_none() {
-                    let data = sema.resolve_ident_in_cont(tp).map(Definition::from);
+                    let data = sema.nameres_ident(tp).map(Definition::from);
 
                     match (port, data) {
                         (Some(port), Some(data)) => Self::PortConnShorthand { port, data },
@@ -241,7 +241,7 @@ impl DefinitionClass {
                     port?.into()
                 }
             },
-            _ => Definition::from(sema.resolve_ident_in_cont(tp)?).into(),
+            _ => Definition::from(sema.nameres_ident(tp)?).into(),
         };
 
         Some(res)
