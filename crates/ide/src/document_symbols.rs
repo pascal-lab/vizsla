@@ -50,12 +50,7 @@ impl SymbolCollecter {
         Self { res: Vec::with_capacity(len), stack: Vec::with_capacity(len) }
     }
 
-    pub fn push_symbol<F: FnOnce(&mut Self)>(
-        &mut self,
-        name: &Option<SmolStr>,
-        src: impl IsNamedSrc,
-        f: F,
-    ) {
+    pub fn push_symbol(&mut self, name: &Option<SmolStr>, src: impl IsNamedSrc) {
         let container_name = self.stack.last().map(|sym| sym.name.to_owned());
         let sym = DocumentSymbol {
             name: name.as_ref().unwrap_or(&DEFAULT_NAME).to_string(),
@@ -67,39 +62,31 @@ impl SymbolCollecter {
             children: Vec::new(),
         };
         self.stack.push(sym);
-        f(self);
-        self.pop();
     }
 
-    pub fn push_symbol_with_kind<F: FnOnce(&mut Self)>(
+    pub fn push_symbol_with_kind(
         &mut self,
         name: &Option<SmolStr>,
         src: impl IsNamedSrc,
         kind: SymbolKind,
-        f: F,
     ) {
-        self.push_symbol(name, src, |this| {
-            this.stack.last_mut().unwrap().kind = kind;
-            f(this);
-        });
+        self.push_symbol(name, src);
+        self.stack.last_mut().unwrap().kind = kind;
     }
 
-    pub fn push_symbol_with_children<F: FnOnce(&mut Self)>(
+    pub fn push_symbol_with_children(
         &mut self,
         name: &Option<SmolStr>,
         src: impl IsNamedSrc,
         len: usize,
-        f: F,
     ) {
-        self.push_symbol(name, src, |this| {
-            if let Some(parent) = this.stack.last_mut() {
-                parent.children.reserve(len);
-            } else {
-                this.res.reserve(len);
-            }
+        self.push_symbol(name, src);
 
-            f(this);
-        });
+        if let Some(parent) = self.stack.last_mut() {
+            parent.children.reserve(len);
+        } else {
+            self.res.reserve(len);
+        }
     }
 
     pub fn push_region(&mut self, region: &RegionNode) {
@@ -223,72 +210,62 @@ fn collect_module_items(
         &module.name,
         module_src,
         src_map.items.len() + module.decls.len() + module.stmts.len(),
-        |collector| {
-            if let Some(params) = &module.param_ports {
-                for declaration_id in params.clone() {
-                    let src = src_map.get(declaration_id);
-                    regions.add_region_symbol(src.range(), collector);
-                    build_declaration(collector, declaration_id, module, src_map);
-                }
-            }
-
-            match &module.ports {
-                Ports::NonAnsi { ports, .. } => {
-                    for (port_id, port) in ports.iter() {
-                        let src = src_map.get(port_id);
-                        regions.add_region_symbol(src.range(), collector);
-                        collector.push_symbol(&port.label, src, |_| {});
-                    }
-                }
-                Ports::Ansi(port_decls) => {
-                    for (port_id, port_decl) in port_decls.iter() {
-                        let src = src_map.get(port_id);
-                        regions.add_region_symbol(src.range(), collector);
-                        build_decls(
-                            collector,
-                            &port_decl.decls,
-                            SymbolKind::PortDecl,
-                            module,
-                            src_map,
-                        );
-                    }
-                }
-            }
-
-            for item in src_map.items.iter() {
-                regions.add_region_symbol(src_map.item_to_ptr(&item).range(), collector);
-                match *item {
-                    ModuleItem::DeclarationId(declaration_id) => {
-                        build_declaration(collector, declaration_id, module, src_map)
-                    }
-                    ModuleItem::InstantiationId(instantiation_id) => {
-                        for &instance_id in module.get(instantiation_id).instances.iter() {
-                            let hir = module.get(instance_id);
-                            let src = src_map.get(instance_id);
-                            collector.push_symbol(&hir.name, src, |_| {});
-                        }
-                    }
-                    ModuleItem::ProcId(proc_id) => {
-                        let proc = module.get(proc_id);
-                        let stmt_id = proc.stmt;
-                        build_stmt(db, collector, stmt_id, module, src_map);
-                    }
-                    ModuleItem::PortDeclId(port_decl) => {
-                        let port_decl = module.get(port_decl);
-                        build_decls(
-                            collector,
-                            &port_decl.decls,
-                            SymbolKind::PortDecl,
-                            module,
-                            src_map,
-                        )
-                    }
-                    ModuleItem::ContAssignId(_) => {}
-                }
-            }
-            regions.finish_all(collector);
-        },
     );
+
+    if let Some(params) = &module.param_ports {
+        for declaration_id in params.clone() {
+            let src = src_map.get(declaration_id);
+            regions.add_region_symbol(src.range(), collector);
+            build_declaration(collector, declaration_id, module, src_map);
+        }
+    }
+
+    match &module.ports {
+        Ports::NonAnsi { ports, .. } => {
+            for (port_id, port) in ports.iter() {
+                let src = src_map.get(port_id);
+                regions.add_region_symbol(src.range(), collector);
+                collector.push_symbol(&port.label, src);
+                collector.pop();
+            }
+        }
+        Ports::Ansi(port_decls) => {
+            for (port_id, port_decl) in port_decls.iter() {
+                let src = src_map.get(port_id);
+                regions.add_region_symbol(src.range(), collector);
+                build_decls(collector, &port_decl.decls, SymbolKind::PortDecl, module, src_map);
+            }
+        }
+    }
+
+    for item in src_map.items.iter() {
+        regions.add_region_symbol(src_map.item_to_ptr(&item).range(), collector);
+        match *item {
+            ModuleItem::DeclarationId(declaration_id) => {
+                build_declaration(collector, declaration_id, module, src_map)
+            }
+            ModuleItem::InstantiationId(instantiation_id) => {
+                for &instance_id in module.get(instantiation_id).instances.iter() {
+                    let hir = module.get(instance_id);
+                    let src = src_map.get(instance_id);
+                    collector.push_symbol(&hir.name, src);
+                    collector.pop();
+                }
+            }
+            ModuleItem::ProcId(proc_id) => {
+                let proc = module.get(proc_id);
+                let stmt_id = proc.stmt;
+                build_stmt(db, collector, stmt_id, module, src_map);
+            }
+            ModuleItem::PortDeclId(port_decl) => {
+                let port_decl = module.get(port_decl);
+                build_decls(collector, &port_decl.decls, SymbolKind::PortDecl, module, src_map)
+            }
+            ModuleItem::ContAssignId(_) => {}
+        }
+    }
+    collector.pop();
+    regions.finish_all(collector);
 }
 
 fn collect_block_items(
@@ -305,22 +282,19 @@ fn collect_block_items(
         &block.name,
         block_src,
         block.decls.len() + src_map.items.len(),
-        |collector| {
-            for item in src_map.items.iter() {
-                regions.add_region_symbol(src_map.item_to_ptr(&item).range(), collector);
-                match *item {
-                    BlockItem::DeclarationId(declaration_id) => {
-                        build_declaration(collector, declaration_id, block, src_map)
-                    }
-                    BlockItem::StmtId(stmt_id) => {
-                        build_stmt(db, collector, stmt_id, block, src_map)
-                    }
-                }
-            }
-
-            regions.finish_all(collector);
-        },
     );
+
+    for item in src_map.items.iter() {
+        regions.add_region_symbol(src_map.item_to_ptr(&item).range(), collector);
+        match *item {
+            BlockItem::DeclarationId(declaration_id) => {
+                build_declaration(collector, declaration_id, block, src_map)
+            }
+            BlockItem::StmtId(stmt_id) => build_stmt(db, collector, stmt_id, block, src_map),
+        }
+    }
+    collector.pop();
+    regions.finish_all(collector);
 }
 
 fn build_stmt<Arn, SrcMap>(
@@ -346,7 +320,8 @@ fn build_stmt<Arn, SrcMap>(
         return;
     }
 
-    collector.push_symbol(&stmt.label, src_map.get(stmt_id), |collector| match &stmt.kind {
+    collector.push_symbol(&stmt.label, src_map.get(stmt_id));
+    match &stmt.kind {
         StmtKind::Wait(_, stmt_id)
         | StmtKind::TimingCtrl(_, stmt_id)
         | StmtKind::Forever(stmt_id)
@@ -384,7 +359,8 @@ fn build_stmt<Arn, SrcMap>(
         | StmtKind::Disable(_) => {}
 
         StmtKind::Block(_) => unreachable!(),
-    });
+    }
+    collector.pop();
 }
 
 #[inline]
@@ -437,5 +413,6 @@ fn build_decl<Arn, SrcMap>(
 {
     let hir = arena.get(decl);
     let src = src_map.get(decl);
-    collector.push_symbol_with_kind(&hir.name, src, kind, |_| {});
+    collector.push_symbol_with_kind(&hir.name, src, kind);
+    collector.pop();
 }
