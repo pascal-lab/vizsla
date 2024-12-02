@@ -235,9 +235,9 @@ fn collect_block_comments(
                 continue;
             }
 
-            let range = TextRange::new(range.start(), range.end());
-            let fold = Fold::try_build(range, FoldKind::Comment, line_index).unwrap();
-            folds.push(fold);
+            if let Some(fold) = Fold::try_build(range, FoldKind::Comment, line_index) {
+                folds.push(fold);
+            }
         }
 
         last_pos = tok.range().unwrap().start();
