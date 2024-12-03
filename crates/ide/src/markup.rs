@@ -49,19 +49,19 @@ impl Markup {
     }
 
     pub fn horizontal_line(&mut self) {
-        self.text.push_str("\n---------\n");
+        self.text.push_str("\n\n---------\n\n");
     }
 
     pub fn new_section(&mut self, title: &str) {
         self.text.push_str("\n## ");
         self.text.push_str(title);
-        self.text.push('\n');
+        self.text.push_str("\n\n");
     }
 
     pub fn new_subsection(&mut self, title: &str) {
         self.text.push_str("\n### ");
         self.text.push_str(title);
-        self.text.push('\n');
+        self.text.push_str("\n\n");
     }
 
     pub fn push_with_plain_fence(&mut self, contents: &str) {
