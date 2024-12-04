@@ -170,8 +170,9 @@ pub(crate) fn document_symbols(db: &RootDb, file_id: FileId) -> Vec<DocumentSymb
     let (file, src_map) = (file.as_ref(), src_map.as_ref());
     let mut regions = src_map.region_tree.walk().peekable();
 
-    let mut collector =
-        SymbolCollecter::new(src_map.items.len() + src_map.region_tree.roots.len() + file.decls.len());
+    let mut collector = SymbolCollecter::new(
+        src_map.items.len() + src_map.region_tree.roots.len() + file.decls.len(),
+    );
 
     for &item in src_map.items.iter() {
         regions.add_region_symbol(src_map.item_to_ptr(&item).range(), &mut collector);

@@ -180,10 +180,8 @@ impl Definition {
                 let container: ContainerId = module.into();
                 if let Some(port_decl) = port_decl {
                     Some(InContainer::new(container, port_decl).into())
-                } else if let Some(decl) = data_decl {
-                    Some(InContainer::new(container, decl).into())
                 } else {
-                    None
+                    data_decl.map(|decl| InContainer::new(container, decl).into())
                 }
             }
             _ => Some(self.pick()),
