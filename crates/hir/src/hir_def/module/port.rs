@@ -299,10 +299,10 @@ impl LowerModuleCtx<'_> {
                 ExplicitAnsiPort(_port) => unimplemented!(),
                 _ => unreachable!(),
             };
-            self.doc_tree.handle_node(port.syntax());
+            self.region_tree.handle_node(port.syntax());
         }
 
-        self.doc_tree.stage(port_list.close_paren());
+        self.region_tree.stage(port_list.close_paren());
 
         self.module.ports = Ports::Ansi(ports);
         self.module_source_map.port_srcs =
@@ -359,14 +359,14 @@ impl LowerModuleCtx<'_> {
                 EmptyNonAnsiPort(_) => NonAnsiPort { label: None, refs: None },
             };
 
-            self.doc_tree.handle_node(port.syntax());
+            self.region_tree.handle_node(port.syntax());
             alloc_idx_and_src! {
                 hir_port => ports,
                 port => port_srcs,
             };
         }
 
-        self.doc_tree.stage(port_list.close_paren());
+        self.region_tree.stage(port_list.close_paren());
 
         self.module.ports = Ports::NonAnsi { ports, refs, decls: Arena::default() };
         self.module_source_map.port_srcs = PortSrcs::NonAnsi {

@@ -168,10 +168,10 @@ pub(crate) fn document_symbols(db: &RootDb, file_id: FileId) -> Vec<DocumentSymb
     let file_id = HirFileId(file_id);
     let (file, src_map) = db.hir_file_with_source_map(file_id);
     let (file, src_map) = (file.as_ref(), src_map.as_ref());
-    let mut regions = src_map.doc_tree.walk().peekable();
+    let mut regions = src_map.region_tree.walk().peekable();
 
     let mut collector =
-        SymbolCollecter::new(src_map.items.len() + src_map.doc_tree.roots.len() + file.decls.len());
+        SymbolCollecter::new(src_map.items.len() + src_map.region_tree.roots.len() + file.decls.len());
 
     for &item in src_map.items.iter() {
         regions.add_region_symbol(src_map.item_to_ptr(&item).range(), &mut collector);
@@ -205,7 +205,7 @@ fn collect_module_items(
 ) {
     let (module, src_map) = db.module_with_source_map(module_id);
     let (module, src_map) = (module.as_ref(), src_map.as_ref());
-    let mut regions = src_map.doc_tree.walk().peekable();
+    let mut regions = src_map.region_tree.walk().peekable();
 
     collector.push_symbol_with_children(
         &module.name,
@@ -277,7 +277,7 @@ fn collect_block_items(
 ) {
     let (block, src_map) = db.block_with_source_map(block_id);
     let (block, src_map) = (block.as_ref(), src_map.as_ref());
-    let mut regions = src_map.doc_tree.walk().peekable();
+    let mut regions = src_map.region_tree.walk().peekable();
 
     collector.push_symbol_with_children(
         &block.name,

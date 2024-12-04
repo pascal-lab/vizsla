@@ -58,7 +58,7 @@ define_container! {
     #[derive(Default, Debug, PartialEq, Eq)]
     pub struct BlockSourceMap {
         items: SmallVec<[BlockItem; 2]>,
-        doc_tree: RegionTree,
+        region_tree: RegionTree,
 
         declaration_srcs: [Declaration | DeclarationSrc],
         expr_srcs: [Expr | ExprSrc],
@@ -177,7 +177,7 @@ pub(crate) struct LowerBlockCtx<'a> {
     pub(crate) block: &'a mut Block,
     pub(crate) block_source_map: &'a mut BlockSourceMap,
 
-    pub(crate) doc_tree: RegionTreeBuilder,
+    pub(crate) region_tree: RegionTreeBuilder,
 }
 
 impl_lower_expr!(LowerBlockCtx<'_>, block, block_source_map);
@@ -204,11 +204,11 @@ impl LowerBlockCtx<'_> {
                 _ => unimplemented!("{:?}", node.syntax().kind()),
             };
             self.block_source_map.items.push(idx);
-            self.doc_tree.handle_node(node.syntax());
+            self.region_tree.handle_node(node.syntax());
         }
 
-        self.doc_tree.stage(block.end());
-        self.block_source_map.doc_tree = self.doc_tree.finish();
+        self.region_tree.stage(block.end());
+        self.block_source_map.region_tree = self.region_tree.finish();
     }
 }
 
@@ -231,7 +231,7 @@ pub(crate) fn block_with_source_map_query(
         block_id,
         block: &mut block,
         block_source_map: &mut block_source_map,
-        doc_tree: RegionTreeBuilder::new(),
+        region_tree: RegionTreeBuilder::new(),
     };
     lower_ctx.lower_block(ast_block);
 

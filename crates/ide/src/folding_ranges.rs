@@ -118,7 +118,7 @@ pub(crate) fn folding_ranges(db: &RootDb, file_id: FileId, _config: &FoldingConf
 
     collect_comments(db, file_id, line_index, &mut folds);
 
-    folds.collect_docs(&src_map.doc_tree, line_index);
+    folds.collect_docs(&src_map.region_tree, line_index);
 
     src_map.module_srcs.iter().for_each(|(idx, src)| {
         collect_module(db, &mut folds, ModuleId::new(file_id, idx), *src, line_index)
@@ -253,7 +253,7 @@ fn collect_module(
 ) {
     let (module, src_map) = db.module_with_source_map(module_id);
 
-    folds.collect_docs(&src_map.doc_tree, line_index);
+    folds.collect_docs(&src_map.region_tree, line_index);
 
     if let Some(port_list_src) = src_map.port_srcs.port_list_src() {
         let port_list_fold = Fold::try_build(port_list_src.range(), FoldKind::PortList, line_index);
@@ -302,7 +302,7 @@ fn collect_block(
 ) {
     let (block, src_map) = db.block_with_source_map(block_id);
 
-    folds.collect_docs(&src_map.doc_tree, line_index);
+    folds.collect_docs(&src_map.region_tree, line_index);
 
     folds.collect_fold(block_src, FoldKind::Block, line_index);
     folds.collect_folds(&src_map.declaration_srcs, FoldKind::Declaration, line_index);

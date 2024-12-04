@@ -53,7 +53,7 @@ define_container! {
     #[derive(Default, Debug, PartialEq, Eq)]
     pub struct FileSourceMap {
         items: SmallVec<[FileItem; 3]>,
-        doc_tree: RegionTree,
+        region_tree: RegionTree,
 
         module_srcs: [ModuleInfo | ModuleSrc],
         proc_srcs: [Proc | ProcSrc],
@@ -95,7 +95,7 @@ pub(crate) struct LowerFileCtx<'a> {
     pub(crate) file: &'a mut HirFile,
     pub(crate) file_source_map: &'a mut FileSourceMap,
 
-    pub(crate) doc_tree: RegionTreeBuilder,
+    pub(crate) region_tree: RegionTreeBuilder,
 }
 
 impl_lower_expr!(LowerFileCtx<'_>, file, file_source_map);
@@ -150,11 +150,11 @@ impl LowerFileCtx<'_> {
                 _ => unimplemented!(),
             };
             self.file_source_map.items.push(idx);
-            self.doc_tree.handle_node(member.syntax());
+            self.region_tree.handle_node(member.syntax());
         }
 
-        self.doc_tree.stage(root.end_of_file());
-        self.file_source_map.doc_tree = self.doc_tree.finish();
+        self.region_tree.stage(root.end_of_file());
+        self.file_source_map.region_tree = self.region_tree.finish();
     }
 }
 
@@ -175,7 +175,7 @@ pub(crate) fn hir_file_with_source_map_query(
         file_id,
         file: &mut hir_file,
         file_source_map: &mut source_map,
-        doc_tree: RegionTreeBuilder::new(),
+        region_tree: RegionTreeBuilder::new(),
     };
     lower_ctx.lower_file(root);
 

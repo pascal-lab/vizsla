@@ -84,7 +84,7 @@ define_container! {
     #[derive(Default, Debug, PartialEq, Eq)]
     pub struct ModuleSourceMap {
         items: Vec<ModuleItem>,
-        doc_tree: RegionTree,
+        region_tree: RegionTree,
 
         port_srcs: PortSrcs => {
             [NonAnsiPortId | NonAnsiPortSrc],
@@ -153,7 +153,7 @@ pub(crate) struct LowerModuleCtx<'a> {
 
     pub(crate) module: &'a mut Module,
     pub(crate) module_source_map: &'a mut ModuleSourceMap,
-    pub(crate) doc_tree: RegionTreeBuilder,
+    pub(crate) region_tree: RegionTreeBuilder,
 }
 
 impl_lower_expr!(LowerModuleCtx<'_>, module, module_source_map);
@@ -193,7 +193,7 @@ impl LowerModuleCtx<'_> {
         if let Some(param_ports) = header.parameters() {
             for decls in param_ports.declarations().children() {
                 self.declaration_ctx().lower_param_decl_base(decls);
-                self.doc_tree.handle_node(decls.syntax());
+                self.region_tree.handle_node(decls.syntax());
             }
 
             let beg = Idx::from_raw(RawIdx::from(0));
@@ -202,7 +202,7 @@ impl LowerModuleCtx<'_> {
                 self.module.param_ports = Some(IdxRange::new(beg..end));
             }
 
-            self.doc_tree.stage(param_ports.close_paren());
+            self.region_tree.stage(param_ports.close_paren());
         }
 
         match header.ports() {
@@ -235,12 +235,12 @@ impl LowerModuleCtx<'_> {
                 _ => unimplemented!("unhandled module member: {:?}", member.syntax().kind()),
             };
             self.module_source_map.items.push(idx);
-            self.doc_tree.handle_node(member.syntax());
+            self.region_tree.handle_node(member.syntax());
         }
-        self.doc_tree.stage(decl.endmodule());
+        self.region_tree.stage(decl.endmodule());
 
-        self.doc_tree.handle_tok(decl.endmodule());
-        self.module_source_map.doc_tree = self.doc_tree.finish();
+        self.region_tree.handle_tok(decl.endmodule());
+        self.module_source_map.region_tree = self.region_tree.finish();
     }
 }
 
@@ -265,7 +265,7 @@ pub(crate) fn module_with_source_map_query(
         module_id,
         module: &mut module,
         module_source_map: &mut module_source_map,
-        doc_tree: RegionTreeBuilder::new(),
+        region_tree: RegionTreeBuilder::new(),
     };
     lower_ctx.lower_module_decl(ast_module);
 

@@ -171,7 +171,7 @@ fn render_containers(sema: &Semantics<RootDb>, origin: &DefinitionOrigin) -> Mar
     for cont_id in ContainerParent::start_from(db, cont_id) {
         let src_map = cont_id.to_container_src_map(db);
 
-        if let Some(region_tree) = src_map.doc_tree()
+        if let Some(region_tree) = src_map.region_tree()
             && let Some(node) = region_tree.find(range.start())
         {
             for region in RegionParent::start_from(region_tree, node) {

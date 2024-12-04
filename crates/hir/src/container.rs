@@ -199,11 +199,11 @@ impl AsRef<Container> for Container {
 
 impl ContainerSrcMap {
     #[inline]
-    pub fn doc_tree(&self) -> Option<&RegionTree> {
+    pub fn region_tree(&self) -> Option<&RegionTree> {
         match self {
-            ContainerSrcMap::FileSourceMap(_) => None,
-            ContainerSrcMap::ModuleSourceMap(module) => Some(&module.doc_tree),
-            ContainerSrcMap::BlockSourceMap(block) => Some(&block.doc_tree),
+            ContainerSrcMap::FileSourceMap(file) => Some(&file.region_tree),
+            ContainerSrcMap::ModuleSourceMap(module) => Some(&module.region_tree),
+            ContainerSrcMap::BlockSourceMap(block) => Some(&block.region_tree),
         }
     }
 }
