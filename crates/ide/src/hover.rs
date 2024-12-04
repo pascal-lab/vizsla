@@ -79,6 +79,6 @@ fn handle_definition(sema: &Semantics<RootDb>, tp: SyntaxTokenWithParent) -> Opt
             res.merge(render::render_definition(sema, local));
         }
     }
-    dbg!(&res);
+
     Some(res)
 }
