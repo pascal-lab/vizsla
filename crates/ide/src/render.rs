@@ -1,7 +1,7 @@
 use base_db::source_db::SourceDb;
 use hir::{
     container::{ContainerId, ContainerParent, InFile},
-    hir_def::{literal::Literal, DEFAULT_NAME},
+    hir_def::{DEFAULT_NAME, literal::Literal},
     region_tree::RegionParent,
     semantics::Semantics,
 };
@@ -11,7 +11,8 @@ use syntax::{SVInt, SyntaxCursorExt, ast::AstNode, trivia::TriviaExt};
 use utils::text_edit::TextSize;
 
 use crate::{
-    definitions::{Definition, DefinitionOrigin}, document_symbols, markup::Markup
+    definitions::{Definition, DefinitionOrigin},
+    markup::Markup,
 };
 
 pub(crate) fn render_literal(literal: &Literal) -> Option<Markup> {

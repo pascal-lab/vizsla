@@ -238,8 +238,6 @@ impl LowerModuleCtx<'_> {
             self.region_tree.handle_node(member.syntax());
         }
         self.region_tree.stage(decl.endmodule());
-
-        self.region_tree.handle_tok(decl.endmodule());
         self.module_source_map.region_tree = self.region_tree.finish();
     }
 }

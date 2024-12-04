@@ -1,8 +1,11 @@
 use la_arena::{Arena, Idx};
-use smol_str::SmolStr;
+use smol_str::{SmolStr, ToSmolStr};
 use syntax::{
-    SyntaxNode, SyntaxNodeExt, SyntaxToken, SyntaxTrivia, WalkEvent, has_text_range::HasTextRange,
-    token::SyntaxTokenExt, trivia::TriviaExt,
+    SyntaxNode, SyntaxNodeExt, SyntaxToken, SyntaxTrivia, WalkEvent, ast,
+    has_text_range::HasTextRange,
+    match_ast,
+    token::SyntaxTokenExt,
+    trivia::{TriviaExt, TriviaKindExt},
 };
 use utils::text_edit::{TextRange, TextSize};
 
@@ -10,7 +13,7 @@ use utils::text_edit::{TextRange, TextSize};
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum RegionKind {
     Region { name: Option<SmolStr>, begin_range: TextRange },
-    PseudoRegion,
+    PseudoRegion { description: Option<SmolStr> },
 }
 
 #[derive(Default, Debug, PartialEq, Eq)]
@@ -88,16 +91,17 @@ impl RegionNode {
     const REGION_DEFAULT_NAME: &SmolStr = &SmolStr::new_static("<region>");
 
     pub fn name(&self) -> &SmolStr {
-        match &self.kind {
-            RegionKind::Region { name, .. } => name.as_ref().unwrap_or(Self::REGION_DEFAULT_NAME),
-            _ => Self::REGION_DEFAULT_NAME,
-        }
+        let name = match &self.kind {
+            RegionKind::Region { name, .. } => name.as_ref(),
+            RegionKind::PseudoRegion { description } => description.as_ref(),
+        };
+        name.unwrap_or(Self::REGION_DEFAULT_NAME)
     }
 
     pub fn focus_range(&self) -> TextRange {
         match &self.kind {
             RegionKind::Region { begin_range, .. } => *begin_range,
-            RegionKind::PseudoRegion => self.range,
+            RegionKind::PseudoRegion { .. } => self.range,
         }
     }
 }
@@ -106,11 +110,12 @@ impl RegionNode {
 pub(crate) struct RegionTreeBuilder {
     tree: RegionTree,
     stack: Vec<Idx<RegionNode>>,
+    pseudo_region: Option<(usize, TextRange, SmolStr)>,
 }
 
 impl RegionTreeBuilder {
     pub(crate) fn new() -> Self {
-        Self { tree: RegionTree::default(), stack: Vec::new() }
+        Self { tree: RegionTree::default(), stack: Vec::new(), pseudo_region: None }
     }
 
     fn open_region(&mut self, start: usize, kind: RegionKind) {
@@ -151,25 +156,102 @@ impl RegionTreeBuilder {
 
     #[inline]
     pub(crate) fn handle_node(&mut self, node: SyntaxNode) {
-        node.trivias_with_range().for_each(|(range, trivia)| self.handle_trivia(range, trivia));
+        self.handle_pseudo_region(node, node.trivias());
+        self.handle_trivia(node.trivias_with_range());
     }
 
     #[inline]
-    pub(crate) fn handle_tok(&mut self, token: Option<SyntaxToken>) {
+    fn handle_tok(&mut self, token: Option<SyntaxToken>) {
         let Some(token) = token else {
             return;
         };
-        token.trivias_with_range().for_each(|(range, trivia)| self.handle_trivia(range, trivia));
+
+        self.finish_pseudo_region();
+        self.handle_trivia(token.trivias_with_range());
+    }
+
+    fn handle_pseudo_region<'a>(
+        &mut self,
+        node: SyntaxNode<'a>,
+        trivias: impl DoubleEndedIterator<Item = SyntaxTrivia<'a>> + ExactSizeIterator + Clone,
+    ) {
+        match_ast! { node,
+            ast::DataDeclaration
+            | ast::NetDeclaration
+            | ast::ParameterDeclaration
+            | ast::ImplicitAnsiPort
+            | ast::PortDeclaration => {},
+            _ => {
+                self.finish_pseudo_region();
+                return;
+            },
+        };
+
+        let trivias = trivias.rev().filter(|t| !t.kind().is_whitespace());
+
+        if let Some((cnt, range, _)) = self.pseudo_region.as_mut() {
+            let mut trivias = trivias.clone();
+
+            let first = trivias.next();
+            let second = trivias.next();
+            if first.is_none_or(|t| t.kind().is_eol()) && second.is_none() {
+                *cnt += 1;
+                *range = range.cover(node.text_range().unwrap());
+                return;
+            }
+
+            self.finish_pseudo_region();
+        }
+
+        // set self.pseudo_region
+        let mut trivias = trivias.peekable();
+        let mut last_comment = None;
+
+        trivias.next_if(|t| t.kind().is_eol());
+        loop {
+            if let Some(comment) = trivias.next_if(|t| t.kind().is_comment())
+                && comment.is_region_begin().is_none()
+                && !comment.is_region_end()
+            {
+                last_comment = Some(comment);
+            } else if trivias.next_if(|t| t.kind().is_eol()).is_some() {
+                break;
+            } else {
+                return;
+            }
+        }
+
+        if let Some(comment) = last_comment {
+            let description = comment.as_comment().unwrap().to_smolstr();
+            let range = node.text_range().unwrap();
+            self.pseudo_region = Some((1, range, description));
+        }
+    }
+
+    fn finish_pseudo_region(&mut self) {
+        if let Some((cnt, range, description)) = self.pseudo_region.take()
+            && cnt > 1
+        {
+            let kind = RegionKind::PseudoRegion { description: Some(description) };
+            self.open_region(range.start().into(), kind);
+            self.finish_region(range.end().into());
+        };
     }
 
     #[inline]
-    fn handle_trivia(&mut self, range: TextRange, trivia: SyntaxTrivia) {
-        if let Some(name) = trivia.is_region_begin() {
-            self.open_region(range.start().into(), RegionKind::Region { name, begin_range: range });
-        } else if trivia.is_region_end() {
-            self.finish_region(range.end().into());
-        } else {
-            // TODO: handle doc comments
+    fn handle_trivia<'a>(
+        &'a mut self,
+        trivias: impl DoubleEndedIterator<Item = (TextRange, SyntaxTrivia<'a>)>
+        + ExactSizeIterator
+        + Clone,
+    ) {
+        for (range, trivia) in trivias {
+            if let Some(name) = trivia.is_region_begin() {
+                let region = RegionKind::Region { name, begin_range: range };
+                self.open_region(range.start().into(), region);
+            } else if trivia.is_region_end() {
+                self.finish_region(range.end().into());
+            }
         }
     }
 }

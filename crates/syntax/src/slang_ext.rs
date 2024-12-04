@@ -80,10 +80,12 @@ pub trait SyntaxNodeExt<'a> {
     fn token_at_offset(&self, offset: TextSize) -> TokenAtOffset<'a>;
     fn find_root(&self) -> SyntaxNode<'a>;
     fn to_ptr(&self) -> SyntaxNodePtr;
-    fn trivias(&self) -> impl DoubleEndedIterator<Item = SyntaxTrivia<'a>> + ExactSizeIterator;
+    fn trivias(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = SyntaxTrivia<'a>> + ExactSizeIterator + Clone;
     fn trivias_with_range(
         &self,
-    ) -> impl DoubleEndedIterator<Item = (TextRange, SyntaxTrivia<'a>)> + ExactSizeIterator;
+    ) -> impl DoubleEndedIterator<Item = (TextRange, SyntaxTrivia<'a>)> + Clone + ExactSizeIterator;
 }
 
 impl<'a> SyntaxNodeExt<'a> for SyntaxNode<'a> {
@@ -146,7 +148,9 @@ impl<'a> SyntaxNodeExt<'a> for SyntaxNode<'a> {
     }
 
     #[inline]
-    fn trivias(&self) -> impl DoubleEndedIterator<Item = SyntaxTrivia<'a>> + ExactSizeIterator {
+    fn trivias(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = SyntaxTrivia<'a>> + ExactSizeIterator + Clone {
         if let Some(tok) = self.first_token() {
             Either::Right(tok.trivias())
         } else {
@@ -157,7 +161,8 @@ impl<'a> SyntaxNodeExt<'a> for SyntaxNode<'a> {
     #[inline]
     fn trivias_with_range(
         &self,
-    ) -> impl DoubleEndedIterator<Item = (TextRange, SyntaxTrivia<'a>)> + ExactSizeIterator {
+    ) -> impl DoubleEndedIterator<Item = (TextRange, SyntaxTrivia<'a>)> + ExactSizeIterator + Clone
+    {
         if let Some(tok) = self.first_token() {
             Either::Right(tok.trivias_with_range())
         } else {
