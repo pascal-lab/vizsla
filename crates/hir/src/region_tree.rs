@@ -188,19 +188,18 @@ impl RegionTreeBuilder {
         };
 
         let trivias = trivias.rev().filter(|t| !t.kind().is_whitespace());
-
         if let Some((cnt, range, _)) = self.pseudo_region.as_mut() {
             let mut trivias = trivias.clone();
 
-            let first = trivias.next();
-            let second = trivias.next();
-            if first.is_none_or(|t| t.kind().is_eol()) && second.is_none() {
+            let first_eol = trivias.next();
+            let second_eol = trivias.find(|t| t.kind().is_eol());
+            if first_eol.is_none_or(|t| t.kind().is_eol()) && second_eol.is_none() {
                 *cnt += 1;
                 *range = range.cover(node.text_range().unwrap());
                 return;
+            } else {
+                self.finish_pseudo_region();
             }
-
-            self.finish_pseudo_region();
         }
 
         // set self.pseudo_region
