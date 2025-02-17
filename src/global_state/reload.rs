@@ -10,7 +10,7 @@ use utils::{paths::AbsPath, thread::ThreadIntent};
 use super::main_loop::Task;
 use crate::{
     config::{Config, FilesWatcher},
-    global_state::GlobalState,
+    global_state::{DEFAULT_REQ_HANDLER, GlobalState},
 };
 
 #[derive(Debug)]
@@ -27,7 +27,7 @@ impl From<FetchWorkspaceProgress> for Task {
 }
 
 impl GlobalState {
-    pub(crate) fn is_quiescent(&self) -> bool {
+    pub(crate) fn is_stuck(&self) -> bool {
         !(self.fetch_workspaces_task.in_process()
             || self.vfs_progress.config_version < self.vfs_config_version
             || self.vfs_progress.in_progress())
@@ -144,7 +144,7 @@ impl GlobalState {
 
             self.send_request::<lsp_types::request::RegisterCapability>(
                 lsp_types::RegistrationParams { registrations: vec![registration] },
-                |_, _| (),
+                DEFAULT_REQ_HANDLER,
             );
         }
 

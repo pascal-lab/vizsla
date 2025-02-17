@@ -1,5 +1,6 @@
 use lsp_types::{notification, request};
 
+use super::DEFAULT_REQ_HANDLER;
 use crate::global_state::{GlobalState, ReqHandler};
 
 // Send and Respond stuff
@@ -77,7 +78,7 @@ impl GlobalState {
             Progress::Begin => {
                 self.send_request::<request::WorkDoneProgressCreate>(
                     lsp_types::WorkDoneProgressCreateParams { token: token.clone() },
-                    |_, _| (),
+                    DEFAULT_REQ_HANDLER,
                 );
 
                 lsp_types::WorkDoneProgress::Begin(lsp_types::WorkDoneProgressBegin {

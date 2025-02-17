@@ -105,6 +105,15 @@ impl Config {
         if support_markdown { HoverFormat::Markdown } else { HoverFormat::PlainText }
     }
 
+    pub fn inlay_hint_refresh_support(&self) -> bool {
+        try_or_default! {
+            self.client_caps
+            .workspace.as_ref()?
+            .inlay_hint.as_ref()?
+            .refresh_support?
+        }
+    }
+
     pub(crate) fn negotiated_encoding(&self) -> PositionEncoding {
         let client_encodings = match &self.client_caps.general {
             Some(general) => general.position_encodings.as_deref().unwrap_or_default(),

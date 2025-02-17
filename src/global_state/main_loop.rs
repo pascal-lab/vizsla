@@ -16,7 +16,7 @@ use super::{
     reload::FetchWorkspaceProgress,
     respond::Progress,
 };
-use crate::config::Config;
+use crate::{config::Config, global_state::DEFAULT_REQ_HANDLER};
 
 #[derive(Debug)]
 enum Event {
@@ -101,7 +101,7 @@ impl GlobalState {
         };
         self.send_request::<lsp_types::request::RegisterCapability>(
             lsp_types::RegistrationParams { registrations: vec![registration] },
-            |_, _| (),
+            DEFAULT_REQ_HANDLER,
         );
     }
 
@@ -119,7 +119,7 @@ impl GlobalState {
         let event_dbg_msg = format!("{event:?}");
         tracing::debug!("{} [handle_event]: {}", format!("{loop_start:?}"), event_dbg_msg);
 
-        let was_quiescent = self.is_quiescent();
+        let was_stuck = self.is_stuck();
 
         match event {
             Event::Lsp(msg) => match msg {
@@ -136,7 +136,20 @@ impl GlobalState {
 
         let event_handling_duration = loop_start.elapsed();
 
-        self.process_changes();
+        let state_changed = self.process_changes();
+
+        if self.is_stuck() {
+            let client_refresh = !was_stuck || state_changed;
+
+            if client_refresh {
+                if self.config.inlay_hint_refresh_support() {
+                    self.send_request::<lsp_types::request::InlayHintRefreshRequest>(
+                        (),
+                        DEFAULT_REQ_HANDLER,
+                    );
+                }
+            }
+        }
 
         if self.config.user_config.workspace_auto_reload
             && let Some(cause) = self.fetch_workspaces_task.should_start()
@@ -145,7 +158,7 @@ impl GlobalState {
         }
 
         let loop_duration = loop_start.elapsed();
-        if loop_duration > Duration::from_millis(100) && was_quiescent {
+        if loop_duration > Duration::from_millis(100) && was_stuck {
             tracing::warn!(
                 "overly long loop turn took {loop_duration:?} (event handling took {event_handling_duration:?}): {event_dbg_msg}"
             );

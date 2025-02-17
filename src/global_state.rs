@@ -79,6 +79,7 @@ impl VfsProgress {
 }
 
 pub(crate) type ReqHandler = fn(&mut GlobalState, lsp_server::Response);
+pub(crate) const DEFAULT_REQ_HANDLER: ReqHandler = |_, _| {};
 
 pub(crate) struct GlobalState {
     pub(crate) sender: Sender<Message>,
