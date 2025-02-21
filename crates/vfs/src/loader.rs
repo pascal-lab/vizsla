@@ -91,7 +91,7 @@ impl Directories {
     fn includes_path(&self, path: &AbsPath) -> bool {
         let mut longest_incl: Option<&AbsPathBuf> = None;
         for incl in &self.include {
-            if path.starts_with(incl) && longest_incl.map_or(true, |path| incl.starts_with(path)) {
+            if path.starts_with(incl) && longest_incl.is_none_or(|path| incl.starts_with(path)) {
                 longest_incl = Some(incl);
             }
         }

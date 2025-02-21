@@ -1,5 +1,3 @@
-#![feature(trait_upcasting)]
-
 pub use salsa::{self, Cancelled};
 
 pub mod change;

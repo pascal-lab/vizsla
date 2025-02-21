@@ -120,11 +120,10 @@ fn run_server(opt: Opt) -> anyhow::Result<()> {
             Config::parse_initialization_options(initialization_options.unwrap());
         if !errors.is_empty() {
             use lsp_types::notification::{Notification, ShowMessage};
-            let noti =
-                lsp_server::Notification::new(ShowMessage::METHOD.to_string(), ShowMessageParams {
-                    typ: MessageType::WARNING,
-                    message: errors.to_string(),
-                });
+            let noti = lsp_server::Notification::new(
+                ShowMessage::METHOD.to_string(),
+                ShowMessageParams { typ: MessageType::WARNING, message: errors.to_string() },
+            );
             connection.sender.send(lsp_server::Message::Notification(noti)).unwrap();
         }
         (user_config, snippets)
@@ -160,7 +159,9 @@ fn run_server(opt: Opt) -> anyhow::Result<()> {
 
 fn main() -> anyhow::Result<()> {
     if env::var("RUST_BACKTRACE").is_err() {
-        env::set_var("RUST_BACKTRACE", "short");
+        unsafe {
+            env::set_var("RUST_BACKTRACE", "short");
+        }
     }
 
     let opt = Opt::parse();

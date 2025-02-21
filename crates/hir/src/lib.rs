@@ -1,4 +1,3 @@
-#![feature(trait_upcasting)]
 #![feature(let_chains)]
 #![feature(trait_alias)]
 #![feature(decl_macro)]

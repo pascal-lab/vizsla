@@ -12,7 +12,7 @@ pub fn get_field<T: DeserializeOwned>(
     json: &mut serde_json::Value,
     error_sink: &mut Vec<(String, serde_json::Error)>,
     field: &'static str,
-    default: &str,
+    default: String,
 ) -> T {
     // check alias first, to work around the VS Code where it pre-fills the
     // defaults instead of sending an empty object.
@@ -30,6 +30,6 @@ pub fn get_field<T: DeserializeOwned>(
             )
         })
         .unwrap_or_else(|| {
-            serde_json::from_str(default).unwrap_or_else(|e| panic!("{e} on: `{default}`"))
+            serde_json::from_str(&default).unwrap_or_else(|e| panic!("{e} on: `{default}`"))
         })
 }

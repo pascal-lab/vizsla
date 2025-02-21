@@ -34,7 +34,7 @@ impl From<ScopeVisibility> for ide::ScopeVisibility {
 macro_rules! default_value {
     ($default:expr, $ty:ty) => {{
         let default_: $ty = $default;
-        &serde_json::to_string_pretty(&default_).unwrap()
+        serde_json::to_string_pretty(&default_).unwrap()
     }};
 }
 

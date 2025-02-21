@@ -141,13 +141,11 @@ impl GlobalState {
         if self.is_stuck() {
             let client_refresh = !was_stuck || state_changed;
 
-            if client_refresh {
-                if self.config.inlay_hint_refresh_support() {
-                    self.send_request::<lsp_types::request::InlayHintRefreshRequest>(
-                        (),
-                        DEFAULT_REQ_HANDLER,
-                    );
-                }
+            if client_refresh && self.config.inlay_hint_refresh_support() {
+                self.send_request::<lsp_types::request::InlayHintRefreshRequest>(
+                    (),
+                    DEFAULT_REQ_HANDLER,
+                );
             }
         }
 
