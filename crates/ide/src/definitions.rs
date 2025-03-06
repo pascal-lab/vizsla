@@ -227,7 +227,7 @@ impl Definition {
             PathResolution::Instance(instance_id) => instance_id.into(),
             PathResolution::Stmt(stmt_id) => stmt_id.into(),
             PathResolution::Block(blk_id) => blk_id.into(),
-            PathResolution::AnsiPort(decl_id) => {
+            PathResolution::ParamDecl(decl_id) | PathResolution::AnsiPort(decl_id) => {
                 InContainer::new(decl_id.module_id.into(), decl_id.value).into()
             }
             PathResolution::NonAnsiPort { label, port_decl, data_decl, module } => {
@@ -270,6 +270,9 @@ impl DefinitionClass {
         let res = match_ast! { parent,
             ast::MemberAccessExpression => unimplemented!(),
             ast::ScopedName => unimplemented!(),
+            ast::NamedParamAssignment[it] if it.name() == Some(tok) => {
+                sema.nameres_named_param_assign(it).map(Definition::from)?.into()
+            },
             ast::NamedPortConnection[it] if it.name() == Some(tok) => {
                 let port = sema.nameres_named_port_conn(it).map(Definition::from);
 

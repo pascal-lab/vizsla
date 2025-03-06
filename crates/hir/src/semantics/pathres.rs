@@ -1,14 +1,16 @@
 use syntax::{
-    SyntaxNode, SyntaxTokenWithParent,
+    SyntaxNode, SyntaxToken, SyntaxTokenWithParent,
     ast::{self, AstNode},
 };
+use utils::get::GetRef;
 
 use super::SemanticsImpl;
 use crate::{
     container::{ContainerId, ContainerParent, InBlock, InContainer, InFile, InModule},
     hir_def::{
         block::BlockId,
-        expr::declarator::DeclId,
+        declaration::Declaration,
+        expr::declarator::{DeclId, DeclaratorParent},
         lower_ident_opt,
         module::{ModuleId, instantiation::InstanceId, port::NonAnsiPortId},
         stmt::StmtId,
@@ -51,10 +53,40 @@ impl SemanticsImpl<'_> {
         &self,
         conn: ast::NamedPortConnection,
     ) -> Option<PathResolution> {
-        let db = self.db;
-        let conn_name = lower_ident_opt(conn.name())?;
+        let entry = self.nameres_from_instantiation_helper(conn.name(), conn.syntax())?;
 
-        let instantiatiion = ast::HierarchyInstantiation::cast(conn.syntax().parent()?.parent()?)?;
+        if matches!(entry.value, ModuleEntry::AnsiPortEntry(_) | ModuleEntry::NonAnsiPortEntry(_)) {
+            Some(entry.into())
+        } else {
+            None
+        }
+    }
+
+    pub fn nameres_named_param_assign(
+        &self,
+        conn: ast::NamedParamAssignment,
+    ) -> Option<PathResolution> {
+        let entry = self.nameres_from_instantiation_helper(conn.name(), conn.syntax())?;
+        let module = self.db.module(entry.module_id);
+        if let ModuleEntry::DeclId(decl_id) = entry.value
+            && let DeclaratorParent::DeclarationId(declaration_id) = module.get(decl_id).parent
+            && let Declaration::ParamDecl(_) = module.get(declaration_id)
+        {
+            Some(entry.into())
+        } else {
+            None
+        }
+    }
+
+    fn nameres_from_instantiation_helper(
+        &self,
+        name: Option<SyntaxToken>,
+        node: SyntaxNode,
+    ) -> Option<InModule<ModuleEntry>> {
+        let db = self.db;
+        let conn_name = lower_ident_opt(name)?;
+
+        let instantiatiion = ast::HierarchyInstantiation::cast(node.parent()?.parent()?)?;
         let module_name = lower_ident_opt(instantiatiion.type_())?;
         let UnitEntry::ModuleId(module_id) = db.unit_scope().get(&module_name)? else {
             return None;
@@ -63,11 +95,7 @@ impl SemanticsImpl<'_> {
         let module_scope = db.module_scope(module_id);
         let entry = module_scope.get(&conn_name)?;
 
-        if matches!(entry, ModuleEntry::AnsiPortEntry(_) | ModuleEntry::NonAnsiPortEntry(_)) {
-            Some(InModule::new(module_id, entry).into())
-        } else {
-            None
-        }
+        Some(InModule::new(module_id, entry))
     }
 
     pub(in crate::semantics) fn find_container(&self, node: InFile<SyntaxNode>) -> ContainerId {
@@ -79,6 +107,7 @@ impl SemanticsImpl<'_> {
 pub enum PathResolution {
     Module(ModuleId),
     Decl(InContainer<DeclId>),
+    ParamDecl(InModule<DeclId>),
     NonAnsiPort {
         // There won't be a situation where all fields are None.
         label: Option<NonAnsiPortId>,
