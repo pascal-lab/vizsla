@@ -91,16 +91,19 @@ macro_rules! define_src {
         pub struct $name(pub syntax::ptr::SyntaxNodePtr);
 
         impl $crate::source_map::IsSrc for $name {
+            #[inline]
             fn kind(&self) -> syntax::SyntaxKind {
                 self.0.kind()
             }
 
+            #[inline]
             fn range(&self) -> utils::text_edit::TextRange {
                 self.0.range()
             }
         }
 
         impl<'a> $crate::source_map::ToAstNode<'a, ast::$ty<'a>> for $name {
+            #[inline]
             fn to_node(&self, tree: &'a syntax::SyntaxTree) -> Option<ast::$ty<'a>> {
                 let mut node = self.0.to_node(tree)?;
                 while !<ast::$ty<'a> as syntax::ast::AstNode>::can_cast(node.kind()) {
@@ -132,6 +135,7 @@ macro_rules! define_src {
         }
 
         impl $crate::source_map::IsSrc for $name {
+            #[inline]
             fn kind(&self) -> syntax::SyntaxKind {
                 match self {
                     $(
@@ -140,6 +144,7 @@ macro_rules! define_src {
                 }
             }
 
+            #[inline]
             fn range(&self) -> utils::text_edit::TextRange {
                 match self {
                     $(
@@ -151,6 +156,7 @@ macro_rules! define_src {
 
         $(
             impl<'a> $crate::source_map::ToAstNode<'a, ast::$ty<'a>> for $name {
+                #[inline]
                 fn to_node(&self, tree: &'a syntax::SyntaxTree) -> Option<ast::$ty<'a>> {
                     match self {
                         $name::$ty(ptr) => syntax::ast::AstNode::cast(ptr.to_node(tree)?),

@@ -279,12 +279,11 @@ impl Config {
             ),
             moniker_provider: None,
             linked_editing_range_provider: None,
-            // TODO: const eval?
             inline_value_provider: None,
             inlay_hint_provider: OneOf::Right(InlayHintServerCapabilities::Options(
                 InlayHintOptions {
                     work_done_progress_options: Default::default(),
-                    resolve_provider: true.into(),
+                    resolve_provider: false.into(),
                 },
             ))
             .into(),

@@ -73,6 +73,8 @@ impl Parse for HirField {
     }
 }
 
+// its just a proc-macro, so it's fine to allow this for clarity
+#[allow(clippy::large_enum_variant)]
 enum HirFieldType {
     Type(Type),
     Arena(Type),

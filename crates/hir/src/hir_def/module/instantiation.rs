@@ -14,7 +14,7 @@ use crate::{
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Instantiation {
-    pub ty: Option<Ident>,
+    pub module_name: Option<Ident>,
     pub param_assigns: SmallVec<[ParamAssignId; 1]>,
     pub instances: SmallVec<[InstanceId; 1]>,
 }
@@ -62,7 +62,7 @@ impl LowerModuleCtx<'_> {
         &mut self,
         instance: ast::HierarchyInstantiation,
     ) -> InstantiationId {
-        let ty = lower_ident_opt(instance.type_());
+        let module_name = lower_ident_opt(instance.type_());
         let param_assigns = self.lower_param_assign(instance.parameters());
 
         let next_instantiation_id = self.module.instantiations.nxt_idx();
@@ -72,7 +72,7 @@ impl LowerModuleCtx<'_> {
             .map(|inst| self.lower_instance(inst, next_instantiation_id))
             .collect();
         alloc_idx_and_src! {
-            Instantiation { ty, param_assigns, instances } => self.module.instantiations,
+            Instantiation { module_name, param_assigns, instances } => self.module.instantiations,
             instance => self.module_source_map.instantiation_srcs,
         }
     }

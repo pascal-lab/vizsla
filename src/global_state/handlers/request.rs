@@ -1,7 +1,8 @@
 use ide::{folding_ranges::FoldingConfig, references::References};
 use itertools::Itertools;
-use lsp_types::{PrepareRenameResponse, RenameParams, WorkspaceEdit};
+use lsp_types::{InlayHint, PrepareRenameResponse, RenameParams, WorkspaceEdit};
 use span::{FilePosition, FileRange};
+use utils::text_edit::TextRange;
 
 use crate::{
     global_state::snapshot::GlobalStateSnapshot,
@@ -246,6 +247,29 @@ pub(crate) fn handle_hover(
         contents: to_proto::hover_contents(hover_info.info, hover_format),
         range: Some(range),
     };
+
+    Ok(Some(res))
+}
+
+pub(crate) fn handle_inlay_hint(
+    snap: GlobalStateSnapshot,
+    params: lsp_types::InlayHintParams,
+) -> anyhow::Result<Option<Vec<InlayHint>>> {
+    let FileRange { file_id, range } =
+        from_proto::file_range(&snap, &params.text_document.uri, params.range)?;
+
+    let line_info = snap.line_info(file_id)?;
+    let range = TextRange::new(
+        range.start().min(line_info.index.text_len()),
+        range.end().min(line_info.index.text_len()),
+    );
+
+    let res = snap
+        .analysis
+        .inlay_hint(file_id, range)?
+        .into_iter()
+        .map(|hint| to_proto::inlay_hint(&snap, &line_info, file_id, hint))
+        .collect_vec();
 
     Ok(Some(res))
 }

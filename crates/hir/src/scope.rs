@@ -81,7 +81,7 @@ impl<Entry: Copy> Scope<Entry> {
         self.insert(ident.as_ref()?, entry)
     }
 
-    pub(crate) fn get(&self, ident: &Ident) -> Option<Entry> {
+    pub fn get(&self, ident: &Ident) -> Option<Entry> {
         self.entries.get(ident).copied()
     }
 

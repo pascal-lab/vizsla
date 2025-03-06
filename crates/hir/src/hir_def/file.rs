@@ -147,7 +147,8 @@ impl LowerFileCtx<'_> {
                     self.declaration_ctx().lower_data_decl(data_decl).into()
                 }
                 NetDeclaration(net_decl) => self.declaration_ctx().lower_net_decl(net_decl).into(),
-                _ => unimplemented!(),
+                EmptyMember(_x) => continue,
+                _ => unimplemented!("{:?}", member.syntax().kind()),
             };
             self.file_source_map.items.push(idx);
             self.region_tree.handle_node(member.syntax());

@@ -1,4 +1,4 @@
-use span::FilePosition;
+use span::{FilePosition, FileRange};
 use utils::{
     line_index::{LineCol, TextRange, TextSize, WideLineCol},
     lines::{LineInfo, PositionEncoding},
@@ -58,6 +58,17 @@ pub(crate) fn file_position(
     let line_index = snap.line_info(file_id)?;
     let offset = offset(&line_index, pos_params.position)?;
     Ok(FilePosition { file_id, offset })
+}
+
+pub(crate) fn file_range(
+    snap: &GlobalStateSnapshot,
+    url: &lsp_types::Url,
+    range: lsp_types::Range,
+) -> anyhow::Result<FileRange> {
+    let file_id = snap.file_id(url)?;
+    let line_index = snap.line_info(file_id)?;
+    let range = text_range(&line_index, range)?;
+    Ok(FileRange { file_id, range })
 }
 
 pub(crate) fn file_id(snap: &GlobalStateSnapshot, url: &lsp_types::Url) -> anyhow::Result<FileId> {

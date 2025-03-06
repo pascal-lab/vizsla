@@ -19,5 +19,6 @@ tags
 generated.rs
 
 .DS_Store
+.vscode/
 
 rustc-ice*

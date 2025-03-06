@@ -27,7 +27,7 @@ use super::{
     },
     expr::{
         Expr, ExprSrc,
-        declarator::{Declarator, DeclaratorSrc, impl_lower_decl},
+        declarator::{DeclId, Declarator, DeclaratorSrc, impl_lower_decl},
         impl_lower_expr,
         timing_control::{EventExpr, EventExprSrc, impl_lower_event_expr},
     },
@@ -53,7 +53,7 @@ define_container! {
     pub struct Module {
         name: Option<Ident>,
 
-        param_ports: Option<IdxRange<Declaration>>,
+        param_ports: Option<IdxRange<Declarator>>,
         ports: Ports => {
             [NonAnsiPortId | NonAnsiPort],
             [PortRefId | PortRef],
@@ -113,6 +113,28 @@ define_container! {
 }
 
 define_src_with_name!(ModuleSrc(ast::ModuleDeclaration));
+
+impl Module {
+    pub fn param_port_id_by_idx(&self, idx: usize) -> Option<DeclId> {
+        let start = self.param_ports.as_ref()?.start();
+        let raw_idx = (start.into_raw().into_u32() as usize) + idx;
+        Some(Idx::from_raw(RawIdx::from_u32(raw_idx as u32)))
+    }
+
+    pub fn non_ansi_port_id_by_idx(&self, idx: usize) -> NonAnsiPortId {
+        Idx::from_raw(RawIdx::from_u32(idx as u32))
+    }
+
+    pub fn ansi_port_id_by_idx(&self, idx: usize) -> Option<DeclId> {
+        let Ports::Ansi(decls) = &self.ports else {
+            return None;
+        };
+
+        let start = decls.values().next()?.decls.start();
+        let raw_idx = (start.into_raw().into_u32() as usize) + idx;
+        Some(Idx::from_raw(RawIdx::from_u32(raw_idx as u32)))
+    }
+}
 
 impl ModuleSourceMap {
     pub fn item_to_ptr(&self, item: &ModuleItem) -> SyntaxNodePtr {
@@ -197,7 +219,7 @@ impl LowerModuleCtx<'_> {
             }
 
             let beg = Idx::from_raw(RawIdx::from(0));
-            let end = self.module.declarations.nxt_idx();
+            let end = self.module.decls.nxt_idx();
             if beg != end {
                 self.module.param_ports = Some(IdxRange::new(beg..end));
             }

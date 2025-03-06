@@ -1,9 +1,11 @@
 use anyhow::Error;
+use hir::container::InFile;
 use ide::{
     Cancellable, SymbolKind,
     document_highlight::DocumentHighlight,
     folding_ranges::{Fold, FoldingConfig},
     hover::HoverFormat,
+    inlay_hint::{InlayHint, InlayKind},
     markup::Markup,
     navigation_target::NavTarget,
     references::ReferenceCategory,
@@ -378,4 +380,47 @@ pub(crate) fn hover_contents(markup: Markup, format: HoverFormat) -> lsp_types::
 
     let value = markup.into();
     lsp_types::HoverContents::Markup(lsp_types::MarkupContent { kind, value })
+}
+
+pub(crate) fn inlay_hint(
+    snap: &GlobalStateSnapshot,
+    line_info: &LineInfo,
+    file_id: FileId,
+    hint: InlayHint,
+) -> lsp_types::InlayHint {
+    let InlayHint { range, label, tooltip, target_location, position, kind, text_edit } = hint;
+
+    let label = lsp_types::InlayHintLabelPart {
+        value: label,
+        tooltip: tooltip.map(|tooltip| {
+            lsp_types::InlayHintLabelPartTooltip::MarkupContent(lsp_types::MarkupContent {
+                kind: lsp_types::MarkupKind::Markdown,
+                value: tooltip.into(),
+            })
+        }),
+        location: target_location.and_then(|InFile { value, file_id }| {
+            let file_range = FileRange { file_id: file_id.file_id(), range: value };
+            self::location(snap, file_range).ok()
+        }),
+        command: None,
+    };
+
+    let range = self::range(line_info, range);
+    let position = self::position(line_info, position);
+    let kind = match kind {
+        InlayKind::ParamAssign | InlayKind::Port => Some(lsp_types::InlayHintKind::PARAMETER),
+    };
+
+    let text_edits = text_edit.map(|it| self::text_edits(line_info, it));
+
+    lsp_types::InlayHint {
+        position,
+        label: lsp_types::InlayHintLabel::LabelParts(vec![label]),
+        kind,
+        text_edits,
+        tooltip: None,
+        padding_left: None,
+        padding_right: None,
+        data: None,
+    }
 }

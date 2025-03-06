@@ -215,10 +215,10 @@ fn collect_module_items(
     );
 
     if let Some(params) = &module.param_ports {
-        for declaration_id in params.clone() {
-            let src = src_map.get(declaration_id);
+        for decl_id in params.clone() {
+            let src = src_map.get(decl_id);
             regions.add_region_symbol(src.range(), collector);
-            build_declaration(collector, declaration_id, module, src_map);
+            build_decl(collector, decl_id, SymbolKind::ParamDecl, module, src_map);
         }
     }
 
