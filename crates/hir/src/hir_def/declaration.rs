@@ -11,11 +11,16 @@ use crate::{
     db::InternDb,
     define_src,
     hir_def::{
-        alloc_idx_and_src, expr::{
-            data_ty::DataTy, declarator::{Declarator, DeclaratorParent, DeclaratorSrc, LowerDecl}, timing_control::{DelayControl, EventExpr, EventExprSrc, LowerEventExpr}, Expr, ExprSrc, LowerExpr
-        }, ty::{
-            lower_drive_strength, lower_net_kind, lower_strength, DriveStrength, NetKind, Strength
-        }, HirData
+        HirData, alloc_idx_and_src,
+        expr::{
+            Expr, ExprSrc, LowerExpr,
+            data_ty::DataTy,
+            declarator::{Declarator, DeclaratorSrc, LowerDecl},
+            timing_control::{DelayControl, EventExpr, EventExprSrc, LowerEventExpr},
+        },
+        ty::{
+            DriveStrength, NetKind, Strength, lower_drive_strength, lower_net_kind, lower_strength,
+        },
     },
     source_map::SourceMap,
 };

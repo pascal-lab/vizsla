@@ -68,7 +68,7 @@ pub(crate) fn handle_document_highlight(
 ) -> anyhow::Result<Option<Vec<lsp_types::DocumentHighlight>>> {
     let position = from_proto::file_position(&snap, params.text_document_position_params)?;
     let line_info = snap.line_info(position.file_id)?;
-    let config = snap.config.document_highlight_config();
+    let config = snap.config.document_highlight();
     let Some(highlights) = snap.analysis.document_highlight(position, config)? else {
         return Ok(None);
     };
@@ -85,7 +85,7 @@ pub(crate) fn handle_references(
     params: lsp_types::ReferenceParams,
 ) -> anyhow::Result<Option<Vec<lsp_types::Location>>> {
     let position = from_proto::file_position(&snap, params.text_document_position)?;
-    let config = snap.config.references_config();
+    let config = snap.config.references();
     let Some(refs) = snap.analysis.references(position, config)? else {
         return Ok(None);
     };
@@ -128,7 +128,7 @@ pub(crate) fn handle_rename(
     params: RenameParams,
 ) -> anyhow::Result<Option<WorkspaceEdit>> {
     let position = from_proto::file_position(&snap, params.text_document_position)?;
-    let config = snap.config.rename_config();
+    let config = snap.config.rename();
     let change = snap
         .analysis
         .rename(position, config, &params.new_name)?
@@ -145,7 +145,7 @@ pub(crate) fn handle_formatting(
     let file_id = from_proto::file_id(&snap, &params.text_document.uri)?;
     let line_info = snap.line_info(file_id)?;
 
-    let config = snap.config.fmt_config();
+    let config = snap.config.fmt();
     let edit =
         snap.analysis.format(file_id, None, &line_info, config)?.map_err(to_proto::format_error)?;
 
@@ -162,7 +162,7 @@ pub(crate) fn handle_range_formatting(
     let line_ranges =
         Some((params.range.start.line as usize)..((params.range.end.line as usize) + 1));
 
-    let config = snap.config.fmt_config();
+    let config = snap.config.fmt();
     let edit = snap
         .analysis
         .format(file_id, line_ranges, &line_info, config)?
@@ -179,7 +179,7 @@ pub(crate) fn handle_on_type_formatting(
     let position = from_proto::file_position(&snap, params.text_document_position)?;
     let line_info = snap.line_info(position.file_id)?;
 
-    let config = snap.config.fmt_config();
+    let config = snap.config.fmt();
     let edit = snap
         .analysis
         .format_on_type(position, params.ch, &line_info, config)?
@@ -234,7 +234,7 @@ pub(crate) fn handle_hover(
 ) -> anyhow::Result<Option<lsp_types::Hover>> {
     let position = from_proto::file_position(&snap, params.text_document_position_params)?;
 
-    let config = snap.config.hover_config();
+    let config = snap.config.hover();
     let hover_format = config.format;
     let Some(hover_info) = snap.analysis.hover(position, config)? else {
         return Ok(None);
@@ -254,7 +254,7 @@ pub(crate) fn handle_hover(
 pub(crate) fn handle_inlay_hint(
     snap: GlobalStateSnapshot,
     params: lsp_types::InlayHintParams,
-) -> anyhow::Result<Option<Vec<InlayHint>>> {
+) -> anyhow::Result<Option<Vec<lsp_types::InlayHint>>> {
     let FileRange { file_id, range } =
         from_proto::file_range(&snap, &params.text_document.uri, params.range)?;
 
@@ -264,9 +264,10 @@ pub(crate) fn handle_inlay_hint(
         range.end().min(line_info.index.text_len()),
     );
 
+    let config = snap.config.inlay_hint();
     let res = snap
         .analysis
-        .inlay_hint(file_id, range)?
+        .inlay_hint(file_id, range, config)?
         .into_iter()
         .map(|hint| to_proto::inlay_hint(&snap, &line_info, file_id, hint))
         .collect_vec();

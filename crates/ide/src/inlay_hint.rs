@@ -24,6 +24,18 @@ use vfs::FileId;
 
 use crate::markup::Markup;
 
+#[derive(Debug)]
+pub struct InlayHintConfig {
+    pub port_connection: bool,
+    pub parameter_assignment: bool,
+}
+
+impl InlayHintConfig {
+    fn instantiation(&self) -> bool {
+        self.port_connection || self.parameter_assignment
+    }
+}
+
 #[derive(Debug, Copy, Clone, Hash)]
 pub enum InlayKind {
     ParamAssign,
@@ -47,11 +59,12 @@ pub struct InlayHint {
 struct InlayHintCollector {
     hints: Vec<InlayHint>,
     range: TextRange,
+    config: InlayHintConfig,
 }
 
 impl InlayHintCollector {
-    fn new(range: TextRange) -> Self {
-        Self { hints: Vec::new(), range }
+    fn new(range: TextRange, config: InlayHintConfig) -> Self {
+        Self { hints: Vec::new(), range, config }
     }
 
     fn collect_hint(
@@ -62,10 +75,7 @@ impl InlayHintCollector {
         text_edit: Option<TextEdit>,
     ) {
         let range = src.range();
-
-        if range.intersect(self.range).is_none() {
-            return;
-        }
+        assert!(range.intersect(self.range).is_some());
 
         let kind = match_ast_kind! { src.kind(),
             ast::ParamAssignment => InlayKind::ParamAssign,
@@ -112,14 +122,23 @@ impl InlayHintCollector {
     fn into_hints(self) -> Vec<InlayHint> {
         self.hints
     }
+
+    fn intersect(&self, range: TextRange) -> bool {
+        self.range.intersect(range).is_some()
+    }
 }
 
-pub(crate) fn inlay_hint(db: &RootDb, file_id: FileId, range: TextRange) -> Vec<InlayHint> {
+pub(crate) fn inlay_hint(
+    db: &RootDb,
+    file_id: FileId,
+    range: TextRange,
+    config: InlayHintConfig,
+) -> Vec<InlayHint> {
     let file_id = HirFileId(file_id);
     let (file, src_map) = db.hir_file_with_source_map(file_id);
     let (_file, src_map) = (file.as_ref(), src_map.as_ref());
 
-    let mut collector = InlayHintCollector::new(range);
+    let mut collector = InlayHintCollector::new(range, config);
 
     for &item in src_map.items.iter() {
         match item {
@@ -127,7 +146,7 @@ pub(crate) fn inlay_hint(db: &RootDb, file_id: FileId, range: TextRange) -> Vec<
                 let module_id = ModuleId::new(file_id, idx);
                 let module_src = src_map.get(idx);
 
-                if module_src.range().intersect(range).is_some() {
+                if collector.intersect(module_src.range()) {
                     collect_module_items(db, module_id, &mut collector);
                 }
             }
@@ -142,9 +161,14 @@ fn collect_module_items(db: &RootDb, module_id: ModuleId, collector: &mut InlayH
     let (module, src_map) = db.module_with_source_map(module_id);
     let (module, src_map) = (module.as_ref(), src_map.as_ref());
 
-    module.instantiations.iter().for_each(|(_, instantiation)| {
-        process_instantiation(db, module, src_map, instantiation, collector);
-    });
+    if collector.config.instantiation() {
+        for (instantiation_id, instantiation) in module.instantiations.iter() {
+            let instantiation_src = src_map.get(instantiation_id);
+            if collector.intersect(instantiation_src.range()) {
+                process_instantiation(db, module, src_map, instantiation, collector);
+            }
+        }
+    }
 }
 
 fn process_instantiation(
@@ -164,66 +188,80 @@ fn process_instantiation(
     let (target_module, target_src_map) = db.module_with_source_map(target_module_id);
 
     // handle param assignments
-    for (id, &assign_id) in instantiation.param_assigns.iter().enumerate() {
-        let ParamAssign::Ordered(assign_expr) = module.get(assign_id) else {
-            continue;
-        };
-        let assign_src = src_map.get(assign_id);
+    if collector.config.parameter_assignment {
+        for (id, &assign_id) in instantiation.param_assigns.iter().enumerate() {
+            let ParamAssign::Ordered(assign_expr) = module.get(assign_id) else {
+                continue;
+            };
+            let assign_src = src_map.get(assign_id);
+            if !collector.intersect(assign_src.range()) {
+                break;
+            }
 
-        let Some(param_id) = target_module.param_port_id_by_idx(id) else {
-            continue;
-        };
-        let Some(param_name) = target_module.get(param_id).name.as_ref() else {
-            continue;
-        };
-
-        if should_skip(module.get(*assign_expr), param_name) {
-            continue;
-        }
-
-        let target_src = InFile::new(target_file, target_src_map.get(param_id));
-        collector.collect_port_hint(param_name, assign_src, target_src);
-    }
-
-    // handle port connections
-    for instance_id in instantiation.instances.iter() {
-        let instance = module.get(*instance_id);
-
-        for (id, &conn_id) in instance.connections.iter().enumerate() {
-            let PortConn::Ordered(conn_expr) = module.get(conn_id) else {
+            let Some(param_id) = target_module.param_port_id_by_idx(id) else {
+                continue;
+            };
+            let Some(param_name) = target_module.get(param_id).name.as_ref() else {
                 continue;
             };
 
-            let conn_src = src_map.get(conn_id);
+            if should_skip(module.get(*assign_expr), param_name) {
+                continue;
+            }
 
-            match &target_module.ports {
-                Ports::NonAnsi { .. } => {
-                    let port_id = target_module.non_ansi_port_id_by_idx(id);
-                    let Some(port_name) = target_module.get(port_id).label.as_ref() else {
-                        continue;
-                    };
+            let target_src = InFile::new(target_file, target_src_map.get(param_id));
+            collector.collect_port_hint(param_name, assign_src, target_src);
+        }
+    }
 
-                    if should_skip(module.get(*conn_expr), port_name) {
-                        continue;
-                    }
+    // handle port connections
+    if collector.config.port_connection {
+        for instance_id in instantiation.instances.iter() {
+            let instance = module.get(*instance_id);
+            let instance_src = src_map.get(*instance_id);
+            if !collector.intersect(instance_src.range()) {
+                break;
+            }
 
-                    let target_src = InFile::new(target_file, target_src_map.get(port_id));
-                    collector.collect_port_hint(port_name, conn_src, target_src);
+            for (id, &conn_id) in instance.connections.iter().enumerate() {
+                let PortConn::Ordered(conn_expr) = module.get(conn_id) else {
+                    continue;
+                };
+
+                let conn_src = src_map.get(conn_id);
+                if !collector.intersect(conn_src.range()) {
+                    break;
                 }
-                Ports::Ansi(_) => {
-                    let Some(port_id) = target_module.ansi_port_id_by_idx(id) else {
-                        continue;
-                    };
-                    let Some(port_name) = target_module.get(port_id).name.as_ref() else {
-                        continue;
-                    };
 
-                    if should_skip(module.get(*conn_expr), port_name) {
-                        continue;
+                match &target_module.ports {
+                    Ports::NonAnsi { .. } => {
+                        let port_id = target_module.non_ansi_port_id_by_idx(id);
+                        let Some(port_name) = target_module.get(port_id).label.as_ref() else {
+                            continue;
+                        };
+
+                        if should_skip(module.get(*conn_expr), port_name) {
+                            continue;
+                        }
+
+                        let target_src = InFile::new(target_file, target_src_map.get(port_id));
+                        collector.collect_port_hint(port_name, conn_src, target_src);
                     }
+                    Ports::Ansi(_) => {
+                        let Some(port_id) = target_module.ansi_port_id_by_idx(id) else {
+                            continue;
+                        };
+                        let Some(port_name) = target_module.get(port_id).name.as_ref() else {
+                            continue;
+                        };
 
-                    let target_src = InFile::new(target_file, target_src_map.get(port_id));
-                    collector.collect_port_hint(port_name, conn_src, target_src);
+                        if should_skip(module.get(*conn_expr), port_name) {
+                            continue;
+                        }
+
+                        let target_src = InFile::new(target_file, target_src_map.get(port_id));
+                        collector.collect_port_hint(port_name, conn_src, target_src);
+                    }
                 }
             }
         }

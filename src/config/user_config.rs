@@ -1,6 +1,6 @@
 use ide::{
     document_highlight::DocumentHighlightConfig, formatting::FmtConfig, hover::HoverConfig,
-    references::ReferencesConfig, rename::RenameConfig,
+    inlay_hint::InlayHintConfig, references::ReferencesConfig, rename::RenameConfig,
 };
 use serde::{Deserialize, Serialize};
 use utils::{json::get_field, paths::Utf8PathBuf};
@@ -89,26 +89,29 @@ config_data! {
             "--indentation_spaces=4",
             "--failsafe_success=false",
         ].into_iter().map(String::from).collect(),
+
+        inlayHints_port_connection_enable: bool = true,
+        inlayHints_parameter_assignment_enable: bool = true,
     }
 }
 
 impl Config {
-    pub(crate) fn references_config(&self) -> ReferencesConfig {
+    pub(crate) fn references(&self) -> ReferencesConfig {
         let scope_visibility = self.user_config.scope_visibility.into();
         ReferencesConfig::new(scope_visibility, None)
     }
 
-    pub(crate) fn document_highlight_config(&self) -> DocumentHighlightConfig {
+    pub(crate) fn document_highlight(&self) -> DocumentHighlightConfig {
         let scope_visibility = self.user_config.scope_visibility.into();
         DocumentHighlightConfig { scope_visibility }
     }
 
-    pub(crate) fn rename_config(&self) -> RenameConfig {
+    pub(crate) fn rename(&self) -> RenameConfig {
         let scope_visibility = self.user_config.scope_visibility.into();
         RenameConfig { scope_visibility }
     }
 
-    pub(crate) fn fmt_config(&self) -> FmtConfig {
+    pub(crate) fn fmt(&self) -> FmtConfig {
         let mut args = self.user_config.formatter_args.clone();
         args.push(format!("--indentation_spaces={}", self.user_config.formatting_indent_width));
         FmtConfig {
@@ -119,8 +122,15 @@ impl Config {
         }
     }
 
-    pub(crate) fn hover_config(&self) -> HoverConfig {
+    pub(crate) fn hover(&self) -> HoverConfig {
         HoverConfig { format: self.cli_hover_markdown_support() }
+    }
+
+    pub(crate) fn inlay_hint(&self) -> InlayHintConfig {
+        InlayHintConfig {
+            port_connection: self.user_config.inlayHints_port_connection_enable,
+            parameter_assignment: self.user_config.inlayHints_parameter_assignment_enable,
+        }
     }
 }
 

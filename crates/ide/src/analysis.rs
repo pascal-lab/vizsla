@@ -19,7 +19,7 @@ use crate::{
     formatting::{self, FmtConfig},
     goto_declaration, goto_definition,
     hover::{self, HoverConfig},
-    inlay_hint::{self, InlayHint},
+    inlay_hint::{self, InlayHint, InlayHintConfig},
     markup::Markup,
     navigation_target::NavTarget,
     references::{self, References, ReferencesConfig},
@@ -138,7 +138,12 @@ impl Analysis {
         self.with_db(|db| hover::hover(db, position, config))
     }
 
-    pub fn inlay_hint(&self, file_id: FileId, range: TextRange) -> Cancellable<Vec<InlayHint>> {
-        self.with_db(|db| inlay_hint::inlay_hint(db, file_id, range))
+    pub fn inlay_hint(
+        &self,
+        file_id: FileId,
+        range: TextRange,
+        config: InlayHintConfig,
+    ) -> Cancellable<Vec<InlayHint>> {
+        self.with_db(|db| inlay_hint::inlay_hint(db, file_id, range, config))
     }
 }
