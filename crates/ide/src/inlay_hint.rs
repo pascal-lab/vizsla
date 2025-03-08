@@ -6,7 +6,7 @@ use hir::{
         expr::Expr,
         file::FileItem,
         module::{
-            Module, ModuleId, ModuleSourceMap,
+            Module, ModuleId, ModuleSourceMap, ModuleSrc,
             instantiation::{Instantiation, ParamAssign, PortConn},
             port::Ports,
         },
@@ -28,6 +28,7 @@ use crate::markup::Markup;
 pub struct InlayHintConfig {
     pub port_connection: bool,
     pub parameter_assignment: bool,
+    pub end_structure: bool,
 }
 
 impl InlayHintConfig {
@@ -40,16 +41,16 @@ impl InlayHintConfig {
 pub enum InlayKind {
     ParamAssign,
     Port,
+    EndStructure,
 }
 
 #[derive(Debug)]
 pub struct InlayHint {
-    // The text range this inlay hint applies to.
-    pub range: TextRange,
-
     pub label: String,
     pub tooltip: Option<Markup>,
     pub target_location: Option<InFile<TextRange>>,
+    pub padding_left: bool,
+    pub padding_right: bool,
 
     pub position: TextSize,
     pub kind: InlayKind,
@@ -80,11 +81,18 @@ impl InlayHintCollector {
         let kind = match_ast_kind! { src.kind(),
             ast::ParamAssignment => InlayKind::ParamAssign,
             ast::OrderedPortConnection => InlayKind::Port,
+            ast::ModuleDeclaration => InlayKind::EndStructure,
             _ => unimplemented!("{:?}", src.kind()),
         };
 
         let position = match_ast_kind! { src.kind(),
+            ast::ModuleDeclaration => range.end(),
             _ => range.start(),
+        };
+
+        let (padding_left, padding_right) = match_ast_kind! { src.kind(),
+            ast::ModuleDeclaration => (true, false),
+            _ => (false, false),
         };
 
         let (tooltip, target_location) = if let Some(InFile { value: src, file_id }) = target_src {
@@ -95,10 +103,11 @@ impl InlayHintCollector {
         };
 
         self.hints.push(InlayHint {
-            range,
             label,
             tooltip,
             target_location,
+            padding_left,
+            padding_right,
             position,
             kind,
             text_edit,
@@ -147,7 +156,7 @@ pub(crate) fn inlay_hint(
                 let module_src = src_map.get(idx);
 
                 if collector.intersect(module_src.range()) {
-                    collect_module_items(db, module_id, &mut collector);
+                    collect_module_items(db, module_id, module_src, &mut collector);
                 }
             }
             _ => {}
@@ -157,7 +166,12 @@ pub(crate) fn inlay_hint(
     collector.into_hints()
 }
 
-fn collect_module_items(db: &RootDb, module_id: ModuleId, collector: &mut InlayHintCollector) {
+fn collect_module_items(
+    db: &RootDb,
+    module_id: ModuleId,
+    module_src: ModuleSrc,
+    collector: &mut InlayHintCollector,
+) {
     let (module, src_map) = db.module_with_source_map(module_id);
     let (module, src_map) = (module.as_ref(), src_map.as_ref());
 
@@ -168,6 +182,12 @@ fn collect_module_items(db: &RootDb, module_id: ModuleId, collector: &mut InlayH
                 process_instantiation(db, module, src_map, instantiation, collector);
             }
         }
+    }
+
+    if collector.config.end_structure
+        && let Some(name) = &module.name
+    {
+        collector.collect_hint(module_src, None::<InFile<ModuleSrc>>, format!(": {name}"), None);
     }
 }
 

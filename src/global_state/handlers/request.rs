@@ -269,7 +269,7 @@ pub(crate) fn handle_inlay_hint(
         .analysis
         .inlay_hint(file_id, range, config)?
         .into_iter()
-        .map(|hint| to_proto::inlay_hint(&snap, &line_info, file_id, hint))
+        .map(|hint| to_proto::inlay_hint(&snap, &line_info, hint))
         .collect_vec();
 
     Ok(Some(res))

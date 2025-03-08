@@ -181,33 +181,7 @@ impl Config {
             document_highlight_provider: OneOf::Left(true).into(),
             document_symbol_provider: OneOf::Left(true).into(),
             workspace_symbol_provider: OneOf::Left(true).into(),
-            code_action_provider: Some({
-                try_!(
-                    self.client_caps
-                        .text_document
-                        .as_ref()?
-                        .code_action
-                        .as_ref()?
-                        .code_action_literal_support
-                        .as_ref()?
-                )
-                .map_or(true.into(), |_| {
-                    CodeActionOptions {
-                        code_action_kinds: vec![
-                            CodeActionKind::EMPTY,
-                            CodeActionKind::QUICKFIX,
-                            CodeActionKind::REFACTOR,
-                            CodeActionKind::REFACTOR_EXTRACT,
-                            CodeActionKind::REFACTOR_INLINE,
-                            CodeActionKind::REFACTOR_REWRITE,
-                        ]
-                        .into(),
-                        resolve_provider: true.into(),
-                        work_done_progress_options: Default::default(),
-                    }
-                    .into()
-                })
-            }),
+            code_action_provider: None,
             code_lens_provider: CodeLensOptions { resolve_provider: true.into() }.into(),
             document_formatting_provider: OneOf::Left(true).into(),
             document_range_formatting_provider: OneOf::Left(true).into(),
@@ -263,20 +237,7 @@ impl Config {
             }
             .into(),
             call_hierarchy_provider: Some(true.into()),
-            semantic_tokens_provider: Some(
-                SemanticTokensOptions {
-                    // TODO:
-                    legend: SemanticTokensLegend::default(),
-                    // {
-                    //     token_types: SemanticTokensLegend::
-                    //     token_modifiers: semantic_tokens::SUPPORTED_MODIFIERS.to_vec(),
-                    // },
-                    full: SemanticTokensFullOptions::Delta { delta: true.into() }.into(),
-                    range: true.into(),
-                    work_done_progress_options: Default::default(),
-                }
-                .into(),
-            ),
+            semantic_tokens_provider: None,
             moniker_provider: None,
             linked_editing_range_provider: None,
             inline_value_provider: None,
@@ -287,17 +248,7 @@ impl Config {
                 },
             ))
             .into(),
-            diagnostic_provider: Some(lsp_types::DiagnosticServerCapabilities::Options(
-                lsp_types::DiagnosticOptions {
-                    identifier: None,
-                    inter_file_dependencies: true,
-                    // FIXME:
-                    workspace_diagnostics: false,
-                    work_done_progress_options: WorkDoneProgressOptions {
-                        work_done_progress: None,
-                    },
-                },
-            )),
+            diagnostic_provider: None,
             experimental: None,
         }
     }

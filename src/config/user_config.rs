@@ -93,6 +93,7 @@ config_data! {
 
         inlayHints_port_connection_enable: bool = true,
         inlayHints_parameter_assignment_enable: bool = true,
+        inlayHints_end_structure_enable: bool = true,
 
         lens_instantiations_enable: bool = true,
     }
@@ -133,6 +134,7 @@ impl Config {
         InlayHintConfig {
             port_connection: self.user_config.inlayHints_port_connection_enable,
             parameter_assignment: self.user_config.inlayHints_parameter_assignment_enable,
+            end_structure: self.user_config.inlayHints_end_structure_enable,
         }
     }
 

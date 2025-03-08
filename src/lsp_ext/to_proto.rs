@@ -1,4 +1,3 @@
-
 use anyhow::Error;
 use hir::container::InFile;
 use ide::{
@@ -390,10 +389,18 @@ pub(crate) fn hover_contents(markup: Markup, format: HoverFormat) -> lsp_types::
 pub(crate) fn inlay_hint(
     snap: &GlobalStateSnapshot,
     line_info: &LineInfo,
-    file_id: FileId,
     hint: InlayHint,
 ) -> lsp_types::InlayHint {
-    let InlayHint { range, label, tooltip, target_location, position, kind, text_edit } = hint;
+    let InlayHint {
+        label,
+        tooltip,
+        target_location,
+        position,
+        kind,
+        text_edit,
+        padding_left,
+        padding_right,
+    } = hint;
 
     let label = lsp_types::InlayHintLabelPart {
         value: label,
@@ -410,10 +417,10 @@ pub(crate) fn inlay_hint(
         command: None,
     };
 
-    let range = self::range(line_info, range);
     let position = self::position(line_info, position);
     let kind = match kind {
         InlayKind::ParamAssign | InlayKind::Port => Some(lsp_types::InlayHintKind::PARAMETER),
+        InlayKind::EndStructure => None,
     };
 
     let text_edits = text_edit.map(|it| self::text_edits(line_info, it));
@@ -424,8 +431,8 @@ pub(crate) fn inlay_hint(
         kind,
         text_edits,
         tooltip: None,
-        padding_left: None,
-        padding_right: None,
+        padding_left: Some(padding_left),
+        padding_right: Some(padding_right),
         data: None,
     }
 }
