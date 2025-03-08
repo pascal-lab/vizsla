@@ -66,7 +66,7 @@ impl SearchScope {
         }
     }
 
-    fn all(db: &RootDb) -> Self {
+    pub(crate) fn all(db: &RootDb) -> Self {
         let res = db.files().iter().map(|&file_id| (file_id, None)).collect();
         SearchScope(res)
     }

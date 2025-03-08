@@ -20,6 +20,7 @@ pub mod navigation_target;
 pub mod render;
 pub mod source_change;
 
+pub mod code_lens;
 pub mod document_highlight;
 pub mod document_symbols;
 pub mod folding_ranges;

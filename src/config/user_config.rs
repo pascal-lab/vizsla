@@ -1,6 +1,7 @@
 use ide::{
-    document_highlight::DocumentHighlightConfig, formatting::FmtConfig, hover::HoverConfig,
-    inlay_hint::InlayHintConfig, references::ReferencesConfig, rename::RenameConfig,
+    code_lens::CodeLensConfig, document_highlight::DocumentHighlightConfig, formatting::FmtConfig,
+    hover::HoverConfig, inlay_hint::InlayHintConfig, references::ReferencesConfig,
+    rename::RenameConfig,
 };
 use serde::{Deserialize, Serialize};
 use utils::{json::get_field, paths::Utf8PathBuf};
@@ -92,6 +93,8 @@ config_data! {
 
         inlayHints_port_connection_enable: bool = true,
         inlayHints_parameter_assignment_enable: bool = true,
+
+        lens_instantiations_enable: bool = true,
     }
 }
 
@@ -131,6 +134,10 @@ impl Config {
             port_connection: self.user_config.inlayHints_port_connection_enable,
             parameter_assignment: self.user_config.inlayHints_parameter_assignment_enable,
         }
+    }
+
+    pub(crate) fn code_lens(&self) -> CodeLensConfig {
+        CodeLensConfig { instantiations: self.user_config.lens_instantiations_enable }
     }
 }
 

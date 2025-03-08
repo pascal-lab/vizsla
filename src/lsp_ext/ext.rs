@@ -1,9 +1,14 @@
-use lsp_types::notification::Notification;
+use serde::{Deserialize, Serialize};
 
-pub enum ReloadWorkspace {}
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CodeLensData {
+    pub version: i32,
+    pub kind: CodeLensDataKind,
+}
 
-impl Notification for ReloadWorkspace {
-    type Params = ();
-
-    const METHOD: &'static str = "rust-analyzer/workspace/reloadWorkspace";
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum CodeLensDataKind {
+    Instantiation(lsp_types::TextDocumentPositionParams),
 }

@@ -194,6 +194,8 @@ impl GlobalState {
             .on::<DocumentSymbolRequest>(handle_document_symbol)
             .on::<FoldingRangeRequest>(handle_folding_ranges)
             .on_no_retry::<InlayHintRequest>(handle_inlay_hint)
+            .on_no_retry::<CodeLensRequest>(handle_code_lens)
+            .on_no_retry::<CodeLensResolve>(handle_code_lens_resolve)
             .on_no_retry::<HoverRequest>(handle_hover)
             .on_no_retry::<GotoDefinition>(handle_goto_definition)
             .on_no_retry::<GotoDeclaration>(handle_goto_declaration)
@@ -212,7 +214,7 @@ impl GlobalState {
         use handlers::notification::*;
         use lsp_types::notification::*;
 
-        use crate::lsp_ext::ext::*;
+        
 
         NotifDispatcher { notif: Some(notif), global_state: self }
             .on_sync_mut::<Cancel>(handle_cancel)?
@@ -223,7 +225,6 @@ impl GlobalState {
             .on_sync_mut::<DidChangeConfiguration>(handle_did_change_configuration)?
             .on_sync_mut::<DidChangeWorkspaceFolders>(handle_did_change_workspace_folders)?
             .on_sync_mut::<DidChangeWatchedFiles>(handle_did_change_watched_files)?
-            .on_sync_mut::<ReloadWorkspace>(handle_workspace_reload)?
             .finish();
 
         Ok(())

@@ -13,6 +13,7 @@ use vfs::FileId;
 
 use crate::{
     Cancellable,
+    code_lens::{self, CodeLens, CodeLensConfig, CodeLensKind},
     document_highlight::{self, DocumentHighlight, DocumentHighlightConfig},
     document_symbols::{self, DocumentSymbol},
     folding_ranges::{self, Fold, FoldingConfig},
@@ -145,5 +146,13 @@ impl Analysis {
         config: InlayHintConfig,
     ) -> Cancellable<Vec<InlayHint>> {
         self.with_db(|db| inlay_hint::inlay_hint(db, file_id, range, config))
+    }
+
+    pub fn code_lens(&self, file_id: FileId, config: CodeLensConfig) -> Cancellable<Vec<CodeLens>> {
+        self.with_db(|db| code_lens::code_lens(db, config, file_id))
+    }
+
+    pub fn code_lens_resolve(&self, kind: CodeLensKind) -> Cancellable<CodeLensKind> {
+        self.with_db(|db| code_lens::code_lens_resolve(db, kind))
     }
 }

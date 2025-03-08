@@ -1,6 +1,6 @@
 use ide::{folding_ranges::FoldingConfig, references::References};
 use itertools::Itertools;
-use lsp_types::{InlayHint, PrepareRenameResponse, RenameParams, WorkspaceEdit};
+use lsp_types::{PrepareRenameResponse, RenameParams, WorkspaceEdit};
 use span::{FilePosition, FileRange};
 use utils::text_edit::TextRange;
 
@@ -273,4 +273,40 @@ pub(crate) fn handle_inlay_hint(
         .collect_vec();
 
     Ok(Some(res))
+}
+
+pub(crate) fn handle_code_lens(
+    snap: GlobalStateSnapshot,
+    params: lsp_types::CodeLensParams,
+) -> anyhow::Result<Option<Vec<lsp_types::CodeLens>>> {
+    let file_id = from_proto::file_id(&snap, &params.text_document.uri)?;
+    let line_info = snap.line_info(file_id)?;
+    let config = snap.config.code_lens();
+
+    let res = snap
+        .analysis
+        .code_lens(file_id, config)?
+        .into_iter()
+        .filter_map(|lens| to_proto::code_lens(&snap, &line_info, file_id, lens))
+        .collect();
+
+    Ok(Some(dbg!(res)))
+}
+
+pub(crate) fn handle_code_lens_resolve(
+    snap: GlobalStateSnapshot,
+    mut code_lens: lsp_types::CodeLens,
+) -> anyhow::Result<lsp_types::CodeLens> {
+    let Some(data) = code_lens.data.take() else {
+        return Ok(code_lens);
+    };
+
+    let (file_id, code_lens_kind) = from_proto::code_lens(&snap, data)?;
+    let code_lens_kind = snap.analysis.code_lens_resolve(code_lens_kind)?;
+
+    let line_info = snap.line_info(file_id)?;
+    let (command, data) = to_proto::code_lens_kind(&snap, file_id, &line_info, code_lens_kind)?;
+    let res = lsp_types::CodeLens { range: code_lens.range, command, data };
+
+    Ok(dbg!(res))
 }

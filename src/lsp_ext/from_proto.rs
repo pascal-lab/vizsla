@@ -1,3 +1,4 @@
+use ide::code_lens::CodeLensKind;
 use span::{FilePosition, FileRange};
 use utils::{
     line_index::{LineCol, TextRange, TextSize, WideLineCol},
@@ -6,6 +7,7 @@ use utils::{
 };
 use vfs::{FileId, VfsPath};
 
+use super::ext;
 use crate::global_state::snapshot::GlobalStateSnapshot;
 
 pub(crate) fn vfs_path(url: &lsp_types::Url) -> anyhow::Result<vfs::VfsPath> {
@@ -73,4 +75,20 @@ pub(crate) fn file_range(
 
 pub(crate) fn file_id(snap: &GlobalStateSnapshot, url: &lsp_types::Url) -> anyhow::Result<FileId> {
     snap.file_id(url)
+}
+
+pub(crate) fn code_lens(
+    snap: &GlobalStateSnapshot,
+    data: serde_json::Value,
+) -> anyhow::Result<(FileId, CodeLensKind)> {
+    let data = serde_json::from_value::<ext::CodeLensData>(data)?;
+    let (file_id, kind) = match data.kind {
+        ext::CodeLensDataKind::Instantiation(pos_params) => {
+            let pos = self::file_position(snap, pos_params)?;
+            let file_id = pos.file_id;
+            (file_id, CodeLensKind::ModuleInstance { pos, data: None })
+        }
+    };
+
+    Ok((file_id, kind))
 }

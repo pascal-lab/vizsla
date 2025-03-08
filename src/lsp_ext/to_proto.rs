@@ -1,7 +1,9 @@
+
 use anyhow::Error;
 use hir::container::InFile;
 use ide::{
     Cancellable, SymbolKind,
+    code_lens::{CodeLens, CodeLensKind},
     document_highlight::DocumentHighlight,
     folding_ranges::{Fold, FoldingConfig},
     hover::HoverFormat,
@@ -13,7 +15,7 @@ use ide::{
     source_change::SourceChange,
 };
 use itertools::Itertools;
-use span::FileRange;
+use span::{FilePosition, FileRange};
 use utils::{
     line_index::{TextRange, TextSize},
     lines::{LineEnding, LineInfo, PositionEncoding},
@@ -25,7 +27,10 @@ use utils::{
 };
 use vfs::FileId;
 
-use super::lsp_error::LspError;
+use super::{
+    ext::{CodeLensData, CodeLensDataKind},
+    lsp_error::LspError,
+};
 use crate::global_state::snapshot::GlobalStateSnapshot;
 
 pub(crate) fn goto_definition_response(
@@ -423,4 +428,54 @@ pub(crate) fn inlay_hint(
         padding_right: None,
         data: None,
     }
+}
+
+pub(crate) fn code_lens(
+    snap: &GlobalStateSnapshot,
+    line_info: &LineInfo,
+    file_id: FileId,
+    CodeLens { range, kind }: CodeLens,
+) -> Option<lsp_types::CodeLens> {
+    let range = self::range(line_info, range);
+    let (command, data) = self::code_lens_kind(snap, file_id, line_info, kind).ok()?;
+    Some(lsp_types::CodeLens { range, command, data })
+}
+
+pub(crate) fn code_lens_kind(
+    snap: &GlobalStateSnapshot,
+    file_id: FileId,
+    line_info: &LineInfo,
+    kind: CodeLensKind,
+) -> anyhow::Result<(Option<lsp_types::Command>, Option<serde_json::Value>)> {
+    let url = self::url(snap, file_id);
+
+    let command = match kind {
+        CodeLensKind::ModuleInstance { data, .. } => data.map(|ranges| {
+            let count = ranges.len();
+            let s = if count == 1 { "" } else { "s" };
+            lsp_types::Command {
+                title: format!("{count} instance{s}"),
+                command: String::new(),
+                arguments: None,
+            }
+        }),
+    };
+
+    let data = match kind {
+        CodeLensKind::ModuleInstance { pos: FilePosition { offset, .. }, .. } => {
+            snap.url_file_version(&url).and_then(|version| {
+                let file_pos = lsp_types::TextDocumentPositionParams {
+                    text_document: lsp_types::TextDocumentIdentifier {
+                        uri: self::url(snap, file_id),
+                    },
+                    position: self::position(line_info, offset),
+                };
+                let data =
+                    CodeLensData { version, kind: CodeLensDataKind::Instantiation(file_pos) };
+                serde_json::to_value(data).ok()
+            })
+        }
+    };
+
+    Ok((command, data))
 }

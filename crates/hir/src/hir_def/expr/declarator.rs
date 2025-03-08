@@ -1,7 +1,7 @@
 use la_arena::{Arena, Idx, IdxRange};
 use smallvec::SmallVec;
 use syntax::ast;
-use utils::{define_enum_deriving_from, impl_from};
+use utils::define_enum_deriving_from;
 
 use super::{Expr, ExprId, ExprSrc, LowerExpr, data_ty::Dimension, impl_lower_expr};
 use crate::{

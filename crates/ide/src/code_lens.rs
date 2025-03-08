@@ -1,0 +1,112 @@
+use hir::{
+    db::HirDb,
+    file::HirFileId,
+    hir_def::{
+        file::{FileSourceMap, HirFile},
+        module::ModuleId,
+    },
+    semantics::{Semantics, pathres::PathResolution},
+    source_map::IsSrc,
+};
+use ide_db::root_db::RootDb;
+use span::{FilePosition, FileRange};
+use syntax::{
+    ast::{self, AstNode},
+    has_text_range::HasTextRange,
+};
+use utils::{get::Get, text_edit::TextRange};
+use vfs::FileId;
+
+use crate::{
+    ScopeVisibility,
+    definitions::Definition,
+    references::{
+        ReferencesConfig,
+        search::{ReferencesCtx, SearchScope},
+    },
+};
+
+pub struct CodeLensConfig {
+    pub instantiations: bool,
+}
+
+pub struct CodeLens {
+    pub range: TextRange,
+    pub kind: CodeLensKind,
+}
+
+pub enum CodeLensKind {
+    ModuleInstance { pos: FilePosition, data: Option<Vec<FileRange>> },
+}
+
+pub(crate) fn code_lens(db: &RootDb, config: CodeLensConfig, file_id: FileId) -> Vec<CodeLens> {
+    let file_id = HirFileId(file_id);
+    let (hir_file, src_map) = db.hir_file_with_source_map(file_id);
+    let (hir_file, src_map) = (hir_file.as_ref(), src_map.as_ref());
+
+    let mut res = Vec::new();
+
+    if config.instantiations {
+        process_instantiations(hir_file, src_map, file_id, &mut res);
+    }
+
+    res
+}
+
+fn process_instantiations(
+    hir_file: &HirFile,
+    src_map: &FileSourceMap,
+    file_id: HirFileId,
+    res: &mut Vec<CodeLens>,
+) {
+    for (local_module_id, module_info) in hir_file.modules.iter() {
+        if module_info.name.is_none() {
+            continue;
+        };
+
+        let range = src_map.get(local_module_id).range();
+        let pos = FilePosition { file_id: file_id.file_id(), offset: range.start() };
+
+        res.push(CodeLens { range, kind: CodeLensKind::ModuleInstance { pos, data: None } });
+    }
+}
+
+pub(crate) fn code_lens_resolve(db: &RootDb, mut kind: CodeLensKind) -> CodeLensKind {
+    let sema = Semantics::new(db);
+
+    match kind {
+        CodeLensKind::ModuleInstance { pos: FilePosition { file_id, offset }, ref mut data } => {
+            let hir_file_id = HirFileId(file_id);
+            let (_, src_map) = sema.db.hir_file_with_source_map(hir_file_id);
+            let (local_module_id, _) =
+                src_map.module_srcs.iter().find(|(_, src)| src.range().start() == offset).unwrap();
+            let module_id = ModuleId::new(hir_file_id, local_module_id);
+
+            let def = Definition(PathResolution::Module(module_id));
+
+            let ref_config =
+                ReferencesConfig::new(ScopeVisibility::Public, Some(SearchScope::all(sema.db)));
+
+            let mut ranges = Vec::new();
+            for (file_id, tokens) in ReferencesCtx::new(&sema, &def, ref_config).search() {
+                for tok in tokens {
+                    let instantiation =
+                        ast::HierarchyInstantiation::cast(tok.token.parent).unwrap();
+                    for instance in instantiation.instances().children() {
+                        if let Some(range) = instance
+                            .decl()
+                            .and_then(|decl| decl.name())
+                            .and_then(|name| name.text_range())
+                        {
+                            ranges.push(FileRange { file_id, range });
+                        }
+                    }
+                }
+            }
+
+            *data = Some(ranges);
+        }
+    }
+
+    kind
+}

@@ -14,7 +14,7 @@ description = "Language server for Verilog and System-Verilog"
 members = [".", "crates/*"]
 
 [workspace.package]
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 base-db.workspace = true
@@ -32,6 +32,7 @@ clap = { version = "4.4.6", features = ["derive"] }
 const_format.workspace = true
 crossbeam-channel.workspace = true
 itertools.workspace = true
+la-arena.workspace = true
 lsp-server = "0.7.6"
 lsp-types = "0.95.0"
 nohash-hasher.workspace = true
