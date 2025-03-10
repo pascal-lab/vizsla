@@ -1,8 +1,9 @@
 use ide::{folding_ranges::FoldingConfig, references::References};
 use itertools::Itertools;
-use lsp_types::{PrepareRenameResponse, RenameParams, WorkspaceEdit};
+use lsp_types;
 use span::{FilePosition, FileRange};
 use utils::text_edit::TextRange;
+use vfs::FileId;
 
 use crate::{
     global_state::snapshot::GlobalStateSnapshot,
@@ -114,19 +115,19 @@ pub(crate) fn handle_references(
 pub(crate) fn handle_prepare_rename(
     snap: GlobalStateSnapshot,
     params: lsp_types::TextDocumentPositionParams,
-) -> anyhow::Result<Option<PrepareRenameResponse>> {
+) -> anyhow::Result<Option<lsp_types::PrepareRenameResponse>> {
     let position = from_proto::file_position(&snap, params)?;
     let line_index = snap.line_info(position.file_id)?;
 
     let text_range = snap.analysis.prepare_rename(position)?.map_err(to_proto::rename_error)?;
     let range = to_proto::range(&line_index, text_range);
-    Ok(Some(PrepareRenameResponse::Range(range)))
+    Ok(Some(lsp_types::PrepareRenameResponse::Range(range)))
 }
 
 pub(crate) fn handle_rename(
     snap: GlobalStateSnapshot,
-    params: RenameParams,
-) -> anyhow::Result<Option<WorkspaceEdit>> {
+    params: lsp_types::RenameParams,
+) -> anyhow::Result<Option<lsp_types::WorkspaceEdit>> {
     let position = from_proto::file_position(&snap, params.text_document_position)?;
     let config = snap.config.rename();
     let change = snap
@@ -290,7 +291,7 @@ pub(crate) fn handle_code_lens(
         .filter_map(|lens| to_proto::code_lens(&snap, &line_info, file_id, lens))
         .collect();
 
-    Ok(Some(dbg!(res)))
+    Ok(Some(res))
 }
 
 pub(crate) fn handle_code_lens_resolve(
@@ -308,5 +309,5 @@ pub(crate) fn handle_code_lens_resolve(
     let (command, data) = to_proto::code_lens_kind(&snap, file_id, &line_info, code_lens_kind)?;
     let res = lsp_types::CodeLens { range: code_lens.range, command, data };
 
-    Ok(dbg!(res))
+    Ok(res)
 }
