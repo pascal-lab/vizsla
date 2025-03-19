@@ -1,4 +1,5 @@
 use bitflags::bitflags;
+use collector::SemaTokenCollectorTree;
 use hir::{
     container::{InContainer, InModule},
     db::HirDb,
@@ -26,6 +27,7 @@ use utils::{
 };
 use vfs::FileId;
 
+mod collector;
 mod port;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -77,18 +79,25 @@ bitflags! {
 
 struct SemaTokenCollector {
     config: SemaTokenConfig,
-    tokens: Vec<SemaToken>,
+    tokens: SemaTokenCollectorTree,
     range: TextRange,
 }
 
 impl SemaTokenCollector {
     fn new(config: SemaTokenConfig, range: TextRange) -> Self {
-        Self { config, tokens: Vec::new(), range }
+        Self {
+            config,
+            tokens: SemaTokenCollectorTree::new(SemaToken {
+                range,
+                tag: SemaTokenTag::None,
+                mods: SemaTokenModifier::empty(),
+            }),
+            range,
+        }
     }
 
-    fn finish(mut self) -> Vec<SemaToken> {
-        self.tokens.sort_by_key(|tok| tok.range.start());
-        self.tokens
+    fn finish(self) -> Vec<SemaToken> {
+        self.tokens.finish()
     }
 }
 
@@ -194,7 +203,7 @@ fn collect_module(
             check_range!(collector, range);
             let sema_token =
                 SemaToken { range, tag: SemaTokenTag::Instance, mods: SemaTokenModifier::empty() };
-            collector.tokens.push(sema_token);
+            collector.tokens.add(sema_token);
         };
     }
 
@@ -332,7 +341,7 @@ fn collect_ident_like(
         PathResolution::Instance(_) => {
             let sema_token =
                 SemaToken { range, tag: SemaTokenTag::Instance, mods: SemaTokenModifier::empty() };
-            collector.tokens.push(sema_token);
+            collector.tokens.add(sema_token);
         }
         _ => {}
     }

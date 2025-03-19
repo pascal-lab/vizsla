@@ -161,7 +161,7 @@ pub(super) fn add_port_token(
         SemaTokenModifier::empty()
     };
 
-    collector.tokens.push(SemaToken { range, tag, mods });
+    collector.tokens.add(SemaToken { range, tag, mods });
 }
 
 fn port_tag(
