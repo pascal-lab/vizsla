@@ -43,7 +43,7 @@ pub enum ParamAssign {
 
 pub type ParamAssignId = Idx<ParamAssign>;
 
-define_src!(ParamAssignSrc(ast::ParamAssignment));
+define_src_with_name!(ParamAssignSrc(ast::ParamAssignment));
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum PortConn {
@@ -55,7 +55,7 @@ pub enum PortConn {
 
 pub type PortConnId = Idx<PortConn>;
 
-define_src!(PortConnSrc(ast::PortConnection));
+define_src_with_name!(PortConnSrc(ast::PortConnection));
 
 impl LowerModuleCtx<'_> {
     pub(crate) fn lower_instantiation(

@@ -76,7 +76,8 @@ impl<'a> Iterator for TokenAtOffset<'a> {
 }
 
 pub trait SyntaxNodeExt<'a> {
-    fn elem_at_range(&self, range: TextRange) -> Option<SyntaxElement<'a>>;
+    fn elem_at_exact_range(&self, range: TextRange) -> Option<SyntaxElement<'a>>;
+    fn covering_element(&self, range: TextRange) -> SyntaxElement<'a>;
     fn token_at_offset(&self, offset: TextSize) -> TokenAtOffset<'a>;
     fn find_root(&self) -> SyntaxNode<'a>;
     fn to_ptr(&self) -> SyntaxNodePtr;
@@ -87,7 +88,7 @@ pub trait SyntaxNodeExt<'a> {
 }
 
 impl<'a> SyntaxNodeExt<'a> for SyntaxNode<'a> {
-    fn elem_at_range(&self, range: TextRange) -> Option<SyntaxElement<'a>> {
+    fn elem_at_exact_range(&self, range: TextRange) -> Option<SyntaxElement<'a>> {
         let start = range.start();
         let mut cursor = self.walk();
         loop {
@@ -103,6 +104,29 @@ impl<'a> SyntaxNodeExt<'a> for SyntaxNode<'a> {
             }
 
             cursor.goto_first_child_after_pos(start.into());
+        }
+    }
+
+    fn covering_element(&self, range: TextRange) -> SyntaxElement<'a> {
+        let start = range.start();
+
+        let mut cursor = self.walk();
+        loop {
+            let elem = cursor.to_elem();
+
+            if elem.text_range().is_none_or(|elem_range| !elem_range.contains_range(range)) {
+                cursor.goto_parent();
+                break cursor.to_elem();
+            }
+
+            match elem {
+                SyntaxElement::Token(_) => break elem,
+                SyntaxElement::Node(_) => {
+                    if !cursor.goto_last_child_before_pos(start.into()) {
+                        break elem;
+                    }
+                }
+            }
         }
     }
 

@@ -150,6 +150,7 @@ pub(crate) fn inlay_hint(
     let mut collector = InlayHintCollector::new(range, config);
 
     for &item in src_map.items.iter() {
+        #[allow(clippy::single_match)]
         match item {
             FileItem::LocalModuleId(idx) => {
                 let module_id = ModuleId::new(file_id, idx);
@@ -298,6 +299,8 @@ fn edits_for_conn(param: &str, conn_src: impl IsSrc) -> Option<TextEdit> {
 }
 
 fn should_skip(expr: &Expr, name: &str) -> bool {
+    // TODO: handle more cases
+    #[allow(clippy::match_like_matches_macro)]
     match expr {
         Expr::Ident(ident) if ident == name => true,
         _ => false,

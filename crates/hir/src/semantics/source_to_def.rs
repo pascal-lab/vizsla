@@ -6,6 +6,7 @@ use syntax::{
 };
 use utils::get::{Get, GetRef};
 
+use super::hir_to_def::Hir2DefCache;
 use crate::{
     container::{ContainerId, InFile},
     db::HirDb,
@@ -19,12 +20,13 @@ use crate::{
 
 #[derive(Default, Debug)]
 pub(super) struct Source2DefCache<'db> {
-    find_container: FxHashMap<(HirFileId, SyntaxNode<'db>), ContainerId>,
+    container_map: FxHashMap<InFile<SyntaxNode<'db>>, ContainerId>,
 }
 
 pub(super) struct Source2DefCtx<'db, 'cache> {
     pub(super) db: &'db dyn HirDb,
-    pub(super) cache: &'cache mut Source2DefCache<'db>,
+    pub(super) source_cache: &'cache mut Source2DefCache<'db>,
+    pub(super) hir_cache: &'cache mut Hir2DefCache,
 }
 
 impl Source2DefCtx<'_, '_> {
@@ -78,16 +80,16 @@ impl Source2DefCtx<'_, '_> {
 
     fn container_to_def(&mut self, file_id: HirFileId, node: SyntaxNode) -> Option<ContainerId> {
         let cont_id = match_ast! { node,
-            ast::ModuleDeclaration[module] => {
-                let src = module.into();
-                self.module_to_def(InFile::new(file_id, src))?.into()
-            },
-            ast::BlockStatement[block] => {
-                let block_src = BlockSrc::from(block);
-                self.block_to_def_inner(file_id, block, block_src)?.into()
-            },
-            ast::CompilationUnit => file_id.into(),
-            _ => return None,
+           ast::ModuleDeclaration[module] => {
+               let src = module.into();
+               self.module_to_def(InFile::new(file_id, src))?.into()
+           },
+           ast::BlockStatement[block] => {
+               let block_src = BlockSrc::from(block);
+               self.block_to_def_inner(file_id, block, block_src)?.into()
+           },
+           ast::CompilationUnit => file_id.into(),
+           _ => return None,
         };
 
         Some(cont_id)
@@ -98,8 +100,9 @@ impl Source2DefCtx<'_, '_> {
         InFile { value: node, file_id }: InFile<SyntaxNode>,
     ) -> ContainerId {
         let node = unsafe { std::mem::transmute::<SyntaxNode<'_>, SyntaxNode<'_>>(node) };
+        let in_file = InFile::new(file_id, node);
 
-        if let Some(container_id) = self.cache.find_container.get(&(file_id, node)) {
+        if let Some(container_id) = self.source_cache.container_map.get(&in_file) {
             return *container_id;
         }
 
@@ -107,7 +110,7 @@ impl Source2DefCtx<'_, '_> {
             .skip(1) // skip the node itself
             .find_map(|node| self.container_to_def(file_id, node))
             .unwrap_or(file_id.into());
-        self.cache.find_container.insert((file_id, node), container_id);
+        self.source_cache.container_map.insert(in_file, container_id);
         container_id
     }
 }

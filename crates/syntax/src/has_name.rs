@@ -1,9 +1,7 @@
 use slang::{
-    SyntaxToken,
     ast::{
-        AstNode, BlockStatement, Declarator, HierarchicalInstance, ModuleDeclaration, NonAnsiPort,
-        Statement,
-    },
+        AstNode, BlockStatement, Declarator, HierarchicalInstance, ModuleDeclaration, NonAnsiPort, ParamAssignment, PortConnection, PortReference, Statement
+    }, SyntaxToken
 };
 
 pub trait HasName<'a>: AstNode<'a> {
@@ -28,12 +26,35 @@ impl<'a> HasName<'a> for NonAnsiPort<'a> {
     }
 }
 
+impl<'a> HasName<'a> for PortReference<'a> {
+    fn name(&self) -> Option<SyntaxToken<'a>> {
+        self.name()
+    }
+}
+
 impl<'a> HasName<'a> for Declarator<'a> {
     fn name(&self) -> Option<SyntaxToken<'a>> {
         self.name()
     }
 }
 
+impl<'a> HasName<'a> for ParamAssignment<'a> {
+    fn name(&self) -> Option<SyntaxToken<'a>> {
+        match self {
+            ParamAssignment::OrderedParamAssignment(_) => None,
+            ParamAssignment::NamedParamAssignment(assign) => assign.name(),
+        }
+    }
+}
+
+impl<'a> HasName<'a> for PortConnection<'a> {
+    fn name(&self) -> Option<SyntaxToken<'a>> {
+        match self {
+            PortConnection::NamedPortConnection(conn) => conn.name(),
+            _ => None,
+        }
+    }
+}
 impl<'a> HasName<'a> for HierarchicalInstance<'a> {
     fn name(&self) -> Option<SyntaxToken<'a>> {
         self.decl()?.name()

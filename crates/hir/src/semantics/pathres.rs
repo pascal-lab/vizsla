@@ -6,7 +6,7 @@ use utils::get::GetRef;
 
 use super::SemanticsImpl;
 use crate::{
-    container::{ContainerId, ContainerParent, InBlock, InContainer, InFile, InModule},
+    container::{ContainerId, InBlock, InContainer, InFile, InModule},
     hir_def::{
         block::BlockId,
         declaration::Declaration,
@@ -23,29 +23,11 @@ impl SemanticsImpl<'_> {
         &self,
         SyntaxTokenWithParent { parent, tok }: SyntaxTokenWithParent,
     ) -> Option<PathResolution> {
-        let db = self.db;
         let file_id = self.find_file(parent);
         let ident = lower_ident_opt(Some(tok))?;
         self.with_ctx(|ctx| {
             let container = ctx.find_container(InFile::new(file_id, parent));
-
-            ContainerParent::start_from(db, container).find_map(|id| match id {
-                ContainerId::HirFileId(_) => {
-                    let scope = db.unit_scope();
-                    let entry = scope.get(&ident)?;
-                    Some(entry.into())
-                }
-                ContainerId::ModuleId(module_id) => {
-                    let scope = db.module_scope(module_id);
-                    let entry = scope.get(&ident)?;
-                    Some(InModule::new(module_id, entry).into())
-                }
-                ContainerId::BlockId(block_id) => {
-                    let scope = db.block_scope(block_id);
-                    let entry = scope.get(&ident)?;
-                    Some(InBlock::new(block_id, entry).into())
-                }
-            })
+            ctx.name_to_def(InContainer::new(container, ident))
         })
     }
 

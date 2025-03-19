@@ -70,13 +70,13 @@ pub enum PortHeader {
 }
 
 impl PortHeader {
-    pub(crate) fn dir(&self) -> Option<PortDirection> {
+    pub fn dir(&self) -> Option<PortDirection> {
         match self {
             PortHeader::Var { dir, .. } | PortHeader::Net { dir, .. } => Some(*dir),
         }
     }
 
-    pub(crate) fn ty(&self) -> DataTy {
+    pub fn ty(&self) -> DataTy {
         match self {
             PortHeader::Var { ty, .. } => *ty,
             PortHeader::Net { net_ty: NetType { ty, .. }, .. } => *ty,
@@ -162,7 +162,7 @@ pub struct PortRef {
 
 pub type PortRefId = Idx<PortRef>;
 
-define_src!(PortRefSrc(ast::PortReference));
+define_src_with_name!(PortRefSrc(ast::PortReference));
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum PortSrcs {

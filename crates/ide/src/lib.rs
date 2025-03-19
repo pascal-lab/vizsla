@@ -1,6 +1,7 @@
 #![feature(try_blocks)]
 #![feature(let_chains)]
 #![feature(if_let_guard)]
+#![feature(decl_macro)]
 
 pub use base_db::Cancelled;
 use hir::hir_def::{
@@ -32,6 +33,7 @@ pub mod inlay_hint;
 pub mod references;
 pub mod rename;
 pub mod selection_ranges;
+pub mod semantic_tokens;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum SymbolKind {

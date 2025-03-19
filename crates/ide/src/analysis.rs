@@ -26,6 +26,7 @@ use crate::{
     references::{self, References, ReferencesConfig},
     rename::{self, RenameConfig, RenameResult},
     selection_ranges,
+    semantic_tokens::{self, SemaToken, SemaTokenConfig},
     source_change::SourceChange,
 };
 
@@ -154,5 +155,14 @@ impl Analysis {
 
     pub fn code_lens_resolve(&self, kind: CodeLensKind) -> Cancellable<CodeLensKind> {
         self.with_db(|db| code_lens::code_lens_resolve(db, kind))
+    }
+
+    pub fn semantic_tokens(
+        &self,
+        file_id: FileId,
+        config: SemaTokenConfig,
+        range: Option<TextRange>,
+    ) -> Cancellable<Vec<SemaToken>> {
+        self.with_db(|db| semantic_tokens::semantic_tokens(db, config, file_id, range))
     }
 }

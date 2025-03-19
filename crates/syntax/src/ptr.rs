@@ -21,7 +21,7 @@ impl SyntaxNodePtr {
     #[inline]
     pub fn to_node<'a>(&self, tree: &'a SyntaxTree) -> Option<SyntaxNode<'a>> {
         let root_node = tree.root()?;
-        root_node.elem_at_range(self.range)?.as_node()
+        root_node.elem_at_exact_range(self.range)?.as_node()
     }
 
     #[inline]
@@ -47,7 +47,7 @@ impl SyntaxTokenPtr {
     }
 
     pub fn to_token<'a>(&self, tree: &'a SyntaxTree) -> Option<SyntaxTokenWithParent<'a>> {
-        tree.root()?.elem_at_range(self.range)?.as_tok_with_parent()
+        tree.root()?.elem_at_exact_range(self.range)?.as_tok_with_parent()
     }
 
     pub fn kind(&self) -> TokenKind {

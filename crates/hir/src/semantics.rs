@@ -1,6 +1,8 @@
 use std::{cell::RefCell, ops};
 
+use hir_to_def::Hir2DefCache;
 use itertools::Itertools;
+use pathres::PathResolution;
 use rustc_hash::FxHashMap;
 use source_to_def::{Source2DefCache, Source2DefCtx};
 use syntax::{
@@ -9,8 +11,14 @@ use syntax::{
 };
 use vfs::FileId;
 
-use crate::{db::HirDb, file::HirFileId};
+use crate::{
+    container::InContainer,
+    db::HirDb,
+    file::HirFileId,
+    hir_def::{Ident, expr::ExprId},
+};
 
+mod hir_to_def;
 pub mod pathres;
 pub mod resolver;
 mod source_to_def;
@@ -42,6 +50,7 @@ pub struct SemanticsImpl<'db> {
     // Root -> HirFileId
     root2file_cache: RefCell<FxHashMap<SyntaxNode<'db>, HirFileId>>,
     source2def_cache: RefCell<Source2DefCache<'db>>,
+    hir2def_cache: RefCell<Hir2DefCache>,
 }
 
 impl<'db> SemanticsImpl<'db> {
@@ -50,6 +59,7 @@ impl<'db> SemanticsImpl<'db> {
             db,
             root2file_cache: Default::default(),
             source2def_cache: Default::default(),
+            hir2def_cache: Default::default(),
         }
     }
 
@@ -57,7 +67,7 @@ impl<'db> SemanticsImpl<'db> {
         let tree = self.db.parse_src(file_id);
 
         // Unsafe: we garentee that the root node is valid for the lifetime of the db
-        let root_node =
+        let root_node: SyntaxNode<'db> =
             unsafe { std::mem::transmute::<SyntaxNode<'_>, SyntaxNode<'db>>(tree.root().unwrap()) };
         self.cache_node2file(root_node, file_id.into());
         ast::CompilationUnit::cast(root_node).unwrap()
@@ -88,7 +98,21 @@ impl<'db> SemanticsImpl<'db> {
     }
 
     fn with_ctx<F: FnOnce(&mut Source2DefCtx<'_, '_>) -> T, T>(&self, f: F) -> T {
-        let mut ctx = Source2DefCtx { db: self.db, cache: &mut self.source2def_cache.borrow_mut() };
+        let mut ctx = Source2DefCtx {
+            db: self.db,
+            source_cache: &mut self.source2def_cache.borrow_mut(),
+            hir_cache: &mut self.hir2def_cache.borrow_mut(),
+        };
         f(&mut ctx)
+    }
+}
+
+impl SemanticsImpl<'_> {
+    pub fn expr_to_def(&self, in_cont: InContainer<ExprId>) -> Option<PathResolution> {
+        self.with_ctx(|ctx| ctx.expr_to_def(in_cont))
+    }
+
+    pub fn name_to_def(&self, in_cont: InContainer<Ident>) -> Option<PathResolution> {
+        self.with_ctx(|ctx| ctx.name_to_def(in_cont))
     }
 }

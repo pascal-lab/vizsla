@@ -55,6 +55,14 @@ impl Declaration {
             Declaration::ParamDecl(param_decl) => param_decl.decls.clone(),
         }
     }
+
+    pub fn ty(&self) -> DataTy {
+        match self {
+            Declaration::DataDecl(data_decl) => data_decl.ty,
+            Declaration::NetDecl(net_decl) => net_decl.ty,
+            Declaration::ParamDecl(param_decl) => param_decl.ty,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
