@@ -1,6 +1,5 @@
 use ide::{folding_ranges::FoldingConfig, references::References};
 use itertools::Itertools;
-use lsp_types;
 use span::{FilePosition, FileRange};
 use utils::text_edit::TextRange;
 use vfs::FileId;
@@ -309,5 +308,62 @@ pub(crate) fn handle_code_lens_resolve(
     let (command, data) = to_proto::code_lens_kind(&snap, file_id, &line_info, code_lens_kind)?;
     let res = lsp_types::CodeLens { range: code_lens.range, command, data };
 
+    Ok(res)
+}
+
+pub(crate) fn handle_semantic_tokens_full(
+    snap: GlobalStateSnapshot,
+    params: lsp_types::SemanticTokensParams,
+) -> anyhow::Result<Option<lsp_types::SemanticTokensResult>> {
+    let file_id = from_proto::file_id(&snap, &params.text_document.uri)?;
+    let res = compute_sema_tokens(&snap, file_id, None)?;
+    snap.sema_tokens_cache.lock().insert(params.text_document.uri, res.clone());
+    Ok(Some(res.into()))
+}
+
+pub(crate) fn handle_semantic_tokens_full_delta(
+    snap: GlobalStateSnapshot,
+    params: lsp_types::SemanticTokensDeltaParams,
+) -> anyhow::Result<Option<lsp_types::SemanticTokensFullDeltaResult>> {
+    let file_id = from_proto::file_id(&snap, &params.text_document.uri)?;
+    let res = compute_sema_tokens(&snap, file_id, None)?;
+
+    let old_tokens = snap.sema_tokens_cache.lock().remove(&params.text_document.uri);
+    if let Some(old_tokens @ lsp_types::SemanticTokens { result_id: Some(prev_id), .. }) =
+        &old_tokens
+        && *prev_id == params.previous_result_id
+    {
+        let delta = to_proto::semantic_token_delta(old_tokens, &res);
+        snap.sema_tokens_cache.lock().insert(params.text_document.uri, res);
+        Ok(Some(delta.into()))
+    } else {
+        // Clone first to keep the lock short
+        let semantic_tokens_clone = res.clone();
+        snap.sema_tokens_cache.lock().insert(params.text_document.uri, semantic_tokens_clone);
+        Ok(Some(res.into()))
+    }
+}
+
+pub(crate) fn handle_semantic_tokens_range(
+    snap: GlobalStateSnapshot,
+    params: lsp_types::SemanticTokensRangeParams,
+) -> anyhow::Result<Option<lsp_types::SemanticTokensRangeResult>> {
+    let FileRange { file_id, range } =
+        from_proto::file_range(&snap, &params.text_document.uri, params.range)?;
+    let res = compute_sema_tokens(&snap, file_id, Some(range))?;
+    Ok(Some(res.into()))
+}
+
+fn compute_sema_tokens(
+    snap: &GlobalStateSnapshot,
+    file_id: FileId,
+    range: Option<TextRange>,
+) -> anyhow::Result<lsp_types::SemanticTokens> {
+    let text = snap.analysis.file_text(file_id)?;
+    let line_info = snap.line_info(file_id)?;
+    let config = snap.config.semantic_tokens();
+    let tokens = snap.analysis.semantic_tokens(file_id, config, range)?;
+
+    let res = to_proto::semantic_tokens(&text, &line_info, tokens);
     Ok(res)
 }

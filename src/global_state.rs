@@ -13,9 +13,11 @@ use base_db::source_root::SourceRootConfig;
 use crossbeam_channel::{Receiver, Sender, unbounded};
 use ide::analysis_host::AnalysisHost;
 use lsp_server::{Message, ReqQueue, Request};
+use lsp_types::Url;
 use nohash_hasher::IntMap;
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 use project_model::Workspace;
+use rustc_hash::FxHashMap;
 use triomphe::Arc;
 use utils::{
     excl_task::ExclTask,
@@ -97,6 +99,8 @@ pub(crate) struct GlobalState {
 
     pub(crate) shutdown_requested: bool,
 
+    pub(crate) semantic_tokens_cache: Arc<Mutex<FxHashMap<Url, lsp_types::SemanticTokens>>>,
+
     pub(crate) vfs_loader: Handle<Box<dyn vfs::loader::Handle>, Receiver<vfs::loader::Message>>,
     pub(crate) vfs: Arc<RwLock<(Vfs, IntMap<FileId, LineEnding>)>>,
     pub(crate) vfs_config_version: u32,
@@ -135,6 +139,8 @@ impl GlobalState {
             shutdown_requested: false,
             source_root_config: SourceRootConfig::default(),
 
+            semantic_tokens_cache: Arc::new(Default::default()),
+
             vfs_loader,
             vfs: Arc::new(RwLock::new((Vfs::default(), IntMap::default()))),
             vfs_config_version: 0,
@@ -152,6 +158,7 @@ impl GlobalState {
             analysis: self.analysis_host.make_analysis(),
             vfs: Arc::clone(&self.vfs),
             mem_docs: self.mem_docs.clone(),
+            sema_tokens_cache: Arc::clone(&self.semantic_tokens_cache),
         }
     }
 }

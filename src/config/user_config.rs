@@ -1,7 +1,12 @@
 use ide::{
-    code_lens::CodeLensConfig, document_highlight::DocumentHighlightConfig, formatting::FmtConfig,
-    hover::HoverConfig, inlay_hint::InlayHintConfig, references::ReferencesConfig,
+    code_lens::CodeLensConfig,
+    document_highlight::DocumentHighlightConfig,
+    formatting::FmtConfig,
+    hover::HoverConfig,
+    inlay_hint::InlayHintConfig,
+    references::ReferencesConfig,
     rename::RenameConfig,
+    semantic_tokens::{SemaTokenConfig, SemaTokenPortConfig},
 };
 use serde::{Deserialize, Serialize};
 use utils::{json::get_field, paths::Utf8PathBuf};
@@ -96,6 +101,9 @@ config_data! {
         inlayHints_end_structure_enable: bool = true,
 
         lens_instantiations_enable: bool = true,
+
+        semantic_tokens_port_clk_rst_enable: bool = true,
+        semantic_tokens_port_input_output_enable: bool = true,
     }
 }
 
@@ -140,6 +148,15 @@ impl Config {
 
     pub(crate) fn code_lens(&self) -> CodeLensConfig {
         CodeLensConfig { instantiations: self.user_config.lens_instantiations_enable }
+    }
+
+    pub(crate) fn semantic_tokens(&self) -> SemaTokenConfig {
+        SemaTokenConfig {
+            port: SemaTokenPortConfig {
+                clk_rst: self.user_config.semantic_tokens_port_clk_rst_enable,
+                io: self.user_config.semantic_tokens_port_input_output_enable,
+            },
+        }
     }
 }
 

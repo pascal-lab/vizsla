@@ -1,3 +1,5 @@
+use std::sync::atomic::{AtomicU32, Ordering};
+
 use anyhow::Error;
 use hir::container::InFile;
 use ide::{
@@ -11,6 +13,7 @@ use ide::{
     navigation_target::NavTarget,
     references::ReferenceCategory,
     rename::RenameError,
+    semantic_tokens::{SemaToken, SemaTokenModifier, SemaTokenPort, SemaTokenTag},
     source_change::SourceChange,
 };
 use itertools::Itertools;
@@ -30,7 +33,12 @@ use super::{
     ext::{CodeLensData, CodeLensDataKind},
     lsp_error::LspError,
 };
-use crate::global_state::snapshot::GlobalStateSnapshot;
+use crate::{
+    global_state::snapshot::GlobalStateSnapshot,
+    lsp_ext::ext::{
+        SEMA_TOKENS_TYPES, SemaTokenModifierSet, sema_token_modifiers, sema_token_types,
+    },
+};
 
 pub(crate) fn goto_definition_response(
     snap: &GlobalStateSnapshot,
@@ -169,11 +177,6 @@ pub(crate) fn url(snap: &GlobalStateSnapshot, file_id: FileId) -> lsp_types::Url
     snap.url(file_id)
 }
 
-// Returns a `Url` object from a given path, will lowercase drive letters if
-// present.
-//
-// This will only happen when processing windows paths.
-// When processing non-windows path, this is the same as `Url::from_file_path`.
 pub(crate) fn url_from_abs_path(path: &AbsPath) -> lsp_types::Url {
     let url = lsp_types::Url::from_file_path(path).unwrap();
 
@@ -485,4 +488,129 @@ pub(crate) fn code_lens_kind(
     };
 
     Ok((command, data))
+}
+
+pub(crate) struct SemanticTokensBuilder {
+    id: String,
+    prev_line: u32,
+    prev_char: u32,
+    data: Vec<lsp_types::SemanticToken>,
+}
+
+impl SemanticTokensBuilder {
+    pub(crate) fn new(id: String) -> Self {
+        SemanticTokensBuilder { id, prev_line: 0, prev_char: 0, data: Default::default() }
+    }
+
+    /// Push a new token onto the builder
+    pub(crate) fn push(
+        &mut self,
+        range: lsp_types::Range,
+        token_type: u32,
+        token_modifiers_bitset: u32,
+    ) {
+        let lsp_types::Position { line: mut push_line, character: mut push_char } = range.start;
+
+        if !self.data.is_empty() {
+            push_line -= self.prev_line;
+            if push_line == 0 {
+                push_char -= self.prev_char;
+            }
+        }
+
+        let token = lsp_types::SemanticToken {
+            delta_line: push_line,
+            delta_start: push_char,
+            length: range.end.character - range.start.character, // Token can be multiline
+            token_type,
+            token_modifiers_bitset,
+        };
+
+        self.data.push(token);
+
+        self.prev_line = range.start.line;
+        self.prev_char = range.start.character;
+    }
+
+    pub(crate) fn build(self) -> lsp_types::SemanticTokens {
+        lsp_types::SemanticTokens { result_id: Some(self.id), data: self.data }
+    }
+}
+
+pub(crate) fn semantic_tokens(
+    text: &str,
+    line_info: &LineInfo,
+    sema_tokens: Vec<SemaToken>,
+) -> lsp_types::SemanticTokens {
+    static TOKEN_RESULT_COUNTER: AtomicU32 = AtomicU32::new(1);
+
+    let id = TOKEN_RESULT_COUNTER.fetch_add(1, Ordering::SeqCst).to_string();
+    let mut builder = SemanticTokensBuilder::new(id);
+
+    for SemaToken { range, tag, mods } in sema_tokens.into_iter().filter(|tok| !tok.is_empty()) {
+        let ty = match tag {
+            SemaTokenTag::Port(SemaTokenPort::Clk) => sema_token_types::CLK_PORT,
+            SemaTokenTag::Port(SemaTokenPort::Rst) => sema_token_types::RST_PORT,
+            SemaTokenTag::Port(SemaTokenPort::Others) => sema_token_types::OTHERS_PORT,
+            SemaTokenTag::Instance => sema_token_types::INSTANCE,
+            SemaTokenTag::None => sema_token_types::GENERIC,
+        };
+        // WORKAROUND: currently we haven't implemented client.
+        let ty = sema_token_types::fallback(ty).unwrap();
+        let ty = SEMA_TOKENS_TYPES.iter().position(|it| it == &ty).unwrap() as u32;
+
+        let mut mods_set = SemaTokenModifierSet::default();
+        for modifier in mods {
+            let modifier = match modifier {
+                SemaTokenModifier::READ => sema_token_modifiers::READ,
+                SemaTokenModifier::WRITE => sema_token_modifiers::WRITE,
+                SemaTokenModifier::REF => sema_token_modifiers::REF,
+                _ => unreachable!(),
+            };
+            // WORKAROUND: currently we haven't implemented client.
+            mods_set |= sema_token_modifiers::fallback(modifier).unwrap();
+        }
+        let mods = mods_set.finish();
+
+        for mut range in line_info.index.lines(range) {
+            if text[range].ends_with('\n') {
+                range = TextRange::new(range.start(), range.end() - TextSize::of('\n'));
+            }
+            let range = self::range(line_info, range);
+            builder.push(range, ty, mods);
+        }
+    }
+
+    builder.build()
+}
+
+pub(crate) fn semantic_token_delta(
+    lsp_types::SemanticTokens { data: old, .. }: &lsp_types::SemanticTokens,
+    lsp_types::SemanticTokens { data: new, result_id }: &lsp_types::SemanticTokens,
+) -> lsp_types::SemanticTokensDelta {
+    let old = old.as_slice();
+    let new = new.as_slice();
+
+    let offset = new.iter().zip(old.iter()).take_while(|&(n, p)| n == p).count();
+    let (_, old) = old.split_at(offset);
+    let (_, new) = new.split_at(offset);
+
+    let offset_from_end =
+        new.iter().rev().zip(old.iter().rev()).take_while(|&(n, p)| n == p).count();
+
+    let (old, _) = old.split_at(old.len() - offset_from_end);
+    let (new, _) = new.split_at(new.len() - offset_from_end);
+
+    let edits = if old.is_empty() && new.is_empty() {
+        vec![]
+    } else {
+        const TOKEN_SIZE: u32 = 5;
+        vec![lsp_types::SemanticTokensEdit {
+            start: TOKEN_SIZE * (offset as u32),
+            delete_count: TOKEN_SIZE * (old.len() as u32),
+            data: Some(new.into()),
+        }]
+    };
+
+    lsp_types::SemanticTokensDelta { result_id: result_id.clone().clone(), edits }
 }

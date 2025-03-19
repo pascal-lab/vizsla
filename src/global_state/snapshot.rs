@@ -1,8 +1,9 @@
 use ide::{Cancellable, analysis::Analysis};
 use lsp_types::Url;
 use nohash_hasher::IntMap;
-use parking_lot::{MappedRwLockReadGuard, RwLock, RwLockReadGuard};
+use parking_lot::{MappedRwLockReadGuard, Mutex, RwLock, RwLockReadGuard};
 use project_model::Workspace;
+use rustc_hash::FxHashMap;
 use triomphe::Arc;
 use utils::lines::{LineEnding, LineInfo};
 use vfs::{FileId, Vfs};
@@ -18,6 +19,7 @@ pub(crate) struct GlobalStateSnapshot {
     pub(crate) config: Arc<Config>,
     pub(crate) analysis: Analysis,
     // pub(crate) check_fixes: CheckFixes,
+    pub(crate) sema_tokens_cache: Arc<Mutex<FxHashMap<Url, lsp_types::SemanticTokens>>>,
     pub(crate) mem_docs: MemDocs,
     pub(crate) vfs: Arc<RwLock<(Vfs, IntMap<FileId, LineEnding>)>>,
     pub(crate) workspaces: Arc<Vec<Workspace>>,

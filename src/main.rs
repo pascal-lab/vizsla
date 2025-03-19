@@ -134,7 +134,7 @@ fn run_server(opt: Opt) -> anyhow::Result<()> {
     let config = Config::new(opt, root_path, client_caps, workspace_roots, user_config, snippets);
 
     let initialize_result = lsp_types::InitializeResult {
-        capabilities: config.get_server_capabilities(),
+        capabilities: config.server_caps(),
         server_info: Some(lsp_types::ServerInfo {
             name: config.opt.process_name.clone(),
             version: Some(VERSION.to_string()),

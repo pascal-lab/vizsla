@@ -195,6 +195,11 @@ impl GlobalState {
         use handlers::request::*;
         use lsp_types::request::*;
         dispatcher
+            .on_latency_sensitive::<SemanticTokensFullRequest>(handle_semantic_tokens_full)
+            .on_latency_sensitive::<SemanticTokensFullDeltaRequest>(
+                handle_semantic_tokens_full_delta,
+            )
+            .on_latency_sensitive::<SemanticTokensRangeRequest>(handle_semantic_tokens_range)
             .on::<DocumentSymbolRequest>(handle_document_symbol)
             .on::<FoldingRangeRequest>(handle_folding_ranges)
             .on_no_retry::<InlayHintRequest>(handle_inlay_hint)

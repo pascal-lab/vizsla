@@ -1,18 +1,17 @@
 use ide::hover::HoverFormat;
 use lsp_types::{
-    CodeActionKind, CodeActionOptions, CodeLensOptions, CompletionOptions,
-    CompletionOptionsCompletionItem, DeclarationCapability, DocumentOnTypeFormattingOptions,
-    FileOperationFilter, FileOperationPattern, FileOperationPatternKind,
-    FileOperationRegistrationOptions, InlayHintOptions, InlayHintServerCapabilities, OneOf,
-    PositionEncodingKind, RenameOptions, SaveOptions, SemanticTokensFullOptions,
-    SemanticTokensLegend, SemanticTokensOptions, ServerCapabilities, SignatureHelpOptions,
-    TextDocumentSyncKind, TextDocumentSyncOptions, WorkDoneProgressOptions,
+    CodeLensOptions, CompletionOptions, CompletionOptionsCompletionItem, DeclarationCapability,
+    DocumentOnTypeFormattingOptions, FileOperationFilter, FileOperationPattern,
+    FileOperationPatternKind, FileOperationRegistrationOptions, InlayHintOptions,
+    InlayHintServerCapabilities, OneOf, PositionEncodingKind, RenameOptions, SaveOptions,
+    SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions, ServerCapabilities,
+    SignatureHelpOptions, TextDocumentSyncKind, TextDocumentSyncOptions,
     WorkspaceFileOperationsServerCapabilities, WorkspaceFoldersServerCapabilities,
     WorkspaceServerCapabilities,
 };
 use utils::{line_index::WideEncoding, lines::PositionEncoding, try_, try_or_default};
 
-use crate::config::Config;
+use crate::{config::Config, lsp_ext::ext};
 
 impl Config {
     pub fn cli_completion_label_details_support(&self) -> bool {
@@ -122,6 +121,7 @@ impl Config {
             .refresh_support?
         }
     }
+
     pub(crate) fn negotiated_encoding(&self) -> PositionEncoding {
         let client_encodings = match &self.client_caps.general {
             Some(general) => general.position_encodings.as_deref().unwrap_or_default(),
@@ -245,7 +245,19 @@ impl Config {
             }
             .into(),
             call_hierarchy_provider: Some(true.into()),
-            semantic_tokens_provider: None,
+            semantic_tokens_provider: Some(
+                SemanticTokensOptions {
+                    legend: SemanticTokensLegend {
+                        token_types: ext::SEMA_TOKENS_TYPES.to_vec(),
+                        token_modifiers: ext::SEMA_TOKENS_MODIFIERS.to_vec(),
+                    },
+
+                    full: Some(SemanticTokensFullOptions::Delta { delta: Some(true) }),
+                    range: Some(true),
+                    work_done_progress_options: Default::default(),
+                }
+                .into(),
+            ),
             moniker_provider: None,
             linked_editing_range_provider: None,
             inline_value_provider: None,

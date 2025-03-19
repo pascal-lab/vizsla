@@ -1,3 +1,5 @@
+use std::ops;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -11,4 +13,104 @@ pub struct CodeLensData {
 #[serde(rename_all = "camelCase")]
 pub enum CodeLensDataKind {
     Instantiation(lsp_types::TextDocumentPositionParams),
+}
+
+macro_rules! define_semantic_token_kind {
+    (   ($name:ident: [$ty:ty] @ $mod:ident) =>
+        standard {
+            $($standard:ident),*$(,)?
+        }
+        custom {
+            $(($custom:ident, $string:literal) $(=> $fallback:ident)?),*$(,)?
+        }
+    ) => {
+        pub(crate) mod $mod {
+            $(pub(crate) const $standard: $ty = <$ty>::$standard;)*
+            $(pub(crate) const $custom: $ty = <$ty>::new($string);)*
+
+            pub(crate) fn fallback(token: $ty) -> Option<$ty> {
+                $(
+                    if token == $custom {
+                        None $(.or(Some($fallback)))?
+                    } else
+                )*
+                { Some(token)}
+            }
+        }
+
+        pub(crate) const $name: &[$ty] = &[
+            $(self::$mod::$standard,)*
+            $(self::$mod::$custom),*
+        ];
+    };
+}
+
+define_semantic_token_kind! {
+    (SEMA_TOKENS_TYPES: [lsp_types::SemanticTokenType] @ sema_token_types) =>
+    standard {
+        COMMENT,
+        DECORATOR,
+        ENUM_MEMBER,
+        ENUM,
+        FUNCTION,
+        INTERFACE,
+        KEYWORD,
+        MACRO,
+        METHOD,
+        NAMESPACE,
+        NUMBER,
+        OPERATOR,
+        PARAMETER,
+        PROPERTY,
+        STRING,
+        STRUCT,
+        TYPE_PARAMETER,
+        VARIABLE,
+        TYPE,
+    }
+
+    custom {
+        (CLK_PORT, "port_clock") => KEYWORD,
+        (RST_PORT, "port_reset") => KEYWORD,
+        (OTHERS_PORT, "port_generic") => PARAMETER,
+        (INSTANCE, "instance") => VARIABLE,
+        (GENERIC, "generic") => TYPE_PARAMETER,
+    }
+}
+
+#[derive(Default)]
+pub(crate) struct SemaTokenModifierSet(pub(crate) u32);
+
+impl SemaTokenModifierSet {
+    pub(crate) fn finish(self) -> u32 {
+        self.0
+    }
+}
+
+define_semantic_token_kind! {
+    (SEMA_TOKENS_MODIFIERS: [lsp_types::SemanticTokenModifier] @ sema_token_modifiers) =>
+    standard {
+        DECLARATION,
+        DEFINITION,
+        READONLY,
+        STATIC,
+        DEPRECATED,
+        ABSTRACT,
+        ASYNC,
+        MODIFICATION,
+        DOCUMENTATION,
+        DEFAULT_LIBRARY,
+    }
+    custom {
+        (READ, "read") => READONLY,
+        (WRITE, "write") => MODIFICATION,
+        (REF, "ref") => MODIFICATION,
+    }
+}
+
+impl ops::BitOrAssign<lsp_types::SemanticTokenModifier> for SemaTokenModifierSet {
+    fn bitor_assign(&mut self, rhs: lsp_types::SemanticTokenModifier) {
+        let idx = SEMA_TOKENS_MODIFIERS.iter().position(|it| it == &rhs).unwrap();
+        self.0 |= 1 << idx;
+    }
 }
