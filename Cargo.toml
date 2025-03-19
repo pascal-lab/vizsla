@@ -60,20 +60,21 @@ vfs = { path = "./crates/vfs", version = "0.0.0" }
 vfs-notify = { path = "./crates/vfs-notify/", version = "0.0.0" }
 
 anyhow = "1.0.75"
-bitflags = "2.6.0"
+bitflags = "2.9.0"
 camino = "1.1.6"
 const_format = "0.2.31"
 crossbeam-channel = "0.5.8"
 either = "1.9.0"
-itertools = "0.12.0"
+itertools = "0.14.0"
 la-arena = "0.3.1"
 memchr = "2.7.1"
 nohash-hasher = "0.2.0"
-rustc-hash = "1.1.0"
+regex = "1.10.2"
+rustc-hash = "2.1.1"
 salsa = "0.17.0-pre.2"
 serde = { version = "1.0.189", features = ["derive"] }
 serde_json = "1.0.107"
-slang = { version = "0.0.1", path = "/Users/roife/slang" }
+slang = { version = "0.0.1", path = "/Users/jiayanw/slang" }
 smallvec = { version = "1.10.0", features = [
   "const_new",
   "union",
