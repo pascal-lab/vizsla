@@ -80,7 +80,7 @@ impl InlayHintCollector {
 
         let kind = match_ast_kind! { src.kind(),
             ast::ParamAssignment => InlayKind::ParamAssign,
-            ast::OrderedPortConnection => InlayKind::Port,
+            ast::OrderedPortConnection | ast::EmptyPortConnection => InlayKind::Port,
             ast::ModuleDeclaration => InlayKind::EndStructure,
             _ => unimplemented!("{:?}", src.kind()),
         };
@@ -245,8 +245,10 @@ fn process_instantiation(
             }
 
             for (id, &conn_id) in instance.connections.iter().enumerate() {
-                let PortConn::Ordered(conn_expr) = module.get(conn_id) else {
-                    continue;
+                let conn_expr = match module.get(conn_id) {
+                    PortConn::Empty => None,
+                    PortConn::Ordered(expr) => Some(expr),
+                    PortConn::Named(..) | PortConn::Wildcard => continue,
                 };
 
                 let conn_src = src_map.get(conn_id);
@@ -261,7 +263,7 @@ fn process_instantiation(
                             continue;
                         };
 
-                        if should_skip(module.get(*conn_expr), port_name) {
+                        if conn_expr.is_some_and(|expr| should_skip(module.get(*expr), port_name)) {
                             continue;
                         }
 
@@ -276,7 +278,7 @@ fn process_instantiation(
                             continue;
                         };
 
-                        if should_skip(module.get(*conn_expr), port_name) {
+                        if conn_expr.is_some_and(|expr| should_skip(module.get(*expr), port_name)) {
                             continue;
                         }
 
