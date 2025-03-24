@@ -15,7 +15,10 @@ use hir::{
     source_map::IsSrc,
 };
 use ide_db::root_db::RootDb;
-use syntax::{ast, match_ast_kind};
+use syntax::{
+    ast::{self, AstNode},
+    match_ast_kind,
+};
 use utils::{
     get::{Get, GetRef},
     text_edit::{TextEdit, TextRange, TextSize},

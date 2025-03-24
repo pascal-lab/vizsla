@@ -132,6 +132,9 @@ impl Module {
 
         let start = decls.values().next()?.decls.start();
         let raw_idx = (start.into_raw().into_u32() as usize) + idx;
+        if raw_idx > decls.len() {
+            return None;
+        }
         Some(Idx::from_raw(RawIdx::from_u32(raw_idx as u32)))
     }
 }
