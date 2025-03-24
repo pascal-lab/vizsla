@@ -14,6 +14,7 @@ use ide::{
     references::ReferenceCategory,
     rename::RenameError,
     semantic_tokens::{SemaToken, SemaTokenModifier, SemaTokenPort, SemaTokenTag},
+    signature_help::{SignatureHelp, SignatureHelpConfig},
     source_change::SourceChange,
 };
 use itertools::Itertools;
@@ -613,4 +614,49 @@ pub(crate) fn semantic_token_delta(
     };
 
     lsp_types::SemanticTokensDelta { result_id: result_id.clone().clone(), edits }
+}
+
+pub(crate) fn signature_help(
+    sig_help: SignatureHelp,
+    support_label_offsets: bool,
+) -> lsp_types::SignatureHelp {
+    let parameters = if support_label_offsets {
+        sig_help
+            .param_ranges
+            .iter()
+            .map(|it| {
+                let start = sig_help.label[..it.start().into()].chars().count() as u32;
+                let end = sig_help.label[..it.end().into()].chars().count() as u32;
+                [start, end]
+            })
+            .map(|range| lsp_types::ParameterInformation {
+                label: lsp_types::ParameterLabel::LabelOffsets(range),
+                documentation: None,
+            })
+            .collect()
+    } else {
+        sig_help
+            .param_ranges
+            .iter()
+            .map(|range| lsp_types::ParameterInformation {
+                label: lsp_types::ParameterLabel::Simple(sig_help.label[range.clone()].to_owned()),
+                documentation: None,
+            })
+            .collect()
+    };
+
+    let active_parameter = sig_help.active_parameter.map(|it| it as u32);
+
+    let signature = lsp_types::SignatureInformation {
+        label: sig_help.label,
+        documentation: None,
+        parameters: Some(parameters),
+        active_parameter,
+    };
+
+    lsp_types::SignatureHelp {
+        signatures: vec![signature],
+        active_signature: Some(0),
+        active_parameter,
+    }
 }

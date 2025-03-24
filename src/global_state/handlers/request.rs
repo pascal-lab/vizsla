@@ -316,7 +316,7 @@ pub(crate) fn handle_semantic_tokens_full(
     params: lsp_types::SemanticTokensParams,
 ) -> anyhow::Result<Option<lsp_types::SemanticTokensResult>> {
     let file_id = from_proto::file_id(&snap, &params.text_document.uri)?;
-    let res = compute_sema_tokens(&snap, file_id, None)?;
+    let res = compute_sema_tokens_helper(&snap, file_id, None)?;
     snap.sema_tokens_cache.lock().insert(params.text_document.uri, res.clone());
     Ok(Some(res.into()))
 }
@@ -326,7 +326,7 @@ pub(crate) fn handle_semantic_tokens_full_delta(
     params: lsp_types::SemanticTokensDeltaParams,
 ) -> anyhow::Result<Option<lsp_types::SemanticTokensFullDeltaResult>> {
     let file_id = from_proto::file_id(&snap, &params.text_document.uri)?;
-    let res = compute_sema_tokens(&snap, file_id, None)?;
+    let res = compute_sema_tokens_helper(&snap, file_id, None)?;
 
     let old_tokens = snap.sema_tokens_cache.lock().remove(&params.text_document.uri);
     if let Some(old_tokens @ lsp_types::SemanticTokens { result_id: Some(prev_id), .. }) =
@@ -350,11 +350,11 @@ pub(crate) fn handle_semantic_tokens_range(
 ) -> anyhow::Result<Option<lsp_types::SemanticTokensRangeResult>> {
     let FileRange { file_id, range } =
         from_proto::file_range(&snap, &params.text_document.uri, params.range)?;
-    let res = compute_sema_tokens(&snap, file_id, Some(range))?;
+    let res = compute_sema_tokens_helper(&snap, file_id, Some(range))?;
     Ok(Some(res.into()))
 }
 
-fn compute_sema_tokens(
+fn compute_sema_tokens_helper(
     snap: &GlobalStateSnapshot,
     file_id: FileId,
     range: Option<TextRange>,
@@ -366,4 +366,19 @@ fn compute_sema_tokens(
 
     let res = to_proto::semantic_tokens(&text, &line_info, tokens);
     Ok(res)
+}
+
+pub(crate) fn handle_signature_help(
+    snap: GlobalStateSnapshot,
+    params: lsp_types::SignatureHelpParams,
+) -> anyhow::Result<Option<lsp_types::SignatureHelp>> {
+    let position = from_proto::file_position(&snap, params.text_document_position_params)?;
+    let config = snap.config.signature_help();
+    let Some(res) = snap.analysis.signature_help(position, config)? else {
+        return Ok(None);
+    };
+
+    let support_label_offsets = snap.config.cli_signature_help_label_offsets_support();
+    let res = to_proto::signature_help(res, support_label_offsets);
+    Ok(Some(res))
 }

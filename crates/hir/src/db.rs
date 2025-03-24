@@ -1,4 +1,5 @@
 use base_db::{impl_intern_key, impl_intern_lookup, salsa, source_db::SourceDb};
+use rustc_hash::FxHashMap;
 use syntax::SyntaxTree;
 use triomphe::Arc;
 

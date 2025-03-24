@@ -27,6 +27,7 @@ use crate::{
     rename::{self, RenameConfig, RenameResult},
     selection_ranges,
     semantic_tokens::{self, SemaToken, SemaTokenConfig},
+    signature_help::{self, SignatureHelp, SignatureHelpConfig},
     source_change::SourceChange,
 };
 
@@ -164,5 +165,13 @@ impl Analysis {
         range: Option<TextRange>,
     ) -> Cancellable<Vec<SemaToken>> {
         self.with_db(|db| semantic_tokens::semantic_tokens(db, config, file_id, range))
+    }
+
+    pub fn signature_help(
+        &self,
+        position: FilePosition,
+        config: SignatureHelpConfig,
+    ) -> Cancellable<Option<SignatureHelp>> {
+        self.with_db(|db| signature_help::signature_help(db, position, config))
     }
 }

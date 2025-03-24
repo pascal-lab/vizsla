@@ -6,11 +6,26 @@ use crate::{
     container::{ContainerId, InContainer, InFile, InModule},
     hir_def::{
         expr::{ExprId, ExprSrc},
-        module::instantiation::{PortConnId, PortConnSrc},
+        module::instantiation::{InstanceId, InstanceSrc, PortConnId, PortConnSrc},
     },
 };
 
 impl SemanticsImpl<'_> {
+    pub fn resolve_instance(&self, instance: ast::HierarchicalInstance) -> InModule<InstanceId> {
+        let db = self.db;
+        let file_id = self.find_file(instance.syntax());
+        let ContainerId::ModuleId(module_id) =
+            self.find_container(InFile::new(file_id, instance.syntax()))
+        else {
+            unreachable!();
+        };
+
+        let src = InstanceSrc::from(instance);
+        let (_, module_src_map) = db.module_with_source_map(module_id);
+        let instance_id = module_src_map.get(src);
+        InModule::new(module_id, instance_id)
+    }
+
     pub fn resolve_named_port_conn(&self, conn: ast::PortConnection) -> InModule<PortConnId> {
         let db = self.db;
         let file_id = self.find_file(conn.syntax());

@@ -30,9 +30,7 @@ bitflags::bitflags! {
 }
 
 impl ReferenceCategory {
-    pub fn from_tok(
-        SyntaxTokenWithParent { .. }: SyntaxTokenWithParent,
-    ) -> ReferenceCategory {
+    pub fn from_tok(SyntaxTokenWithParent { .. }: SyntaxTokenWithParent) -> ReferenceCategory {
         // TODO:
         ReferenceCategory::empty()
     }

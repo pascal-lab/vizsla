@@ -1,7 +1,9 @@
 use slang::{
+    SyntaxToken,
     ast::{
-        AstNode, BlockStatement, Declarator, HierarchicalInstance, ModuleDeclaration, NonAnsiPort, ParamAssignment, PortConnection, PortReference, Statement
-    }, SyntaxToken
+        AstNode, BlockStatement, Declarator, HierarchicalInstance, ModuleDeclaration, NonAnsiPort,
+        ParamAssignment, PortConnection, PortReference, Statement,
+    },
 };
 
 pub trait HasName<'a>: AstNode<'a> {

@@ -254,7 +254,7 @@ pub enum Arg {
     Empty,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone, Hash)]
 pub enum Selector {
     Bit(ExprId),
     Range(ExprId, ExprId),

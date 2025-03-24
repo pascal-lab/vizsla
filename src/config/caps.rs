@@ -1,3 +1,5 @@
+use std::iter;
+
 use ide::hover::HoverFormat;
 use lsp_types::{
     CodeLensOptions, CompletionOptions, CompletionOptionsCompletionItem, DeclarationCapability,
@@ -104,7 +106,7 @@ impl Config {
         if support_markdown { HoverFormat::Markdown } else { HoverFormat::PlainText }
     }
 
-    pub fn inlay_hint_refresh_support(&self) -> bool {
+    pub fn cli_inlay_hint_refresh_support(&self) -> bool {
         try_or_default! {
             self.client_caps
             .workspace.as_ref()?
@@ -113,12 +115,27 @@ impl Config {
         }
     }
 
-    pub fn code_lens_refresh_support(&self) -> bool {
+    pub fn cli_code_lens_refresh_support(&self) -> bool {
         try_or_default! {
             self.client_caps
             .workspace.as_ref()?
             .code_lens.as_ref()?
             .refresh_support?
+        }
+    }
+
+    pub fn cli_signature_help_label_offsets_support(&self) -> bool {
+        try_or_default! {
+            self.client_caps
+                .text_document
+                .as_ref()?
+                .signature_help
+                .as_ref()?
+                .signature_information
+                .as_ref()?
+                .parameter_information
+                .as_ref()?
+                .label_offset_support?
         }
     }
 
@@ -164,19 +181,9 @@ impl Config {
             ),
             selection_range_provider: Some(true.into()),
             hover_provider: Some(true.into()),
-            completion_provider: CompletionOptions {
-                resolve_provider: self.cli_completion_item_edit_resolve().into(),
-                trigger_characters: Some([":", ",", ".", "(", "`"].map(String::from).into()),
-                all_commit_characters: None,
-                completion_item: CompletionOptionsCompletionItem {
-                    label_details_support: self.cli_completion_label_details_support().into(),
-                }
-                .into(),
-                work_done_progress_options: Default::default(),
-            }
-            .into(),
+            completion_provider: None,
             signature_help_provider: SignatureHelpOptions {
-                trigger_characters: Some(["(", ","].map(String::from).into()),
+                trigger_characters: Some(["(", ",", "."].map(String::from).into()),
                 retrigger_characters: None,
                 work_done_progress_options: Default::default(),
             }

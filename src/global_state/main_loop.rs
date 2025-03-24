@@ -141,11 +141,11 @@ impl GlobalState {
         if self.is_stuck() {
             let client_refresh = !was_stuck || state_changed;
 
-            if client_refresh && self.config.code_lens_refresh_support() {
+            if client_refresh && self.config.cli_code_lens_refresh_support() {
                 self.send_request::<lsp_types::request::CodeLensRefresh>((), DEFAULT_REQ_HANDLER);
             }
 
-            if client_refresh && self.config.inlay_hint_refresh_support() {
+            if client_refresh && self.config.cli_inlay_hint_refresh_support() {
                 self.send_request::<lsp_types::request::InlayHintRefreshRequest>(
                     (),
                     DEFAULT_REQ_HANDLER,
@@ -202,6 +202,7 @@ impl GlobalState {
             .on_latency_sensitive::<SemanticTokensRangeRequest>(handle_semantic_tokens_range)
             .on::<DocumentSymbolRequest>(handle_document_symbol)
             .on::<FoldingRangeRequest>(handle_folding_ranges)
+            .on_no_retry::<SignatureHelpRequest>(handle_signature_help)
             .on_no_retry::<InlayHintRequest>(handle_inlay_hint)
             .on_no_retry::<CodeLensRequest>(handle_code_lens)
             .on_no_retry::<CodeLensResolve>(handle_code_lens_resolve)

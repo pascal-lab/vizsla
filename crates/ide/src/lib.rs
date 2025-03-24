@@ -34,7 +34,7 @@ pub mod references;
 pub mod rename;
 pub mod selection_ranges;
 pub mod semantic_tokens;
-
+pub mod signature_help;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum SymbolKind {
     Module,

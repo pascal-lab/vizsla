@@ -7,6 +7,7 @@ use ide::{
     references::ReferencesConfig,
     rename::RenameConfig,
     semantic_tokens::{SemaTokenConfig, SemaTokenPortConfig},
+    signature_help::SignatureHelpConfig,
 };
 use serde::{Deserialize, Serialize};
 use utils::{json::get_field, paths::Utf8PathBuf};
@@ -104,6 +105,8 @@ config_data! {
 
         semantic_tokens_port_clk_rst_enable: bool = true,
         semantic_tokens_port_input_output_enable: bool = true,
+
+        signature_help_params_only: bool = false,
     }
 }
 
@@ -157,6 +160,10 @@ impl Config {
                 io: self.user_config.semantic_tokens_port_input_output_enable,
             },
         }
+    }
+
+    pub(crate) fn signature_help(&self) -> SignatureHelpConfig {
+        SignatureHelpConfig { params_only: self.user_config.signature_help_params_only }
     }
 }
 

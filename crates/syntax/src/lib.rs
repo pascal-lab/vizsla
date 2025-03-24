@@ -44,7 +44,7 @@ macro_rules! match_ast_kind {
     }};
 
     ($kind:expr , $path:ty $(| $paths:ty)* => $body:expr, $($rest:tt)* ) => {{
-        if <$path as $crate::ast::AstNode>::can_cast($kind).is_some() $(|| <$paths as $crate::ast::AstNode>::can_cast($kind).is_some())* {
+        if <$path as $crate::ast::AstNode>::can_cast($kind) $(|| <$paths as $crate::ast::AstNode>::can_cast($kind))* {
             $body
         } else {
             match_ast_kind!($kind , $($rest)*)

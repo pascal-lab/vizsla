@@ -90,7 +90,7 @@ pub enum Ports {
     Ansi(Arena<PortDecl>),
 }
 
-pub type PortId = Either<NonAnsiPortId, PortDecl>;
+pub type Port = Either<NonAnsiPort, PortDecl>;
 
 impl Default for Ports {
     fn default() -> Self {

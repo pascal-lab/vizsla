@@ -35,7 +35,7 @@ impl SemanticsImpl<'_> {
         &self,
         conn: ast::NamedPortConnection,
     ) -> Option<PathResolution> {
-        let entry = self.nameres_from_instantiation_helper(conn.name(), conn.syntax())?;
+        let entry = self.nameres_instance_conn(conn.name(), conn.syntax())?;
 
         if matches!(entry.value, ModuleEntry::AnsiPortEntry(_) | ModuleEntry::NonAnsiPortEntry(_)) {
             Some(entry.into())
@@ -48,7 +48,7 @@ impl SemanticsImpl<'_> {
         &self,
         conn: ast::NamedParamAssignment,
     ) -> Option<PathResolution> {
-        let entry = self.nameres_from_instantiation_helper(conn.name(), conn.syntax())?;
+        let entry = self.nameres_instance_conn(conn.name(), conn.syntax())?;
         let module = self.db.module(entry.module_id);
         if let ModuleEntry::DeclId(decl_id) = entry.value
             && let DeclaratorParent::DeclarationId(declaration_id) = module.get(decl_id).parent
@@ -60,7 +60,7 @@ impl SemanticsImpl<'_> {
         }
     }
 
-    fn nameres_from_instantiation_helper(
+    fn nameres_instance_conn(
         &self,
         name: Option<SyntaxToken>,
         node: SyntaxNode,
@@ -68,16 +68,24 @@ impl SemanticsImpl<'_> {
         let db = self.db;
         let conn_name = lower_ident_opt(name)?;
 
-        let instantiatiion = ast::HierarchyInstantiation::cast(node.parent()?.parent()?)?;
-        let module_name = lower_ident_opt(instantiatiion.type_())?;
-        let UnitEntry::ModuleId(module_id) = db.unit_scope().get(&module_name)? else {
-            return None;
-        };
+        let instantiation = ast::HierarchyInstantiation::cast(node.parent()?.parent()?)?;
+        let module_id = self.nameres_instantiation(instantiation)?;
 
         let module_scope = db.module_scope(module_id);
         let entry = module_scope.get(&conn_name)?;
 
         Some(InModule::new(module_id, entry))
+    }
+
+    pub fn nameres_instantiation(
+        &self,
+        instantiation: ast::HierarchyInstantiation,
+    ) -> Option<ModuleId> {
+        let module_name = lower_ident_opt(instantiation.type_())?;
+        match self.db.unit_scope().get(&module_name)? {
+            UnitEntry::ModuleId(module_id) => Some(module_id),
+            UnitEntry::FiledDeclId(_) => None,
+        }
     }
 
     pub(in crate::semantics) fn find_container(&self, node: InFile<SyntaxNode>) -> ContainerId {
