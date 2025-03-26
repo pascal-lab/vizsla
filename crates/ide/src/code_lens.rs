@@ -89,9 +89,10 @@ pub(crate) fn code_lens_resolve(db: &RootDb, mut kind: CodeLensKind) -> CodeLens
 
             let mut ranges = Vec::new();
             for (file_id, tokens) in ReferencesCtx::new(&sema, &def, ref_config).search() {
-                for tok in tokens {
-                    let instantiation =
-                        ast::HierarchyInstantiation::cast(tok.token.parent).unwrap();
+                for instantiation in tokens
+                    .into_iter()
+                    .filter_map(|tok| ast::HierarchyInstantiation::cast(tok.token.parent))
+                {
                     for instance in instantiation.instances().children() {
                         if let Some(range) = instance
                             .decl()
