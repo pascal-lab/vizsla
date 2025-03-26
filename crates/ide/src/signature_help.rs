@@ -88,9 +88,13 @@ fn sig_help_for_instance(
         let InModule { value: instance_id, module_id } = sema.resolve_instance(instance);
         let (module, module_src_map) = db.module_with_source_map(module_id);
         let instance = module.get(instance_id);
-        let Some((idx, conn_id)) = instance.connections.iter().enumerate().find(|(_, conn_id)| {
-            module_src_map.get(**conn_id).node.range().contains_inclusive(offset)
-        }) else {
+
+        let Some((idx, conn_id)) = instance
+            .connections
+            .iter()
+            .enumerate()
+            .find(|(_, conn_id)| module_src_map.get(**conn_id).node.range().end() >= offset)
+        else {
             break 'blk None;
         };
 
