@@ -6,10 +6,7 @@ use hir::{
 use itertools::{Either, Itertools};
 use rustc_hash::FxHashSet;
 use smol_str::SmolStr;
-use syntax::{
-    ast::{self, AstNode},
-    has_text_range::HasTextRange,
-};
+use syntax::{ast, has_text_range::HasTextRange};
 use utils::get::GetRef;
 
 use crate::code_action::{CodeActionCollector, CodeActionCtx, CodeActionId, CodeActionKind};
@@ -97,10 +94,10 @@ pub(super) fn add_missing_parameters(
 
         match names {
             Either::Left(names) => {
-                names.into_iter().for_each(|name| add_to_text(name));
+                names.into_iter().for_each(&mut add_to_text);
             }
             Either::Right(names) => {
-                names.into_iter().for_each(|name| add_to_text(name));
+                names.into_iter().for_each(&mut add_to_text);
             }
         }
 

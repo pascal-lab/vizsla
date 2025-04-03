@@ -8,7 +8,6 @@ use source_to_def::{Source2DefCache, Source2DefCtx};
 use syntax::{
     SyntaxAncestors, SyntaxNode, SyntaxNodeExt,
     ast::{self, AstNode},
-    has_text_range::HasTextRange,
 };
 use utils::text_edit::TextSize;
 use vfs::FileId;

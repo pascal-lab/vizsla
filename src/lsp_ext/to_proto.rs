@@ -644,7 +644,7 @@ pub(crate) fn signature_help(
             .param_ranges
             .iter()
             .map(|range| lsp_types::ParameterInformation {
-                label: lsp_types::ParameterLabel::Simple(sig_help.label[range.clone()].to_owned()),
+                label: lsp_types::ParameterLabel::Simple(sig_help.label[*range].to_owned()),
                 documentation: None,
             })
             .collect()

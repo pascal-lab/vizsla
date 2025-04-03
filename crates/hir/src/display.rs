@@ -15,7 +15,7 @@ use crate::{
             declarator::DeclId,
         },
         literal::Literal,
-        module::port::{NonAnsiPort, PortDirection, PortHeader},
+        module::port::{PortDirection, PortHeader},
         ty::{NetKind, NetType},
     },
 };
@@ -119,10 +119,8 @@ impl HirDisplay for InContainer<DataTy> {
                         }
                         VecKind::Reg => f.write_str("reg")?,
                     }
-                    for dim in dimensions.iter() {
-                        if let Some(dim) = dim {
-                            self.with_value(*dim).hir_fmt(f)?;
-                        }
+                    for dim in dimensions.iter().flatten() {
+                        self.with_value(*dim).hir_fmt(f)?;
                     }
                     Ok(())
                 }
@@ -451,7 +449,7 @@ impl HirDisplay for Literal {
                 f.write_str(&format!("{:?}", f64::from(*val)))?;
                 unit.hir_fmt(f)
             }
-            Literal::Str(s) => f.write_str(&s),
+            Literal::Str(s) => f.write_str(s),
             Literal::UnbasedUnsized(bit) => f.write_str(&format!("{bit}")),
         }
     }
@@ -482,10 +480,8 @@ impl HirDisplay for InContainer<DeclId> {
             f.write_str(name)?;
         }
 
-        for dim in decl.dimensions.iter() {
-            if let Some(dim) = dim {
-                self.with_value(*dim).hir_fmt(f)?;
-            }
+        for dim in decl.dimensions.iter().flatten() {
+            self.with_value(*dim).hir_fmt(f)?;
         }
 
         Ok(())

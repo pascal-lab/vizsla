@@ -1,7 +1,7 @@
 use hir::semantics::Semantics;
 use ide_db::root_db::RootDb;
 use syntax::{
-    SyntaxElement, SyntaxNodeExt, SyntaxTokenWithParent, TokenAtOffset,
+    SyntaxElement, SyntaxNodeExt, TokenAtOffset,
     ast::{AstNode, CompilationUnit},
 };
 use utils::text_edit::{TextRange, TextSize};

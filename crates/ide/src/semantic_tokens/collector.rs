@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, iter};
+use std::iter;
 
 use utils::text_edit::TextRange;
 

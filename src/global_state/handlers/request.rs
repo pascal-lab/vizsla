@@ -3,12 +3,12 @@ use ide::{
 };
 use itertools::Itertools;
 use span::{FilePosition, FileRange};
-use utils::{json::from_json, text_edit::TextRange};
+use utils::text_edit::TextRange;
 use vfs::FileId;
 
 use crate::{
     global_state::snapshot::GlobalStateSnapshot,
-    lsp_ext::{ext::CodeActionResolveError, from_proto, lsp_error::LspError, to_proto},
+    lsp_ext::{ext::CodeActionResolveError, from_proto, to_proto},
 };
 
 pub(crate) fn handle_goto_definition(

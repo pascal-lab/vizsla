@@ -1,14 +1,11 @@
-use std::iter;
-
 use ide::hover::HoverFormat;
 use lsp_types::{
     CodeActionKind, CodeActionOptions, CodeActionProviderCapability, CodeLensOptions,
-    CompletionOptions, CompletionOptionsCompletionItem, DeclarationCapability,
-    DocumentOnTypeFormattingOptions, FileOperationFilter, FileOperationPattern,
-    FileOperationPatternKind, FileOperationRegistrationOptions, InlayHintOptions,
-    InlayHintServerCapabilities, OneOf, PositionEncodingKind, RenameOptions, SaveOptions,
-    SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions, ServerCapabilities,
-    SignatureHelpOptions, TextDocumentSyncKind, TextDocumentSyncOptions,
+    DeclarationCapability, DocumentOnTypeFormattingOptions, FileOperationFilter,
+    FileOperationPattern, FileOperationPatternKind, FileOperationRegistrationOptions,
+    InlayHintOptions, InlayHintServerCapabilities, OneOf, PositionEncodingKind, RenameOptions,
+    SaveOptions, SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions,
+    ServerCapabilities, SignatureHelpOptions, TextDocumentSyncKind, TextDocumentSyncOptions,
     WorkspaceFileOperationsServerCapabilities, WorkspaceFoldersServerCapabilities,
     WorkspaceServerCapabilities,
 };

@@ -111,10 +111,10 @@ pub(super) fn add_missing_connections(
 
         match names {
             Either::Left(names) => {
-                names.into_iter().for_each(|name| add_to_text(name));
+                names.into_iter().for_each(&mut add_to_text);
             }
             Either::Right(names) => {
-                names.into_iter().for_each(|name| add_to_text(name));
+                names.into_iter().for_each(&mut add_to_text);
             }
         }
 
