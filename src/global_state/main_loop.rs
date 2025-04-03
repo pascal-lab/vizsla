@@ -216,6 +216,8 @@ impl GlobalState {
             .on_fmt_thread::<Formatting>(handle_formatting)
             .on_fmt_thread::<RangeFormatting>(handle_range_formatting)
             .on_sync::<OnTypeFormatting>(handle_on_type_formatting)
+            .on_no_retry::<CodeActionRequest>(handle_code_action)
+            .on_no_retry::<CodeActionResolveRequest>(handle_code_action_resolve)
             .on::<SelectionRangeRequest>(handle_selection_range)
             .finish();
     }

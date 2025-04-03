@@ -53,6 +53,10 @@ impl GlobalStateSnapshot {
         Ok(text)
     }
 
+    pub(crate) fn file_version(&self, file_id: FileId) -> Option<i32> {
+        self.mem_docs.get(&self.vfs_read().file_path(file_id)).map(|it| it.version)
+    }
+
     pub(crate) fn url(&self, id: FileId) -> Url {
         let vfs = &self.vfs_read();
         let path = vfs.file_path(id);

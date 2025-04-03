@@ -92,3 +92,8 @@ pub(crate) fn code_lens(
 
     Ok((file_id, kind))
 }
+
+pub(crate) fn code_action_data(data: serde_json::Value) -> anyhow::Result<ext::CodeActionData> {
+    let data = serde_json::from_value::<ext::CodeActionData>(data)?;
+    Ok(data)
+}

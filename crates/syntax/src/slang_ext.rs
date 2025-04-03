@@ -79,6 +79,10 @@ pub trait SyntaxNodeExt<'a> {
     fn elem_at_exact_range(&self, range: TextRange) -> Option<SyntaxElement<'a>>;
     fn covering_element(&self, range: TextRange) -> SyntaxElement<'a>;
     fn token_at_offset(&self, offset: TextSize) -> TokenAtOffset<'a>;
+    fn token_or_node_at_offset(
+        &self,
+        offset: TextSize,
+    ) -> Either<TokenAtOffset<'a>, SyntaxNode<'a>>;
     fn find_root(&self) -> SyntaxNode<'a>;
     fn to_ptr(&self) -> SyntaxNodePtr;
     fn trivias(&self) -> impl ChildrenIter<SyntaxTrivia<'a>> + use<'a, Self>;
@@ -156,6 +160,43 @@ impl<'a> SyntaxNodeExt<'a> for SyntaxNode<'a> {
             (true, false) => TokenAtOffset::Single(left.unwrap()),
             (false, true) => TokenAtOffset::Single(right.unwrap()),
             (false, false) => TokenAtOffset::None,
+        }
+    }
+
+    fn token_or_node_at_offset(
+        &self,
+        offset: TextSize,
+    ) -> Either<TokenAtOffset<'a>, SyntaxNode<'a>> {
+        let range = self.text_range().unwrap();
+        if range.is_empty() || !(range.contains(offset)) {
+            return Either::Left(TokenAtOffset::None);
+        }
+
+        let mut cursor = self.walk();
+        cursor.goto_last_tok_before(offset);
+        let left = cursor.to_tok_with_parent();
+        let left_range = left.and_then(|left| left.text_range());
+        if left_range.is_some_and(|range| range.contains(offset)) {
+            return Either::Left(TokenAtOffset::Single(left.unwrap()));
+        }
+        let left_ok = left_range.map(|range| range.end() == offset).unwrap_or(false);
+
+        cursor.reset_to_root();
+        cursor.goto_first_tok_after(offset);
+        let right = cursor.to_tok_with_parent();
+        let right_range = right.and_then(|right| right.text_range());
+        let right_ok = right_range.map(|range| range.contains(offset)).unwrap_or(false);
+
+        match (left_ok, right_ok) {
+            (true, true) => Either::Left(TokenAtOffset::Between(left.unwrap(), right.unwrap())),
+            (true, false) => Either::Left(TokenAtOffset::Single(left.unwrap())),
+            (false, true) => Either::Left(TokenAtOffset::Single(right.unwrap())),
+            (false, false) => {
+                while !cursor.to_elem().text_range().is_some_and(|range| range.contains(offset)) {
+                    cursor.goto_parent();
+                }
+                Either::Right(cursor.to_node().unwrap())
+            }
         }
     }
 

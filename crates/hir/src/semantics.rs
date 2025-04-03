@@ -1,14 +1,16 @@
 use std::{cell::RefCell, ops};
 
 use hir_to_def::Hir2DefCache;
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use pathres::PathResolution;
 use rustc_hash::FxHashMap;
 use source_to_def::{Source2DefCache, Source2DefCtx};
 use syntax::{
-    SyntaxNode, SyntaxNodeExt,
+    SyntaxAncestors, SyntaxNode, SyntaxNodeExt,
     ast::{self, AstNode},
+    has_text_range::HasTextRange,
 };
+use utils::text_edit::TextSize;
 use vfs::FileId;
 
 use crate::{
@@ -40,6 +42,26 @@ impl<'db, DB> ops::Deref for Semantics<'db, DB> {
 
     fn deref(&self) -> &Self::Target {
         &self.impl_
+    }
+}
+
+impl<DB: HirDb> Semantics<'_, DB> {
+    pub fn find_node_at_offset<'a, N: AstNode<'a>>(
+        &self,
+        node: SyntaxNode<'a>,
+        offset: TextSize,
+    ) -> Option<N> {
+        match node.token_or_node_at_offset(offset) {
+            Either::Left(tok_at_offset) => tok_at_offset
+                .map(|tok| SyntaxAncestors::start_from(tok.parent))
+                .kmerge_by(|left, right| {
+                    left.range()
+                        .map(|left| left.end() - left.start())
+                        .lt(&right.range().map(|right| right.end() - right.start()))
+                })
+                .find_map(N::cast),
+            Either::Right(node) => SyntaxAncestors::start_from(node).find_map(N::cast),
+        }
     }
 }
 

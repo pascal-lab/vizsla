@@ -13,6 +13,7 @@ use vfs::FileId;
 
 use crate::{
     Cancellable,
+    code_action::{self, CodeAction, CodeActionResolveStrategy},
     code_lens::{self, CodeLens, CodeLensConfig, CodeLensKind},
     document_highlight::{self, DocumentHighlight, DocumentHighlightConfig},
     document_symbols::{self, DocumentSymbol},
@@ -173,5 +174,14 @@ impl Analysis {
         config: SignatureHelpConfig,
     ) -> Cancellable<Option<SignatureHelp>> {
         self.with_db(|db| signature_help::signature_help(db, position, config))
+    }
+
+    pub fn code_action(
+        &self,
+        file_id: FileId,
+        range: TextRange,
+        resolve_strategy: CodeActionResolveStrategy,
+    ) -> Cancellable<Vec<CodeAction>> {
+        self.with_db(|db| code_action::code_action(db, file_id, range, resolve_strategy))
     }
 }

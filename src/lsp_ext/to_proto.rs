@@ -4,6 +4,7 @@ use anyhow::Error;
 use hir::container::InFile;
 use ide::{
     Cancellable, SymbolKind,
+    code_action::{CodeAction, CodeActionKind},
     code_lens::{CodeLens, CodeLensKind},
     document_highlight::DocumentHighlight,
     folding_ranges::{Fold, FoldingConfig},
@@ -14,7 +15,7 @@ use ide::{
     references::ReferenceCategory,
     rename::RenameError,
     semantic_tokens::{SemaToken, SemaTokenModifier, SemaTokenPort, SemaTokenTag},
-    signature_help::{SignatureHelp, SignatureHelpConfig},
+    signature_help::SignatureHelp,
     source_change::SourceChange,
 };
 use itertools::Itertools;
@@ -31,7 +32,7 @@ use utils::{
 use vfs::FileId;
 
 use super::{
-    ext::{CodeLensData, CodeLensDataKind},
+    ext::{self, CodeLensData, CodeLensDataKind},
     lsp_error::LspError,
 };
 use crate::{
@@ -239,6 +240,10 @@ pub(crate) fn rename_error(err: RenameError) -> LspError {
 
 pub(crate) fn format_error(err: Error) -> LspError {
     LspError::new(lsp_server::ErrorCode::RequestFailed as i32, err.to_string())
+}
+
+pub(crate) fn code_action_resolve_error(err: Error) -> LspError {
+    LspError::new(lsp_server::ErrorCode::InvalidParams as i32, err.to_string())
 }
 
 pub(crate) fn workspace_edit(
@@ -659,4 +664,48 @@ pub(crate) fn signature_help(
         active_signature: Some(0),
         active_parameter,
     }
+}
+
+pub(crate) fn code_action_kind(kind: CodeActionKind) -> lsp_types::CodeActionKind {
+    match kind {
+        CodeActionKind::Generate => lsp_types::CodeActionKind::EMPTY,
+        CodeActionKind::QuickFix => lsp_types::CodeActionKind::QUICKFIX,
+        CodeActionKind::Refactor => lsp_types::CodeActionKind::REFACTOR,
+        CodeActionKind::RefactorExtract => lsp_types::CodeActionKind::REFACTOR_EXTRACT,
+        CodeActionKind::RefactorInline => lsp_types::CodeActionKind::REFACTOR_INLINE,
+        CodeActionKind::RefactorRewrite => lsp_types::CodeActionKind::REFACTOR_REWRITE,
+    }
+}
+
+pub(crate) fn code_action(
+    snap: &GlobalStateSnapshot,
+    CodeAction { id, label, source_change, .. }: CodeAction,
+    resolve_data: Option<(usize, lsp_types::CodeActionParams, Option<i32>)>,
+) -> Cancellable<lsp_types::CodeAction> {
+    let mut res = lsp_types::CodeAction {
+        title: label,
+        kind: Some(self::code_action_kind(id.kind)),
+        edit: None,
+        is_preferred: None,
+        command: None, // TODO: fill commands
+        diagnostics: None,
+        disabled: None,
+        data: None,
+    };
+
+    match (source_change, resolve_data) {
+        (Some(it), _) => res.edit = Some(workspace_edit(snap, it)?),
+        (None, Some((idx, code_action_params, version))) => {
+            let data = ext::CodeActionData {
+                id: format!("{}:{idx}", id.name),
+                code_action_params,
+                version,
+            };
+            res.data = Some(serde_json::to_value(data).unwrap());
+        }
+        (None, None) => {
+            unreachable!("code actions should be resolved if client can't resolve lazily")
+        }
+    };
+    Ok(res)
 }

@@ -1,12 +1,14 @@
-use ide::{folding_ranges::FoldingConfig, references::References};
+use ide::{
+    code_action::CodeActionResolveStrategy, folding_ranges::FoldingConfig, references::References,
+};
 use itertools::Itertools;
 use span::{FilePosition, FileRange};
-use utils::text_edit::TextRange;
+use utils::{json::from_json, text_edit::TextRange};
 use vfs::FileId;
 
 use crate::{
     global_state::snapshot::GlobalStateSnapshot,
-    lsp_ext::{from_proto, to_proto},
+    lsp_ext::{ext::CodeActionResolveError, from_proto, lsp_error::LspError, to_proto},
 };
 
 pub(crate) fn handle_goto_definition(
@@ -381,4 +383,73 @@ pub(crate) fn handle_signature_help(
     let support_label_offsets = snap.config.cli_signature_help_label_offsets_support();
     let res = to_proto::signature_help(res, support_label_offsets);
     Ok(Some(res))
+}
+
+pub(crate) fn handle_code_action(
+    snap: GlobalStateSnapshot,
+    params: lsp_types::CodeActionParams,
+) -> anyhow::Result<Option<Vec<lsp_types::CodeActionOrCommand>>> {
+    if !snap.config.cli_code_action_literals() {
+        return Ok(None);
+    }
+
+    let FileRange { file_id, range } =
+        from_proto::file_range(&snap, &params.text_document.uri, params.range)?;
+
+    let resolve_strategy = if snap.config.cli_code_action_resolve() {
+        CodeActionResolveStrategy::None
+    } else {
+        CodeActionResolveStrategy::All
+    };
+
+    let action = snap.analysis.code_action(file_id, range, resolve_strategy.clone())?;
+
+    let mut res = Vec::new();
+    for (id, assist) in action.into_iter().enumerate() {
+        let resolve_data =
+            resolve_strategy.is_none().then(|| (id, params.clone(), snap.file_version(file_id)));
+        let code_action = to_proto::code_action(&snap, assist, resolve_data)?;
+        res.push(lsp_types::CodeActionOrCommand::CodeAction(code_action))
+    }
+
+    Ok(Some(res))
+}
+
+pub(crate) fn handle_code_action_resolve(
+    snap: GlobalStateSnapshot,
+    mut code_action: lsp_types::CodeAction,
+) -> anyhow::Result<lsp_types::CodeAction> {
+    fn parse_action_id(action_id: &str) -> anyhow::Result<(usize, String), String> {
+        let id_parts = action_id.split(':').collect::<Vec<_>>();
+        match id_parts.as_slice() {
+            [assist_name, index] => {
+                let index: usize = index.parse().map_err(|_| "Incorrect index string")?;
+                Ok((index, assist_name.to_string()))
+            }
+            _ => Err("Action id contains incorrect number of segments".to_owned()),
+        }
+    }
+
+    let data = from_proto::code_action_data(
+        code_action.data.replace(Default::default()).ok_or(CodeActionResolveError::NoData)?,
+    )?;
+
+    let file_id = from_proto::file_id(&snap, &data.code_action_params.text_document.uri)?;
+    if snap.file_version(file_id) != data.version {
+        return Err(CodeActionResolveError::Stable.into());
+    }
+
+    let line_index = snap.line_info(file_id)?;
+    let range = from_proto::text_range(&line_index, data.code_action_params.range)?;
+
+    let (idx, name) = parse_action_id(&data.id).map_err(CodeActionResolveError::InvalidId)?;
+    let resolve_strategy = CodeActionResolveStrategy::Single { name };
+
+    let action = snap.analysis.code_action(file_id, range, resolve_strategy)?.remove(idx);
+
+    let resolved_action = to_proto::code_action(&snap, action, None)?;
+    code_action.edit = resolved_action.edit;
+    code_action.command = resolved_action.command;
+
+    Ok(code_action)
 }

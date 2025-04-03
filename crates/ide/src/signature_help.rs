@@ -125,12 +125,12 @@ fn sig_help_for_instance(
     };
 
     let instantiation = ast::HierarchyInstantiation::cast(instance.syntax().parent()?)?;
-    let module_id = sema.nameres_instantiation(instantiation)?;
-    let module = db.module(module_id);
-    let module_name =
-        module.name.as_ref().map(|name| name.to_string()).unwrap_or("<module>".to_string());
+    let target_module_id = sema.nameres_instantiation(instantiation)?;
+    let target_module = db.module(target_module_id);
+    let target_module_name =
+        target_module.name.as_ref().map(|name| name.to_string()).unwrap_or("<module>".to_string());
 
-    let mut res = SignatureHelp::new(config, format!("module {module_name}("));
+    let mut res = SignatureHelp::new(config, format!("module {target_module_name}("));
 
     if let Some(active_param) = &active_param {
         match active_param {
@@ -139,7 +139,7 @@ fn sig_help_for_instance(
         }
     }
 
-    match &module.ports {
+    match &target_module.ports {
         Ports::NonAnsi { ports, .. } => {
             let mut buf = String::new();
             for port in ports.values() {
@@ -158,10 +158,11 @@ fn sig_help_for_instance(
                 buf.push('(');
                 if let Some(refs) = &port.refs {
                     for r in refs.clone() {
-                        let r = module.get(r);
+                        let r = target_module.get(r);
                         buf.push_str(r.ident.as_ref().map(|s| s.as_str()).unwrap_or("<missing>"));
                         if let Some(select) = &r.select {
-                            match InContainer::new(module_id.into(), *select).display_signature(db)
+                            match InContainer::new(target_module_id.into(), *select)
+                                .display_signature(db)
                             {
                                 Ok(s) => buf.push_str(&s),
                                 Err(_) => buf.push_str("<missing>"),
@@ -177,7 +178,7 @@ fn sig_help_for_instance(
             for port_decl in port_decls.values() {
                 let mut buf = String::new();
                 if !res.config.params_only {
-                    let header = InModule::new(module_id, port_decl.header)
+                    let header = InModule::new(target_module_id, port_decl.header)
                         .display_signature(db)
                         .unwrap_or_else(|_| "<missing-header>".to_string());
                     buf.push_str(&header);
@@ -186,7 +187,7 @@ fn sig_help_for_instance(
                 let header_size = buf.len();
 
                 for decl_id in port_decl.decls.clone() {
-                    match InContainer::new(module_id.into(), decl_id).display_signature(db) {
+                    match InContainer::new(target_module_id.into(), decl_id).display_signature(db) {
                         Ok(decl) => buf.push_str(&decl),
                         Err(_) => buf.push_str("<missing>"),
                     }
@@ -194,7 +195,7 @@ fn sig_help_for_instance(
                     buf.truncate(header_size);
 
                     if let Some(Either::Right(active_name)) = &active_param
-                        && let Some(decl_name) = module.get(decl_id).name.as_ref()
+                        && let Some(decl_name) = target_module.get(decl_id).name.as_ref()
                         && active_name == decl_name.as_str()
                     {
                         res.active_parameter = Some(res.param_ranges.len() - 1);
@@ -240,12 +241,12 @@ fn sig_help_for_instantiation(
         }
     };
 
-    let module_id = sema.nameres_instantiation(instantiation)?;
-    let module = db.module(module_id);
-    let module_name =
-        module.name.as_ref().map(|name| name.to_string()).unwrap_or("<module>".to_string());
+    let target_module_id = sema.nameres_instantiation(instantiation)?;
+    let target_module = db.module(target_module_id);
+    let target_module_name =
+        target_module.name.as_ref().map(|name| name.to_string()).unwrap_or("<module>".to_string());
 
-    let mut res = SignatureHelp::new(config, format!("module {module_name} #("));
+    let mut res = SignatureHelp::new(config, format!("module {target_module_name} #("));
 
     if let Some(active_param) = &active_param {
         match active_param {
@@ -255,11 +256,11 @@ fn sig_help_for_instantiation(
     }
 
     for port_decl in
-        module.declarations.values().take_while(|d| matches!(d, Declaration::ParamDecl(_)))
+        target_module.declarations.values().take_while(|d| matches!(d, Declaration::ParamDecl(_)))
     {
         let mut buf = String::new();
         if !res.config.params_only {
-            let ty = InContainer::new(module_id.into(), port_decl.ty())
+            let ty = InContainer::new(target_module_id.into(), port_decl.ty())
                 .display_signature(db)
                 .unwrap_or_default();
             buf.push_str(&ty);
@@ -270,7 +271,7 @@ fn sig_help_for_instantiation(
         let header_size = buf.len();
 
         for decl_id in port_decl.decls() {
-            match InContainer::new(module_id.into(), decl_id).display_signature(db) {
+            match InContainer::new(target_module_id.into(), decl_id).display_signature(db) {
                 Ok(decl) => buf.push_str(&decl),
                 Err(_) => buf.push_str("<missing>"),
             }
@@ -278,7 +279,7 @@ fn sig_help_for_instantiation(
             buf.truncate(header_size);
 
             if let Some(Either::Right(active_name)) = &active_param
-                && let Some(decl_name) = module.get(decl_id).name.as_ref()
+                && let Some(decl_name) = target_module.get(decl_id).name.as_ref()
                 && active_name == decl_name.as_str()
             {
                 res.active_parameter = Some(res.param_ranges.len() - 1);

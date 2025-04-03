@@ -6,7 +6,9 @@ use crate::{
     container::{ContainerId, InContainer, InFile, InModule},
     hir_def::{
         expr::{ExprId, ExprSrc},
-        module::instantiation::{InstanceId, InstanceSrc, PortConnId, PortConnSrc},
+        module::instantiation::{
+            InstanceId, InstanceSrc, InstantiationId, InstantiationSrc, PortConnId, PortConnSrc,
+        },
     },
 };
 
@@ -24,6 +26,24 @@ impl SemanticsImpl<'_> {
         let (_, module_src_map) = db.module_with_source_map(module_id);
         let instance_id = module_src_map.get(src);
         InModule::new(module_id, instance_id)
+    }
+
+    pub fn resolve_instantiation(
+        &self,
+        instantiation: ast::HierarchyInstantiation,
+    ) -> InModule<InstantiationId> {
+        let db = self.db;
+        let file_id = self.find_file(instantiation.syntax());
+        let ContainerId::ModuleId(module_id) =
+            self.find_container(InFile::new(file_id, instantiation.syntax()))
+        else {
+            unreachable!();
+        };
+
+        let src = InstantiationSrc::from(instantiation);
+        let (_, module_src_map) = db.module_with_source_map(module_id);
+        let instantiation_id = module_src_map.get(src);
+        InModule::new(module_id, instantiation_id)
     }
 
     pub fn resolve_named_port_conn(&self, conn: ast::PortConnection) -> InModule<PortConnId> {

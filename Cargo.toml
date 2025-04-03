@@ -41,6 +41,7 @@ parking_lot = "0.12.1"
 rustc-hash.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+thiserror.workspace = true
 tracing-subscriber = { version = "0.3.17", default-features = false, features = ["registry", "fmt", "tracing-log",] }
 tracing.workspace = true
 triomphe.workspace = true

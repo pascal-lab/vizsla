@@ -1,6 +1,7 @@
 use std::ops;
 
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -77,7 +78,6 @@ define_semantic_token_kind! {
         (GENERIC, "generic") => TYPE_PARAMETER,
     }
 }
-
 #[derive(Default)]
 pub(crate) struct SemaTokenModifierSet(pub(crate) u32);
 
@@ -113,4 +113,22 @@ impl ops::BitOrAssign<lsp_types::SemanticTokenModifier> for SemaTokenModifierSet
         let idx = SEMA_TOKENS_MODIFIERS.iter().position(|it| it == &rhs).unwrap();
         self.0 |= 1 << idx;
     }
+}
+
+#[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CodeActionData {
+    pub code_action_params: lsp_types::CodeActionParams,
+    pub id: String,
+    pub version: Option<i32>,
+}
+
+#[derive(Debug, Error)]
+pub enum CodeActionResolveError {
+    #[error("code action without data")]
+    NoData,
+    #[error("stale code action")]
+    Stable,
+    #[error("invalid action id: {0}")]
+    InvalidId(String),
 }

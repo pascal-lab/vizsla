@@ -2,7 +2,8 @@ use std::iter;
 
 use ide::hover::HoverFormat;
 use lsp_types::{
-    CodeLensOptions, CompletionOptions, CompletionOptionsCompletionItem, DeclarationCapability,
+    CodeActionKind, CodeActionOptions, CodeActionProviderCapability, CodeLensOptions,
+    CompletionOptions, CompletionOptionsCompletionItem, DeclarationCapability,
     DocumentOnTypeFormattingOptions, FileOperationFilter, FileOperationPattern,
     FileOperationPatternKind, FileOperationRegistrationOptions, InlayHintOptions,
     InlayHintServerCapabilities, OneOf, PositionEncodingKind, RenameOptions, SaveOptions,
@@ -139,6 +140,34 @@ impl Config {
         }
     }
 
+    pub fn cli_code_action_literals(&self) -> bool {
+        try_or_default! {
+            self.client_caps
+            .text_document
+            .as_ref()?
+            .code_action
+            .as_ref()?
+            .code_action_literal_support
+            .as_ref()
+        }
+        .is_some()
+    }
+
+    pub fn cli_code_action_resolve(&self) -> bool {
+        try_or_default! {
+            self.client_caps
+            .text_document
+            .as_ref()?
+            .code_action
+            .as_ref()?
+            .resolve_support
+            .as_ref()?
+            .properties
+            .iter()
+            .any(|it| it.as_str() == "edit")
+        }
+    }
+
     pub(crate) fn negotiated_encoding(&self) -> PositionEncoding {
         let client_encodings = match &self.client_caps.general {
             Some(general) => general.position_encodings.as_deref().unwrap_or_default(),
@@ -196,7 +225,18 @@ impl Config {
             document_highlight_provider: OneOf::Left(true).into(),
             document_symbol_provider: OneOf::Left(true).into(),
             workspace_symbol_provider: OneOf::Left(true).into(),
-            code_action_provider: None,
+            code_action_provider: Some(CodeActionProviderCapability::Options(CodeActionOptions {
+                code_action_kinds: Some(vec![
+                    CodeActionKind::EMPTY,
+                    CodeActionKind::QUICKFIX,
+                    CodeActionKind::REFACTOR,
+                    CodeActionKind::REFACTOR_EXTRACT,
+                    CodeActionKind::REFACTOR_INLINE,
+                    CodeActionKind::REFACTOR_REWRITE,
+                ]),
+                work_done_progress_options: Default::default(),
+                resolve_provider: Some(true),
+            })),
             code_lens_provider: CodeLensOptions { resolve_provider: true.into() }.into(),
             document_formatting_provider: OneOf::Left(true).into(),
             document_range_formatting_provider: OneOf::Left(true).into(),
