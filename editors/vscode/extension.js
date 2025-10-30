@@ -20,53 +20,52 @@ function getServerPath(context) {
   const binaryName = platform === 'win32' ? 'vizsla.exe' : 'vizsla';
 
   // Map platform-arch to folder names
-  const platformMap = {
-    'darwin-arm64': 'darwin-arm64',
-    'darwin-x64': 'darwin-x64',
-    'linux-x64': 'linux-x64',
-    'linux-arm64': 'linux-arm64',
-    'win32-x64': 'win32-x64'
-  };
+  const supported_platform = new Set([
+    'darwin-arm64',
+    'darwin-x64',
+    'linux-x64',
+    'linux-arm64',
+    'win32-x64',
+  ]);
 
-  const platformKey = `${platform}-${arch}`;
-  const platformFolder = platformMap[platformKey];
+  const platformFolder = `${platform}-${arch}`;
+  if (!supported_platform.has(platformFolder)) {
+    outputChannel.appendLine(`[ERROR] Unsupported platform-architecture combination: ${platformFolder}`);
+    return undefined;
+  }
 
   // First, try to find bundled server
-  if (platformFolder) {
-    const bundledPath = path.join(context.extensionPath, 'server', platformFolder, binaryName);
-    outputChannel.appendLine(`[INFO] Looking for bundled server at: ${bundledPath}`);
+  const bundledPath = path.join(context.extensionPath, 'server', platformFolder, binaryName);
+  outputChannel.appendLine(`[INFO] Looking for bundled server at: ${bundledPath}`);
 
-    if (fs.existsSync(bundledPath)) {
-      // Check if executable (Unix-like systems)
-      if (platform !== 'win32') {
-        try {
-          fs.accessSync(bundledPath, fs.constants.X_OK);
-          outputChannel.appendLine(`[INFO] Bundled server binary is executable`);
-          return bundledPath;
-        } catch (err) {
-          outputChannel.appendLine(`[WARN] Bundled server binary exists but is not executable, attempting to fix...`);
-          try {
-            fs.chmodSync(bundledPath, 0o755);
-            outputChannel.appendLine(`[INFO] Made bundled server binary executable`);
-            return bundledPath;
-          } catch (chmodErr) {
-            outputChannel.appendLine(`[ERROR] Failed to make bundled binary executable: ${chmodErr.message}`);
-          }
-        }
-      } else {
-        outputChannel.appendLine(`[INFO] Found bundled server binary`);
+  if (fs.existsSync(bundledPath)) {
+    // Check if executable (Unix-like systems)
+    if (platform !== 'win32') {
+      try {
+        fs.accessSync(bundledPath, fs.constants.X_OK);
+        outputChannel.appendLine(`[INFO] Bundled server binary is executable`);
         return bundledPath;
+      } catch (err) {
+        outputChannel.appendLine(`[WARN] Bundled server binary exists but is not executable, attempting to fix...`);
+        try {
+          fs.chmodSync(bundledPath, 0o755);
+          outputChannel.appendLine(`[INFO] Made bundled server binary executable`);
+          return bundledPath;
+        } catch (chmodErr) {
+          outputChannel.appendLine(`[ERROR] Failed to make bundled binary executable: ${chmodErr.message}`);
+        }
       }
     } else {
-      outputChannel.appendLine(`[INFO] Bundled server binary not found at: ${bundledPath}`);
+      outputChannel.appendLine(`[INFO] Found bundled server binary`);
+      return bundledPath;
     }
   } else {
-    outputChannel.appendLine(`[ERROR] Unsupported platform: ${platformKey}`);
+    outputChannel.appendLine(`[INFO] Bundled server binary not found at: ${bundledPath}`);
   }
 
   // If bundled server not found, try to find in PATH
   outputChannel.appendLine(`[INFO] Looking for ${binaryName} in system PATH...`);
-  
+
   const { execSync } = require('child_process');
   try {
     const whichCommand = platform === 'win32' ? 'where' : 'which';
