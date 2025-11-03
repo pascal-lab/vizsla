@@ -6,6 +6,7 @@ use ide::{
     Cancellable, SymbolKind,
     code_action::{CodeAction, CodeActionKind},
     code_lens::{CodeLens, CodeLensKind},
+    completion::{CompletionItem, CompletionItemKind, CompletionResult},
     document_highlight::DocumentHighlight,
     folding_ranges::{Fold, FoldingConfig},
     hover::HoverFormat,
@@ -66,6 +67,82 @@ pub(crate) fn goto_definition_response(
         locations.into()
     };
     Ok(res)
+}
+
+pub(crate) fn completion(
+    line_info: &LineInfo,
+    result: CompletionResult,
+) -> lsp_types::CompletionResponse {
+    let items = result.items.into_iter().map(|item| completion_item(line_info, item)).collect();
+
+    let list = lsp_types::CompletionList { is_incomplete: result.is_incomplete, items };
+    lsp_types::CompletionResponse::List(list)
+}
+
+fn completion_item(line_info: &LineInfo, item: CompletionItem) -> lsp_types::CompletionItem {
+    let mut additional_text_edits = Vec::new();
+    for edit in item.additional_edits {
+        additional_text_edits.extend(self::text_edits(line_info, edit));
+    }
+
+    let text_edit = item.primary_edit.and_then(|edit| {
+        let mut iter = edit.into_iter();
+        match (iter.next(), iter.next()) {
+            (Some(first), None) => {
+                let lsp_edit = self::text_edit(line_info, first);
+                Some(lsp_types::CompletionTextEdit::Edit(lsp_edit))
+            }
+            _ => None,
+        }
+    });
+
+    let label_details = item.label_detail.map(|detail| lsp_types::CompletionItemLabelDetails {
+        detail: Some(detail),
+        description: None,
+    });
+
+    let insert_text_format = match item.kind {
+        CompletionItemKind::Snippet => Some(lsp_types::InsertTextFormat::SNIPPET),
+        _ => None,
+    };
+
+    const SORT_BIAS: i32 = 1_000_000;
+    let order = SORT_BIAS.saturating_sub(item.score).max(0);
+    let sort_text = Some(format!("{order:08}"));
+
+    lsp_types::CompletionItem {
+        label: item.label,
+        label_details,
+        detail: item.detail,
+        documentation: None,
+        sort_text,
+        filter_text: item.filter_text,
+        insert_text: item.insert_text,
+        insert_text_format,
+        text_edit,
+        additional_text_edits: if additional_text_edits.is_empty() {
+            None
+        } else {
+            Some(additional_text_edits)
+        },
+        kind: completion_item_kind(item.kind),
+        ..Default::default()
+    }
+}
+
+fn completion_item_kind(kind: CompletionItemKind) -> Option<lsp_types::CompletionItemKind> {
+    use lsp_types::CompletionItemKind as LspCompletionItemKind;
+    Some(match kind {
+        CompletionItemKind::Keyword => LspCompletionItemKind::KEYWORD,
+        CompletionItemKind::Snippet => LspCompletionItemKind::SNIPPET,
+        CompletionItemKind::Module => LspCompletionItemKind::MODULE,
+        CompletionItemKind::Type => LspCompletionItemKind::CLASS,
+        CompletionItemKind::Function => LspCompletionItemKind::FUNCTION,
+        CompletionItemKind::Variable => LspCompletionItemKind::VARIABLE,
+        CompletionItemKind::Field => LspCompletionItemKind::FIELD,
+        CompletionItemKind::Identifier => LspCompletionItemKind::TEXT,
+        CompletionItemKind::Unknown => return None,
+    })
 }
 
 pub(crate) fn document_symbol(

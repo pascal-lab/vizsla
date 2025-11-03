@@ -16,7 +16,7 @@ pub type Cancellable<T> = Result<T, Cancelled>;
 
 pub mod analysis;
 pub mod analysis_host;
-// pub mod completion; // TODO: Add completion module
+pub mod completion;
 pub mod definitions;
 pub mod markup;
 pub mod navigation_target;

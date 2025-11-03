@@ -1,11 +1,12 @@
 use ide::hover::HoverFormat;
 use lsp_types::{
     CodeActionKind, CodeActionOptions, CodeActionProviderCapability, CodeLensOptions,
-    DeclarationCapability, DocumentOnTypeFormattingOptions, FileOperationFilter,
-    FileOperationPattern, FileOperationPatternKind, FileOperationRegistrationOptions,
-    InlayHintOptions, InlayHintServerCapabilities, OneOf, PositionEncodingKind, RenameOptions,
-    SaveOptions, SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions,
-    ServerCapabilities, SignatureHelpOptions, TextDocumentSyncKind, TextDocumentSyncOptions,
+    CompletionOptions, CompletionOptionsCompletionItem, DeclarationCapability,
+    DocumentOnTypeFormattingOptions, FileOperationFilter, FileOperationPattern,
+    FileOperationPatternKind, FileOperationRegistrationOptions, InlayHintOptions,
+    InlayHintServerCapabilities, OneOf, PositionEncodingKind, RenameOptions, SaveOptions,
+    SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions, ServerCapabilities,
+    SignatureHelpOptions, TextDocumentSyncKind, TextDocumentSyncOptions,
     WorkspaceFileOperationsServerCapabilities, WorkspaceFoldersServerCapabilities,
     WorkspaceServerCapabilities,
 };
@@ -207,7 +208,15 @@ impl Config {
             ),
             selection_range_provider: Some(true.into()),
             hover_provider: Some(true.into()),
-            completion_provider: None,
+            completion_provider: Some({
+                let mut options = CompletionOptions::default();
+                options.resolve_provider = Some(false);
+                options.trigger_characters =
+                    Some([".", ":", "$", "`", "#"].map(String::from).into());
+                options.completion_item =
+                    Some(CompletionOptionsCompletionItem { label_details_support: Some(true) });
+                options
+            }),
             signature_help_provider: SignatureHelpOptions {
                 trigger_characters: Some(["(", ",", "."].map(String::from).into()),
                 retrigger_characters: None,
