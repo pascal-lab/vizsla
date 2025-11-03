@@ -295,15 +295,6 @@ async function activate(context) {
   });
   context.subscriptions.push(restartCommand);
 
-  // Watch for configuration changes
-  const configWatcher = vscode.workspace.onDidChangeConfiguration(async (event) => {
-    if (event.affectsConfiguration('vizslaLsp')) {
-      outputChannel.appendLine('[INFO] Configuration changed, restarting server...');
-      await restartClient(context);
-    }
-  });
-  context.subscriptions.push(configWatcher);
-
   // Start the client
   await startClient(context);
 
