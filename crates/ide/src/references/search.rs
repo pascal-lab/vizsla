@@ -96,6 +96,10 @@ impl SearchScope {
                 let range = module_id.to_container_src_map(db).get(loc.value).range();
                 Self::single_range(module_id.file_id.file_id(), range)
             }
+            ContainerId::FileSubroutineId(InFile { file_id, value: sub_id }) => {
+                let range = file_id.to_container_src_map(db).get(sub_id).range();
+                Self::single_range(file_id.file_id(), range)
+            }
         }
     }
 
