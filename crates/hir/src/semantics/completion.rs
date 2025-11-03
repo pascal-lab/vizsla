@@ -110,6 +110,9 @@ impl<'db> SemanticsImpl<'db> {
                         }
                     }
                 }
+                ContainerId::FileSubroutineId(_loc) => {
+                    // TODO: implement file-level subroutine scope
+                }
                 ContainerId::HirFileId(file_id) => {
                     let scope = self.db.file_scope(file_id);
                     for entry in scope.collect_completions(self.db) {
@@ -427,6 +430,11 @@ impl<'db> SemanticsImpl<'db> {
                 let def = subroutine.structs.get(struct_ref.value);
                 self.struct_member_type(def, field_name)
             }
+            ContainerId::FileSubroutineId(loc) => {
+                let subroutine = loc.to_container(self.db);
+                let def = subroutine.structs.get(struct_ref.value);
+                self.struct_member_type(def, field_name)
+            }
         }
     }
 
@@ -453,6 +461,7 @@ impl<'db> SemanticsImpl<'db> {
             }
             ContainerId::BlockId(_) => None,
             ContainerId::SubroutineId(_) => None,
+            ContainerId::FileSubroutineId(_) => None,
         }
     }
 
@@ -518,6 +527,10 @@ impl<'db> SemanticsImpl<'db> {
                 let subroutine = self.db.subroutine(loc);
                 self.collect_struct_def_fields(subroutine.structs.get(struct_ref.value), prefix)
             }
+            ContainerId::FileSubroutineId(loc) => {
+                let subroutine = loc.to_container(self.db);
+                self.collect_struct_def_fields(subroutine.structs.get(struct_ref.value), prefix)
+            }
         }
     }
 
@@ -535,7 +548,7 @@ impl<'db> SemanticsImpl<'db> {
                 let package = self.db.package(package_id);
                 self.collect_class_def_fields(package.classes.get(class_ref.value), prefix)
             }
-            ContainerId::BlockId(_) | ContainerId::SubroutineId(_) => Vec::new(),
+            ContainerId::BlockId(_) | ContainerId::SubroutineId(_) | ContainerId::FileSubroutineId(_) => Vec::new(),
         }
     }
 
@@ -602,7 +615,7 @@ impl<'db> SemanticsImpl<'db> {
                 let package = self.db.package(package_id);
                 self.collect_class_scope_entries(package.classes.get(class_ref.value), prefix)
             }
-            ContainerId::BlockId(_) | ContainerId::SubroutineId(_) => Vec::new(),
+            ContainerId::BlockId(_) | ContainerId::SubroutineId(_) | ContainerId::FileSubroutineId(_) => Vec::new(),
         }
     }
 
@@ -773,6 +786,20 @@ impl<'db> SemanticsImpl<'db> {
                     }
                 }
             }
+            ContainerId::FileSubroutineId(loc) => {
+                let subroutine = loc.to_container(self.db);
+                let declarator = subroutine.decls.get(decl.value);
+                match declarator.parent {
+                    DeclaratorParent::DeclarationId(declaration_id) => {
+                        let declaration = subroutine.declarations.get(declaration_id);
+                        Some(InContainer::new(decl.cont_id, declaration.ty()))
+                    }
+                    DeclaratorParent::PortDeclId(_) => None,
+                    DeclaratorParent::StmtId(stmt_id) => {
+                        self.stmt_decl_ty(decl.cont_id, stmt_id, decl.value)
+                    }
+                }
+            }
         }
     }
 
@@ -804,6 +831,14 @@ impl<'db> SemanticsImpl<'db> {
             }
             ContainerId::SubroutineId(loc) => {
                 let subroutine = self.db.subroutine(loc);
+                subroutine
+                    .typedefs
+                    .get(typedef.value)
+                    .ty
+                    .map(|ty| InContainer::new(typedef.cont_id, ty))
+            }
+            ContainerId::FileSubroutineId(loc) => {
+                let subroutine = loc.to_container(self.db);
                 subroutine
                     .typedefs
                     .get(typedef.value)
@@ -865,6 +900,11 @@ impl<'db> SemanticsImpl<'db> {
             }
             ContainerId::SubroutineId(loc) => {
                 let subroutine = self.db.subroutine(loc);
+                let stmt = subroutine.stmts.get(stmt_id);
+                self.stmt_decl_ty_from_stmt(cont_id, stmt, decl_id)
+            }
+            ContainerId::FileSubroutineId(loc) => {
+                let subroutine = loc.to_container(self.db);
                 let stmt = subroutine.stmts.get(stmt_id);
                 self.stmt_decl_ty_from_stmt(cont_id, stmt, decl_id)
             }
