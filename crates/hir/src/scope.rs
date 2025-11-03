@@ -40,6 +40,7 @@ define_enum_deriving_from! {
         FiledDeclId(FiledDeclId),
         TypedefId(InFile<TypedefId>),
         ClassId(InFile<ClassId>),
+        SubroutineId(InFile<SubroutineId>),
     }
 }
 
@@ -190,6 +191,10 @@ impl UnitScope {
             scope.insert_opt(&class_.name, InFile::new(file_id, class_id).into());
         }
 
+        for (subroutine_id, subroutine_info) in hir_file.subroutines.iter() {
+            scope.insert_opt(&subroutine_info.name, InFile::new(file_id, subroutine_id).into());
+        }
+
         Arc::new(scope)
     }
 
@@ -230,6 +235,15 @@ impl UnitScope {
                 }
                 UnitEntry::ClassId(_) => {
                     items.push(make_entry(ident, CompletionEntryKind::Type));
+                }
+                UnitEntry::SubroutineId(in_file) => {
+                    let file = db.hir_file(in_file.file_id);
+                    let subroutine = file.subroutines.get(in_file.value);
+                    let detail = match subroutine.kind {
+                        SubroutineKind::Task => "task".to_string(),
+                        SubroutineKind::Function { .. } => "function".to_string(),
+                    };
+                    items.push(make_entry_with_detail(ident, CompletionEntryKind::Function, Some(detail)));
                 }
             }
         }
@@ -1868,5 +1882,136 @@ endmodule
             },
             _ => panic!("expected package member"),
         }
+    }
+
+    #[test]
+    fn debug_package_imports() {
+        use crate::hir_def::{module::ModuleId, package::PackageId};
+
+        let source = r#"
+package my_pkg;
+    typedef logic [7:0] byte_t;
+    parameter int MAX_SIZE = 256;
+
+    function int get_size();
+        return MAX_SIZE;
+    endfunction
+endpackage
+
+module test;
+    import my_pkg::*;
+endmodule
+"#;
+        let (db, hir_file_id) = setup_db(source);
+        let file = db.hir_file(hir_file_id);
+
+        eprintln!("\n=== File Contents ===");
+        eprintln!("Packages: {}", file.packages.len());
+        eprintln!("Modules: {}", file.modules.len());
+
+        // Find the package
+        let mut pkg_id = None;
+        for (idx, pkg_info) in file.packages.iter() {
+            eprintln!("Package {} => {:?}", idx.into_raw(), pkg_info.name);
+            if pkg_info.name.as_ref().map(|n| n.as_str()) == Some("my_pkg") {
+                pkg_id = Some(PackageId { file_id: hir_file_id, value: idx });
+                break;
+            }
+        }
+        let pkg_id = pkg_id.expect("package my_pkg should exist");
+
+        // Check package HIR
+        let package = db.package(pkg_id);
+        eprintln!("\n=== Package HIR ===");
+        eprintln!("Decls: {}", package.decls.len());
+        eprintln!("Typedefs: {}", package.typedefs.len());
+        eprintln!("Subroutines: {}", package.subroutines.len());
+
+        // Check package scope
+        let pkg_scope = db.package_scope(pkg_id);
+        eprintln!("\n=== Package Scope Contents ===");
+        for (name, entry) in pkg_scope.iter() {
+            eprintln!("  {} => {:?}", name, entry);
+        }
+
+        // Check module scope
+        let mut mod_id = None;
+        for (idx, mod_info) in file.modules.iter() {
+            if mod_info.name.as_ref().map(|n| n.as_str()) == Some("test") {
+                mod_id = Some(ModuleId { file_id: hir_file_id, value: idx });
+                break;
+            }
+        }
+        let mod_id = mod_id.expect("module test should exist");
+
+        let mod_scope = db.module_scope(mod_id);
+        eprintln!("\n=== Module Scope Contents ===");
+        for (name, entry) in mod_scope.iter() {
+            eprintln!("  {} => {:?}", name, entry);
+        }
+
+        // Check if items are imported
+        assert!(pkg_scope.get(&SmolStr::new("byte_t")).is_some(), "byte_t should be in package scope");
+        assert!(pkg_scope.get(&SmolStr::new("MAX_SIZE")).is_some(), "MAX_SIZE should be in package scope");
+        assert!(pkg_scope.get(&SmolStr::new("get_size")).is_some(), "get_size should be in package scope");
+
+        assert!(mod_scope.get(&SmolStr::new("byte_t")).is_some(), "byte_t should be imported into module");
+        assert!(mod_scope.get(&SmolStr::new("MAX_SIZE")).is_some(), "MAX_SIZE should be imported into module");
+        assert!(mod_scope.get(&SmolStr::new("get_size")).is_some(), "get_size should be imported into module");
+    }
+
+    #[test]
+    fn debug_completion_in_block() {
+        use crate::semantics::Semantics;
+        use utils::text_edit::TextSize;
+
+        let source = r#"
+package my_pkg;
+    typedef logic [7:0] byte_t;
+    parameter int MAX_SIZE = 256;
+
+    function int fetch_size();
+        return MAX_SIZE;
+    endfunction
+endpackage
+
+module test;
+    import my_pkg::*;
+
+    initial begin
+        byte_t data;
+        int size = fetch_
+    end
+endmodule
+"#;
+
+        let (db, hir_file_id) = setup_db(source);
+
+        // Find the offset of "= fetch_" in the module (not the function definition)
+        let pattern_pos = source.find("= fetch_").unwrap();
+        let fetch_pos = pattern_pos + "= ".len();
+        let offset = TextSize::from((fetch_pos + "fetch_".len()) as u32);
+
+        eprintln!("\n=== Completion Debug ===");
+        eprintln!("Source around offset:");
+        let start = fetch_pos.saturating_sub(20);
+        let end = (fetch_pos + 30).min(source.len());
+        eprintln!("  '{}'", &source[start..end]);
+        eprintln!("Offset: {:?} (bytes from start of source string)", offset);
+
+        let sema = Semantics::new(&db);
+        let completions = sema.scope_completions(hir_file_id.file_id(), offset);
+
+        eprintln!("\n=== Completion Results ===");
+        eprintln!("Total items: {}", completions.len());
+        for item in &completions {
+            eprintln!("  {} => {:?} (scope: {:?})", item.entry.name, item.entry.kind, item.scope);
+        }
+
+        // Check if fetch_size is present
+        let has_fetch_size = completions.iter().any(|item| item.entry.name == "fetch_size");
+        eprintln!("\n=== Has fetch_size: {} ===", has_fetch_size);
+
+        assert!(has_fetch_size, "fetch_size should be present in completions");
     }
 }

@@ -115,7 +115,8 @@ pub(crate) fn complete_parameter_list(
         UnitEntry::FiledDeclId(_)
         | UnitEntry::TypedefId(_)
         | UnitEntry::ClassId(_)
-        | UnitEntry::PackageId(_) => {
+        | UnitEntry::PackageId(_)
+        | UnitEntry::SubroutineId(_) => {
             return Vec::new();
         }
     };

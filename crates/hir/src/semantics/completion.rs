@@ -293,6 +293,7 @@ impl<'db> SemanticsImpl<'db> {
             UnitEntry::ClassId(class_id) => Some(ScopeResolutionTarget::Class(class_id.into())),
             UnitEntry::FiledDeclId(_) => None,
             UnitEntry::TypedefId(_) => None,
+            UnitEntry::SubroutineId(_) => None,
         }
     }
 
