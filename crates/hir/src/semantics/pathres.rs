@@ -6,16 +6,22 @@ use utils::get::GetRef;
 
 use super::SemanticsImpl;
 use crate::{
-    container::{ContainerId, InBlock, InContainer, InFile, InModule},
+    container::{ContainerId, InBlock, InContainer, InFile, InModule, InPackage, InSubroutine},
     hir_def::{
+        aggregate::ClassId,
         block::BlockId,
         declaration::Declaration,
         expr::declarator::{DeclId, DeclaratorParent},
         lower_ident_opt,
         module::{ModuleId, instantiation::InstanceId, port::NonAnsiPortId},
+        package::PackageId,
         stmt::StmtId,
+        subroutine::SubroutineId,
+        typedef::TypedefId,
     },
-    scope::{self, BlockEntry, ModuleEntry, UnitEntry},
+    scope::{
+        self, BlockEntry, ModuleEntry, PackageEntry, PackageImportEntry, SubroutineEntry, UnitEntry,
+    },
 };
 
 impl SemanticsImpl<'_> {
@@ -85,6 +91,9 @@ impl SemanticsImpl<'_> {
         match self.db.unit_scope().get(&module_name)? {
             UnitEntry::ModuleId(module_id) => Some(module_id),
             UnitEntry::FiledDeclId(_) => None,
+            UnitEntry::TypedefId(_) => None,
+            UnitEntry::ClassId(_) => None,
+            UnitEntry::PackageId(_) => None,
         }
     }
 
@@ -98,6 +107,9 @@ pub enum PathResolution {
     Module(ModuleId),
     Decl(InContainer<DeclId>),
     ParamDecl(InModule<DeclId>),
+    Typedef(InContainer<TypedefId>),
+    Class(InContainer<ClassId>),
+    PackageImport(InModule<PackageImportEntry>),
     NonAnsiPort {
         // There won't be a situation where all fields are None.
         label: Option<NonAnsiPortId>,
@@ -109,6 +121,8 @@ pub enum PathResolution {
     Instance(InModule<InstanceId>),
     Stmt(InContainer<StmtId>),
     Block(BlockId),
+    Package(PackageId),
+    Subroutine(InContainer<SubroutineId>),
 }
 
 impl From<UnitEntry> for PathResolution {
@@ -117,6 +131,9 @@ impl From<UnitEntry> for PathResolution {
         match entry {
             ModuleId(idx) => Self::Module(idx),
             FiledDeclId(idx) => Self::Decl(idx.into()),
+            TypedefId(idx) => Self::Typedef(idx.into()),
+            ClassId(idx) => Self::Class(idx.into()),
+            PackageId(idx) => Self::Package(idx),
         }
     }
 }
@@ -133,6 +150,18 @@ impl From<InModule<ModuleEntry>> for PathResolution {
             }
             AnsiPortEntry(scope::AnsiPortEntry(idx)) => Self::AnsiPort(entry.with_value(idx)),
             BlockId(block_id) => Self::Block(block_id),
+            TypedefId(typedef_id) => Self::Typedef(entry.with_value(typedef_id).into()),
+            ClassId(class_id) => Self::Class(entry.with_value(class_id).into()),
+            PackageImportEntry(import_entry) => Self::PackageImport(entry.with_value(import_entry)),
+            PackageMember(pkg_entry) => match pkg_entry {
+                PackageEntry::DeclId(in_pkg_decl) => Self::Decl(in_pkg_decl.into()),
+                PackageEntry::TypedefId(in_pkg_typedef) => Self::Typedef(in_pkg_typedef.into()),
+                PackageEntry::ClassId(in_pkg_class) => Self::Class(in_pkg_class.into()),
+                PackageEntry::StructId(_) | PackageEntry::ProcId(_) => unreachable!(),
+                PackageEntry::SubroutineId(in_pkg_sub) => Self::Subroutine(in_pkg_sub.into()),
+                PackageEntry::Package(in_pkg_pkg) => Self::Package(in_pkg_pkg.value),
+            },
+            SubroutineId(sub_id) => Self::Subroutine(entry.with_value(sub_id).into()),
         }
     }
 }
@@ -144,6 +173,33 @@ impl From<InBlock<BlockEntry>> for PathResolution {
             DeclId(idx) => Self::Decl(entry.with_value(idx).into()),
             StmtId(idx) => Self::Stmt(entry.with_value(idx).into()),
             BlockId(block_id) => Self::Block(block_id),
+            TypedefId(typedef_id) => Self::Typedef(entry.with_value(typedef_id).into()),
+        }
+    }
+}
+
+impl From<InSubroutine<SubroutineEntry>> for PathResolution {
+    fn from(entry: InSubroutine<SubroutineEntry>) -> Self {
+        use SubroutineEntry::*;
+        match entry.value {
+            DeclId(idx) => Self::Decl(entry.with_value(idx).into()),
+            StmtId(idx) => Self::Stmt(entry.with_value(idx).into()),
+            BlockId(block_id) => Self::Block(block_id),
+            TypedefId(typedef_id) => Self::Typedef(entry.with_value(typedef_id).into()),
+        }
+    }
+}
+
+impl From<InPackage<PackageEntry>> for PathResolution {
+    fn from(entry: InPackage<PackageEntry>) -> Self {
+        use PackageEntry::*;
+        match entry.value {
+            DeclId(in_pkg_decl) => Self::Decl(in_pkg_decl.into()),
+            TypedefId(in_pkg_typedef) => Self::Typedef(in_pkg_typedef.into()),
+            ClassId(in_pkg_class) => Self::Class(in_pkg_class.into()),
+            StructId(_) | ProcId(_) => unreachable!(),
+            SubroutineId(in_pkg_sub) => Self::Subroutine(in_pkg_sub.into()),
+            Package(in_pkg_pkg) => Self::Package(in_pkg_pkg.value),
         }
     }
 }
