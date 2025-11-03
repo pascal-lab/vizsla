@@ -4,6 +4,7 @@ use hir_to_def::Hir2DefCache;
 use itertools::{Either, Itertools};
 use pathres::PathResolution;
 use rustc_hash::FxHashMap;
+use smol_str::SmolStr;
 use source_to_def::{Source2DefCache, Source2DefCtx};
 use syntax::{
     SyntaxAncestors, SyntaxNode, SyntaxNodeExt,
@@ -13,12 +14,14 @@ use utils::text_edit::TextSize;
 use vfs::FileId;
 
 use crate::{
+    completion::{DotField, ScopedCompletionEntry},
     container::InContainer,
     db::HirDb,
     file::HirFileId,
     hir_def::{Ident, expr::ExprId},
 };
 
+mod completion;
 mod hir_to_def;
 pub mod pathres;
 pub mod resolver;
@@ -62,6 +65,33 @@ impl<DB: HirDb> Semantics<'_, DB> {
             Either::Right(node) => SyntaxAncestors::start_from(node).find_map(N::cast),
         }
     }
+
+    pub fn scope_completions(
+        &self,
+        file_id: FileId,
+        offset: TextSize,
+    ) -> Vec<ScopedCompletionEntry> {
+        self.impl_.scope_completions(file_id, offset)
+    }
+
+    pub fn scope_resolution_completions(
+        &self,
+        file_id: FileId,
+        chain: &[SmolStr],
+        prefix: &str,
+    ) -> Vec<ScopedCompletionEntry> {
+        self.impl_.scope_resolution_completions(file_id, chain, prefix)
+    }
+
+    pub fn dot_completions(
+        &self,
+        file_id: FileId,
+        offset: TextSize,
+        chain: &[SmolStr],
+        prefix: &str,
+    ) -> Vec<DotField> {
+        self.impl_.dot_completions(file_id, offset, chain, prefix)
+    }
 }
 
 pub struct SemanticsImpl<'db> {
@@ -84,7 +114,7 @@ impl<'db> SemanticsImpl<'db> {
         }
     }
 
-    pub fn parse(&self, file_id: FileId) -> ast::CompilationUnit {
+    pub fn parse(&'_ self, file_id: FileId) -> ast::CompilationUnit<'_> {
         let tree = self.db.parse_src(file_id);
 
         // Unsafe: we garentee that the root node is valid for the lifetime of the db
@@ -128,7 +158,7 @@ impl<'db> SemanticsImpl<'db> {
     }
 }
 
-impl SemanticsImpl<'_> {
+impl<'db> SemanticsImpl<'db> {
     pub fn expr_to_def(&self, in_cont: InContainer<ExprId>) -> Option<PathResolution> {
         self.with_ctx(|ctx| ctx.expr_to_def(in_cont))
     }
