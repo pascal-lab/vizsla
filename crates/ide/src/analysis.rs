@@ -15,6 +15,7 @@ use crate::{
     Cancellable,
     code_action::{self, CodeAction, CodeActionResolveStrategy},
     code_lens::{self, CodeLens, CodeLensConfig, CodeLensKind},
+    completion::{self, CompletionConfig, CompletionResult},
     document_highlight::{self, DocumentHighlight, DocumentHighlightConfig},
     document_symbols::{self, DocumentSymbol},
     folding_ranges::{self, Fold, FoldingConfig},
@@ -174,6 +175,15 @@ impl Analysis {
         config: SignatureHelpConfig,
     ) -> Cancellable<Option<SignatureHelp>> {
         self.with_db(|db| signature_help::signature_help(db, position, config))
+    }
+
+    pub fn completion(
+        &self,
+        position: FilePosition,
+        config: CompletionConfig,
+        trigger_character: Option<char>,
+    ) -> Cancellable<CompletionResult> {
+        self.with_db(|db| completion::completions(db, position, config, trigger_character))
     }
 
     pub fn code_action(

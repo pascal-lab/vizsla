@@ -10,6 +10,7 @@ anyhow.workspace = true
 base-db.workspace = true
 bitflags.workspace = true
 dissimilar = "1.0.9"
+either.workspace = true
 hir.workspace = true
 ide-db.workspace = true
 itertools.workspace = true
@@ -27,3 +28,7 @@ triomphe.workspace = true
 utils.workspace = true
 which = "7.0.0"
 vfs.workspace = true
+
+[dev-dependencies]
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }

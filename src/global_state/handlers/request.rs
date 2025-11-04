@@ -385,6 +385,20 @@ pub(crate) fn handle_signature_help(
     Ok(Some(res))
 }
 
+pub(crate) fn handle_completion(
+    snap: GlobalStateSnapshot,
+    params: lsp_types::CompletionParams,
+) -> anyhow::Result<Option<lsp_types::CompletionResponse>> {
+    let position = from_proto::file_position(&snap, params.text_document_position)?;
+    let trigger_character =
+        params.context.and_then(|ctx| ctx.trigger_character).and_then(|s| s.chars().next());
+    let config = snap.config.completion();
+    let result = snap.analysis.completion(position, config, trigger_character)?;
+    let line_info = snap.line_info(position.file_id)?;
+    let response = to_proto::completion(&line_info, result);
+    Ok(Some(response))
+}
+
 pub(crate) fn handle_code_action(
     snap: GlobalStateSnapshot,
     params: lsp_types::CodeActionParams,

@@ -1,5 +1,6 @@
 use ide::{
     code_lens::CodeLensConfig,
+    completion::CompletionConfig,
     document_highlight::DocumentHighlightConfig,
     formatting::FmtConfig,
     hover::HoverConfig,
@@ -164,6 +165,10 @@ impl Config {
 
     pub(crate) fn signature_help(&self) -> SignatureHelpConfig {
         SignatureHelpConfig { params_only: self.user_config.signature_help_params_only }
+    }
+
+    pub(crate) fn completion(&self) -> CompletionConfig {
+        CompletionConfig { enable_snippets: true }
     }
 }
 
