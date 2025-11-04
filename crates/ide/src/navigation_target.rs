@@ -240,6 +240,20 @@ impl ToNav for InContainer<ClassId> {
                     cont_name,
                 )
             }
+            ContainerId::FileSubroutineId(InFile { file_id, value: sub_id }) => {
+                let file = file_id.to_container(db);
+                let subroutine = file.subroutines.get(sub_id);
+                let cont_name = subroutine.name.clone();
+                let src = file_id.to_container_src_map(db).get(sub_id);
+                build(
+                    file_id.file_id(),
+                    None,
+                    src.range(),
+                    Some(DEFAULT_NAME.clone()),
+                    SymbolKind::Class,
+                    cont_name,
+                )
+            }
         }
     }
 }
@@ -353,6 +367,24 @@ impl ToNav for InContainer<SubroutineId> {
                     Some(name),
                     SymbolKind::Fn,
                     cont_name,
+                )
+            }
+            ContainerId::FileSubroutineId(InFile { file_id, value: file_sub_id }) => {
+                let file = file_id.to_container(db);
+                let src = file_id.to_container_src_map(db).get(file_sub_id);
+                let name = file
+                    .subroutines
+                    .get(file_sub_id)
+                    .name
+                    .clone()
+                    .unwrap_or_else(|| DEFAULT_NAME.clone());
+                build(
+                    file_id.file_id(),
+                    None,
+                    src.range(),
+                    Some(name),
+                    SymbolKind::Fn,
+                    None,
                 )
             }
         }

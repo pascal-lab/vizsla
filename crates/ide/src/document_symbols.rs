@@ -284,6 +284,12 @@ pub(crate) fn document_symbols(db: &RootDb, file_id: FileId) -> Vec<DocumentSymb
                 collector.push_symbol_with_kind(&label, src, SymbolKind::Import);
                 collector.pop();
             }
+            FileItem::SubroutineId(sub_id) => {
+                let sub = file.subroutines.get(sub_id);
+                let src = SubroutineSymbolSrc(src_map.get(sub_id));
+                collector.push_symbol_with_kind(&sub.name, src, SymbolKind::Fn);
+                collector.pop();
+            }
         }
     }
 
