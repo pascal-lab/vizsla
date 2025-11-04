@@ -80,7 +80,8 @@ fn complete_port_names(
         UnitEntry::FiledDeclId(_)
         | UnitEntry::TypedefId(_)
         | UnitEntry::ClassId(_)
-        | UnitEntry::PackageId(_) => {
+        | UnitEntry::PackageId(_)
+        | UnitEntry::SubroutineId(_) => {
             return items;
         }
     };
