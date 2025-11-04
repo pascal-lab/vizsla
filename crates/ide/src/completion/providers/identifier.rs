@@ -27,8 +27,9 @@ pub(crate) fn complete_identifier(
     }
 
     let sema = Semantics::new(db);
-    let scope_items = sema
-        .scope_completions(ctx.position.file_id, ctx.position.offset)
+    let scope_completions = sema.scope_completions(ctx.position.file_id, ctx.position.offset);
+
+    let scope_items = scope_completions
         .into_iter()
         .map(|scoped| render_scope_entry(scoped.entry, Some(scoped.scope), prefix, Some(ctx)))
         .collect::<Vec<_>>();
