@@ -631,6 +631,48 @@ impl<'db> SemanticsImpl<'db> {
         items
     }
 
+    fn find_class_in_scope(
+        &self,
+        class_name: &str,
+        container_id: ContainerId,
+    ) -> Option<InContainer<ClassId>> {
+        match container_id {
+            ContainerId::HirFileId(file_id) => {
+                let file = self.db.hir_file(file_id);
+                file.classes.iter().find_map(|(idx, class_def)| {
+                    class_def
+                        .name
+                        .as_ref()
+                        .filter(|name| name.as_str() == class_name)
+                        .map(|_| InContainer::new(container_id, idx))
+                })
+            }
+            ContainerId::ModuleId(module_id) => {
+                let module = self.db.module(module_id);
+                module.classes.iter().find_map(|(idx, class_def)| {
+                    class_def
+                        .name
+                        .as_ref()
+                        .filter(|name| name.as_str() == class_name)
+                        .map(|_| InContainer::new(container_id, idx))
+                })
+            }
+            ContainerId::PackageId(package_id) => {
+                let package = self.db.package(package_id);
+                package.classes.iter().find_map(|(idx, class_def)| {
+                    class_def
+                        .name
+                        .as_ref()
+                        .filter(|name| name.as_str() == class_name)
+                        .map(|_| InContainer::new(container_id, idx))
+                })
+            }
+            ContainerId::BlockId(_)
+            | ContainerId::SubroutineId(_)
+            | ContainerId::FileSubroutineId(_) => None,
+        }
+    }
+
     fn class_scope_completions(
         &self,
         class_ref: InContainer<ClassId>,
