@@ -138,6 +138,9 @@ fn symbol_kind(symbol_kind: SymbolKind) -> lsp_types::SymbolKind {
         SymbolKind::Generate => LspSymbolKind::NAMESPACE,
         SymbolKind::Interface => LspSymbolKind::INTERFACE,
         SymbolKind::Region => LspSymbolKind::NAMESPACE,
+        SymbolKind::Typedef => LspSymbolKind::TYPE_PARAMETER,
+        SymbolKind::Class => LspSymbolKind::CLASS,
+        SymbolKind::Import => LspSymbolKind::MODULE,
     }
 }
 

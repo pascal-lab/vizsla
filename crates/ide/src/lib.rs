@@ -9,12 +9,14 @@ use hir::hir_def::{
     expr::declarator::DeclId,
     module::{ModuleId, instantiation::InstanceId, port::NonAnsiPortId},
     stmt::StmtId,
+    typedef::TypedefId,
 };
 use syntax::{SyntaxKind, ast, match_ast_kind};
 pub type Cancellable<T> = Result<T, Cancelled>;
 
 pub mod analysis;
 pub mod analysis_host;
+// pub mod completion; // TODO: Add completion module
 pub mod definitions;
 pub mod markup;
 pub mod navigation_target;
@@ -51,24 +53,32 @@ pub enum SymbolKind {
     Generate,
     Interface,
     Region,
+    Typedef,
+    Class,
+    Import,
 }
 
 impl SymbolKind {
     pub fn from_syntax_kind(kind: SyntaxKind) -> Self {
         match_ast_kind! { kind,
             ast::ModuleDeclaration where kind == SyntaxKind::MODULE_DECLARATION => SymbolKind::Module,
+            ast::ModuleDeclaration where kind == SyntaxKind::PACKAGE_DECLARATION => SymbolKind::Import,
             ast::NonAnsiPort => SymbolKind::NonAnsiPortLabel,
             ast::PortDeclaration => SymbolKind::PortDecl,
             ast::ParameterDeclaration => SymbolKind::ParamDecl,
             ast::NetDeclaration => SymbolKind::NetDecl,
             ast::DataDeclaration => SymbolKind::DataDecl,
             ast::Declarator => SymbolKind::DataDecl,
+            ast::TypedefDeclaration => SymbolKind::Typedef,
             ast::HierarchicalInstance => SymbolKind::Instance,
 
             ast::BlockStatement => SymbolKind::Block,
             ast::Statement => SymbolKind::Stmt, // the order of these two is important
 
             ast::FunctionDeclaration => SymbolKind::Fn,
+            ast::ClassDeclaration => SymbolKind::Class,
+
+            ast::PackageImportDeclaration => SymbolKind::Import,
             _ => unreachable!(),
         }
     }
@@ -108,6 +118,12 @@ impl From<InstanceId> for SymbolKind {
 impl From<StmtId> for SymbolKind {
     fn from(_: StmtId) -> Self {
         SymbolKind::Stmt
+    }
+}
+
+impl From<TypedefId> for SymbolKind {
+    fn from(_: TypedefId) -> Self {
+        SymbolKind::Typedef
     }
 }
 

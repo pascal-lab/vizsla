@@ -1,6 +1,7 @@
 use std::iter::Peekable;
 
 use hir::{
+    container::InFile,
     db::HirDb,
     file::HirFileId,
     hir_def::{
@@ -10,7 +11,10 @@ use hir::{
         expr::declarator::{DeclId, Declarator, DeclaratorSrc, DeclsRange},
         file::FileItem,
         module::{ModuleId, ModuleItem, ModuleSrc, port::Ports},
+        package::{PackageId, PackageImportMember, PackageItem, PackageSrc},
         stmt::{CaseItem, ForInit, Stmt, StmtId, StmtKind, StmtSrc},
+        subroutine::SubroutineSrc,
+        typedef::{Typedef, TypedefId, TypedefSrc},
     },
     region_tree::{RegionNode, RegionTreeIterator},
     source_map::{IsNamedSrc, IsSrc},
@@ -27,6 +31,33 @@ use vfs::FileId;
 
 use crate::SymbolKind;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct SubroutineSymbolSrc(SubroutineSrc);
+
+impl IsSrc for SubroutineSymbolSrc {
+    #[inline]
+    fn kind(&self) -> syntax::SyntaxKind {
+        self.0.kind()
+    }
+
+    #[inline]
+    fn range(&self) -> TextRange {
+        self.0.range()
+    }
+}
+
+impl IsNamedSrc for SubroutineSymbolSrc {
+    #[inline]
+    fn name_kind(&self) -> Option<syntax::TokenKind> {
+        None
+    }
+
+    #[inline]
+    fn name_range(&self) -> Option<TextRange> {
+        None
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct DocumentSymbol {
     pub name: String,
@@ -36,6 +67,42 @@ pub struct DocumentSymbol {
     pub detail: Option<String>,
     pub container_name: Option<String>,
     pub children: Vec<DocumentSymbol>,
+}
+
+fn render_package_import(import: &hir::hir_def::package::PackageImport) -> SmolStr {
+    let mut parts = Vec::new();
+    for item in import.items.iter() {
+        match &item.member {
+            PackageImportMember::Named(name) => {
+                parts.push(format!("{}::{}", item.package, name));
+            }
+            PackageImportMember::All => {
+                parts.push(format!("{}::*", item.package));
+            }
+        }
+    }
+
+    SmolStr::from(format!("import {}", parts.join(", ")))
+}
+
+fn render_package_export(export: &hir::hir_def::package::PackageExport) -> SmolStr {
+    match export {
+        hir::hir_def::package::PackageExport::All => SmolStr::from("export *"),
+        hir::hir_def::package::PackageExport::Items(items) => {
+            let mut parts = Vec::new();
+            for item in items {
+                match &item.member {
+                    PackageImportMember::Named(name) => {
+                        parts.push(format!("export {}::{}", item.package, name));
+                    }
+                    PackageImportMember::All => {
+                        parts.push(format!("export {}::*", item.package));
+                    }
+                }
+            }
+            SmolStr::from(parts.join(", "))
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -171,7 +238,11 @@ pub(crate) fn document_symbols(db: &RootDb, file_id: FileId) -> Vec<DocumentSymb
     let mut regions = src_map.region_tree.walk().peekable();
 
     let mut collector = SymbolCollecter::new(
-        src_map.items.len() + src_map.region_tree.roots.len() + file.decls.len(),
+        src_map.items.len()
+            + src_map.region_tree.roots.len()
+            + file.decls.len()
+            + file.typedefs.len()
+            + file.packages.len(),
     );
 
     for &item in src_map.items.iter() {
@@ -188,12 +259,30 @@ pub(crate) fn document_symbols(db: &RootDb, file_id: FileId) -> Vec<DocumentSymb
                 let stmt_id = proc.stmt;
                 build_stmt(db, &mut collector, stmt_id, file, src_map);
             }
+            FileItem::LocalPackageId(package_idx) => {
+                let package_id: PackageId = InFile::new(file_id, package_idx);
+                let package_src = src_map.get(package_idx);
+                collect_package_items(db, package_id, package_src, &mut collector);
+            }
             FileItem::DeclarationId(declaration_id) => {
                 build_declaration(&mut collector, declaration_id, file, src_map);
             }
-            FileItem::LocalPackageId(_) | FileItem::TypedefId(_) | FileItem::StructId(_) |
-            FileItem::ClassId(_) | FileItem::PackageImportId(_) | FileItem::SubroutineId(_) => {
-                // TODO: implement document symbols for these items
+            FileItem::TypedefId(typedef_id) => {
+                build_typedef(&mut collector, typedef_id, file, src_map);
+            }
+            FileItem::StructId(_) => {}
+            FileItem::ClassId(class_id) => {
+                let class = file.classes.get(class_id);
+                let src = src_map.get(class_id);
+                collector.push_symbol_with_kind(&class.name, src, SymbolKind::Class);
+                collector.pop();
+            }
+            FileItem::PackageImportId(import_id) => {
+                let import = file.package_imports.get(import_id);
+                let src = src_map.get(import_id);
+                let label = Some(render_package_import(import));
+                collector.push_symbol_with_kind(&label, src, SymbolKind::Import);
+                collector.pop();
             }
         }
     }
@@ -215,7 +304,13 @@ fn collect_module_items(
     collector.push_symbol_with_children(
         &module.name,
         module_src,
-        src_map.items.len() + module.decls.len() + module.stmts.len(),
+        src_map.items.len()
+            + module.decls.len()
+            + module.stmts.len()
+            + module.typedefs.len()
+            + module.classes.len()
+            + module.package_imports.len()
+            + module.subroutines.len(),
     );
 
     if let Some(params) = &module.param_ports {
@@ -268,12 +363,109 @@ fn collect_module_items(
                 build_decls(collector, &port_decl.decls, SymbolKind::PortDecl, module, src_map)
             }
             ModuleItem::ContAssignId(_) => {}
-            ModuleItem::StructId(_) | ModuleItem::ClassId(_) | ModuleItem::PackageImportId(_) |
-            ModuleItem::TypedefId(_) | ModuleItem::SubroutineId(_) => {
-                // TODO: implement document symbols for these items
+            ModuleItem::TypedefId(typedef_id) => {
+                build_typedef(collector, typedef_id, module, src_map);
+            }
+            ModuleItem::StructId(_) => {}
+            ModuleItem::ClassId(class_id) => {
+                let class = module.classes.get(class_id);
+                let src = src_map.get(class_id);
+                collector.push_symbol_with_kind(&class.name, src, SymbolKind::Class);
+                collector.pop();
+            }
+            ModuleItem::PackageImportId(import_id) => {
+                let import = module.package_imports.get(import_id);
+                let src = src_map.get(import_id);
+                let label = Some(render_package_import(import));
+                collector.push_symbol_with_kind(&label, src, SymbolKind::Import);
+                collector.pop();
+            }
+            ModuleItem::SubroutineId(sub_id) => {
+                let sub = module.subroutines.get(sub_id);
+                let src = SubroutineSymbolSrc(src_map.get(sub_id));
+                collector.push_symbol_with_kind(&sub.name, src, SymbolKind::Fn);
+                collector.pop();
             }
         }
     }
+    collector.pop();
+    regions.finish_all(collector);
+}
+
+fn collect_package_items(
+    db: &RootDb,
+    package_id: PackageId,
+    package_src: PackageSrc,
+    collector: &mut SymbolCollecter,
+) {
+    let (package, src_map) = db.package_with_source_map(package_id);
+    let (package, src_map) = (package.as_ref(), src_map.as_ref());
+    let mut regions = src_map.region_tree.walk().peekable();
+
+    collector.push_symbol_with_children(
+        &package.name,
+        package_src,
+        src_map.items.len()
+            + package.decls.len()
+            + package.typedefs.len()
+            + package.classes.len()
+            + package.procs.len()
+            + package.subroutines.len()
+            + package.exports.len(),
+    );
+
+    for item in src_map.items.iter() {
+        match *item {
+            PackageItem::DeclarationId(declaration_id) => {
+                let src = src_map.get(declaration_id);
+                regions.add_region_symbol(src.range(), collector);
+                build_declaration(collector, declaration_id, package, src_map);
+            }
+            PackageItem::TypedefId(typedef_id) => {
+                let src = src_map.get(typedef_id);
+                regions.add_region_symbol(src.range(), collector);
+                build_typedef(collector, typedef_id, package, src_map);
+            }
+            PackageItem::StructId(struct_id) => {
+                let src = src_map.get(struct_id);
+                regions.add_region_symbol(src.range(), collector);
+            }
+            PackageItem::ClassId(class_id) => {
+                let src = src_map.get(class_id);
+                regions.add_region_symbol(src.range(), collector);
+
+                let class = package.classes.get(class_id);
+                collector.push_symbol_with_kind(&class.name, src, SymbolKind::Class);
+                collector.pop();
+            }
+            PackageItem::ProcId(proc_id) => {
+                let src = src_map.get(proc_id);
+                regions.add_region_symbol(src.range(), collector);
+
+                let proc = package.procs.get(proc_id);
+                let stmt_id = proc.stmt;
+                build_stmt(db, collector, stmt_id, package, src_map);
+            }
+            PackageItem::PackageExportId(export_id) => {
+                let src = src_map.get(export_id);
+                regions.add_region_symbol(src.range(), collector);
+
+                let export = package.exports.get(export_id);
+                let label = Some(render_package_export(export));
+                collector.push_symbol_with_kind(&label, src, SymbolKind::Import);
+                collector.pop();
+            }
+            PackageItem::SubroutineId(sub_id) => {
+                let src = SubroutineSymbolSrc(src_map.get(sub_id));
+                regions.add_region_symbol(src.range(), collector);
+
+                let sub = package.subroutines.get(sub_id);
+                collector.push_symbol_with_kind(&sub.name, src, SymbolKind::Fn);
+                collector.pop();
+            }
+        };
+    }
+
     collector.pop();
     regions.finish_all(collector);
 }
@@ -291,7 +483,7 @@ fn collect_block_items(
     collector.push_symbol_with_children(
         &block.name,
         block_src,
-        block.decls.len() + src_map.items.len(),
+        block.decls.len() + block.typedefs.len() + block.structs.len() + src_map.items.len(),
     );
 
     for item in src_map.items.iter() {
@@ -301,9 +493,10 @@ fn collect_block_items(
                 build_declaration(collector, declaration_id, block, src_map)
             }
             BlockItem::StmtId(stmt_id) => build_stmt(db, collector, stmt_id, block, src_map),
-            BlockItem::TypedefId(_) | BlockItem::StructId(_) => {
-                // TODO: implement document symbols for these items
+            BlockItem::TypedefId(typedef_id) => {
+                build_typedef(collector, typedef_id, block, src_map);
             }
+            BlockItem::StructId(_) => {}
         }
     }
     collector.pop();
@@ -427,5 +620,21 @@ fn build_decl<Arn, SrcMap>(
     let hir = arena.get(decl);
     let src = src_map.get(decl);
     collector.push_symbol_with_kind(&hir.name, src, kind);
+    collector.pop();
+}
+
+#[inline]
+fn build_typedef<Arn, SrcMap>(
+    collector: &mut SymbolCollecter,
+    typedef_id: TypedefId,
+    arena: &Arn,
+    src_map: &SrcMap,
+) where
+    Arn: GetRef<TypedefId, Output = Typedef>,
+    SrcMap: Get<TypedefId, Output = TypedefSrc>,
+{
+    let typedef = arena.get(typedef_id);
+    let src = src_map.get(typedef_id);
+    collector.push_symbol_with_kind(&typedef.name, src, SymbolKind::Typedef);
     collector.pop();
 }

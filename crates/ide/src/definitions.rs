@@ -2,12 +2,19 @@ use base_db::intern::Lookup;
 use hir::{
     container::{ContainerId, InContainer, InFile, InModule},
     db::HirDb,
+    file::HirFileId,
     hir_def::{
+        DEFAULT_NAME,
+        aggregate::ClassId,
         block::{BlockId, BlockLoc},
         expr::declarator::DeclId,
         module::{ModuleId, instantiation::InstanceId, port::NonAnsiPortId},
+        package::{PackageId, PackageImportMember},
         stmt::StmtId,
+        subroutine::SubroutineId,
+        typedef::TypedefId,
     },
+    scope::PackageImportEntry,
     semantics::{Semantics, pathres::PathResolution},
     source_map::{IsNamedSrc, IsSrc},
 };
@@ -18,7 +25,7 @@ use syntax::{SyntaxTokenWithParent, ast, match_ast, token::TokenKindExt};
 use utils::{
     get::{Get, GetRef},
     impl_from,
-    line_index::TextRange,
+    line_index::{TextRange, TextSize},
 };
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -30,6 +37,11 @@ pub enum DefinitionOrigin {
     Decl(InContainer<DeclId>),
     Instance(InModule<InstanceId>),
     Stmt(InContainer<StmtId>),
+    Typedef(InContainer<TypedefId>),
+    Class(InContainer<ClassId>),
+    Package(PackageId),
+    PackageImport(InModule<PackageImportEntry>),
+    Subroutine(InContainer<SubroutineId>),
 }
 
 impl_from! { DefinitionOrigin =>
@@ -39,6 +51,11 @@ impl_from! { DefinitionOrigin =>
     Decl(InContainer<DeclId>),
     Instance(InModule<InstanceId>),
     Stmt(InContainer<StmtId>),
+    Typedef(InContainer<TypedefId>),
+    Class(InContainer<ClassId>),
+    Package(PackageId),
+    PackageImport(InModule<PackageImportEntry>),
+    Subroutine(InContainer<SubroutineId>),
 }
 
 impl DefinitionOrigin {
@@ -51,6 +68,11 @@ impl DefinitionOrigin {
             DefinitionOrigin::Decl(InContainer { cont_id, .. }) => cont_id,
             DefinitionOrigin::Instance(InModule { module_id, .. }) => module_id.into(),
             DefinitionOrigin::Stmt(InContainer { cont_id, .. }) => cont_id,
+            DefinitionOrigin::Typedef(InContainer { cont_id, .. }) => cont_id,
+            DefinitionOrigin::Class(InContainer { cont_id, .. }) => cont_id,
+            DefinitionOrigin::Package(InFile { file_id, .. }) => file_id.into(),
+            DefinitionOrigin::PackageImport(InModule { module_id, .. }) => module_id.into(),
+            DefinitionOrigin::Subroutine(InContainer { cont_id, .. }) => cont_id,
         }
     }
 
@@ -73,8 +95,76 @@ impl DefinitionOrigin {
             DefinitionOrigin::Instance(InModule { value, module_id }) => {
                 module_id.to_container(db).get(value).name.clone().unwrap()
             }
-            DefinitionOrigin::Stmt(InContainer { value, cont_id }) => {
-                cont_id.to_container(db).get(value).label.clone().unwrap()
+            DefinitionOrigin::Stmt(InContainer { value, cont_id }) => cont_id
+                .to_container(db)
+                .get(value)
+                .label
+                .clone()
+                .unwrap_or_else(|| DEFAULT_NAME.clone()),
+            DefinitionOrigin::Typedef(InContainer { value, cont_id }) => cont_id
+                .to_container(db)
+                .get(value)
+                .name
+                .clone()
+                .unwrap_or_else(|| DEFAULT_NAME.clone()),
+            DefinitionOrigin::Class(InContainer { value, cont_id }) => match cont_id {
+                ContainerId::HirFileId(file_id) => {
+                    let file = file_id.to_container(db);
+                    file.classes.get(value).name.clone().unwrap_or_else(|| DEFAULT_NAME.clone())
+                }
+                ContainerId::ModuleId(module_id) => {
+                    let module = module_id.to_container(db);
+                    module.classes.get(value).name.clone().unwrap_or_else(|| DEFAULT_NAME.clone())
+                }
+                ContainerId::PackageId(package_id) => {
+                    let pkg = package_id.to_container(db);
+                    pkg.classes.get(value).name.clone().unwrap_or_else(|| DEFAULT_NAME.clone())
+                }
+                ContainerId::BlockId(_) => DEFAULT_NAME.clone(),
+                ContainerId::SubroutineId(_) => DEFAULT_NAME.clone(),
+            },
+            DefinitionOrigin::Subroutine(InContainer { value, cont_id }) => match cont_id {
+                ContainerId::ModuleId(module_id) => {
+                    let module = module_id.to_container(db);
+                    module
+                        .subroutines
+                        .get(value)
+                        .name
+                        .clone()
+                        .unwrap_or_else(|| DEFAULT_NAME.clone())
+                }
+                ContainerId::PackageId(package_id) => {
+                    let package = package_id.to_container(db);
+                    package
+                        .subroutines
+                        .get(value)
+                        .name
+                        .clone()
+                        .unwrap_or_else(|| DEFAULT_NAME.clone())
+                }
+                ContainerId::HirFileId(_) | ContainerId::BlockId(_) => DEFAULT_NAME.clone(),
+                ContainerId::SubroutineId(loc) => {
+                    let subroutine = db.subroutine(loc);
+                    subroutine.name.clone().unwrap_or_else(|| DEFAULT_NAME.clone())
+                }
+            },
+            DefinitionOrigin::Package(InFile { value, file_id }) => file_id
+                .to_container(db)
+                .packages
+                .get(value)
+                .name
+                .clone()
+                .unwrap_or_else(|| DEFAULT_NAME.clone()),
+            DefinitionOrigin::PackageImport(InModule { value, module_id }) => {
+                let module = module_id.to_container(db);
+                let import = module.package_imports.get(value.import);
+                let Some(item) = import.items.get(value.item_idx as usize) else {
+                    return DEFAULT_NAME.clone();
+                };
+                match &item.member {
+                    PackageImportMember::Named(name) => name.clone(),
+                    PackageImportMember::All => SmolStr::from(format!("{}::*", item.package)),
+                }
             }
         }
     }
@@ -103,8 +193,70 @@ impl DefinitionOrigin {
                 InFile::new(module_id.file_id, range)
             }
             DefinitionOrigin::Stmt(InContainer { value, cont_id }) => {
-                let range = cont_id.to_container_src_map(db).get(value).name_range().unwrap();
+                let src = cont_id.to_container_src_map(db).get(value);
+                let range = src.name_range().unwrap_or_else(|| src.range());
                 InFile::new(cont_id.file_id(db).into(), range)
+            }
+            DefinitionOrigin::Typedef(InContainer { value, cont_id }) => {
+                let src = cont_id.to_container_src_map(db).get(value);
+                let range = src.name_range().unwrap_or_else(|| src.range());
+                InFile::new(cont_id.file_id(db).into(), range)
+            }
+            DefinitionOrigin::Class(InContainer { value, cont_id }) => match cont_id {
+                ContainerId::HirFileId(file_id) => {
+                    let src = file_id.to_container_src_map(db).get(value);
+                    let range = src.name_range().unwrap_or_else(|| src.range());
+                    InFile::new(file_id, range)
+                }
+                ContainerId::ModuleId(module_id) => {
+                    let src = module_id.to_container_src_map(db).get(value);
+                    let range = src.name_range().unwrap_or_else(|| src.range());
+                    InFile::new(module_id.file_id, range)
+                }
+                ContainerId::PackageId(package_id) => {
+                    let src = package_id.to_container_src_map(db).get(value);
+                    let range = src.name_range().unwrap_or_else(|| src.range());
+                    InFile::new(package_id.file_id, range)
+                }
+                ContainerId::BlockId(block_id) => InFile::new(
+                    HirFileId(block_id.file_id(db)),
+                    TextRange::empty(TextSize::from(0)),
+                ),
+                ContainerId::SubroutineId(loc) => InFile::new(
+                    HirFileId(loc.module_id.file_id()),
+                    TextRange::empty(TextSize::from(0)),
+                ),
+            },
+            DefinitionOrigin::PackageImport(InModule { value, module_id }) => {
+                let src = module_id.to_container_src_map(db).get(value.import);
+                InFile::new(module_id.file_id, src.range())
+            }
+            DefinitionOrigin::Subroutine(InContainer { value, cont_id }) => match cont_id {
+                ContainerId::ModuleId(module_id) => {
+                    let src = module_id.to_container_src_map(db).get(value);
+                    InFile::new(module_id.file_id, src.range())
+                }
+                ContainerId::PackageId(package_id) => {
+                    let src = package_id.to_container_src_map(db).get(value);
+                    InFile::new(package_id.file_id, src.range())
+                }
+                ContainerId::BlockId(block_id) => {
+                    let file_id = HirFileId(block_id.file_id(db));
+                    InFile::new(file_id, TextRange::empty(TextSize::from(0)))
+                }
+                ContainerId::HirFileId(file_id) => {
+                    InFile::new(file_id, TextRange::empty(TextSize::from(0)))
+                }
+                ContainerId::SubroutineId(loc) => {
+                    let module_id = loc.module_id;
+                    let src = module_id.to_container_src_map(db).get(loc.value);
+                    InFile::new(module_id.file_id, src.range())
+                }
+            },
+            DefinitionOrigin::Package(InFile { value, file_id }) => {
+                let src = file_id.to_container_src_map(db).get(value);
+                let range = src.name_range().unwrap_or_else(|| src.range());
+                InFile::new(file_id, range)
             }
         }
     }
@@ -136,6 +288,63 @@ impl DefinitionOrigin {
                 let range = cont_id.to_container_src_map(db).get(value).range();
                 InFile::new(cont_id.file_id(db).into(), range)
             }
+            DefinitionOrigin::Typedef(InContainer { value, cont_id }) => {
+                let range = cont_id.to_container_src_map(db).get(value).range();
+                InFile::new(cont_id.file_id(db).into(), range)
+            }
+            DefinitionOrigin::Class(InContainer { value, cont_id }) => match cont_id {
+                ContainerId::HirFileId(file_id) => {
+                    let range = file_id.to_container_src_map(db).get(value).range();
+                    InFile::new(file_id, range)
+                }
+                ContainerId::ModuleId(module_id) => {
+                    let range = module_id.to_container_src_map(db).get(value).range();
+                    InFile::new(module_id.file_id, range)
+                }
+                ContainerId::PackageId(package_id) => {
+                    let range = package_id.to_container_src_map(db).get(value).range();
+                    InFile::new(package_id.file_id, range)
+                }
+                ContainerId::BlockId(block_id) => {
+                    let BlockLoc { src: InFile { value: block_src, file_id }, .. } =
+                        block_id.lookup(db);
+                    InFile::new(file_id, block_src.range())
+                }
+                ContainerId::SubroutineId(loc) => InFile::new(
+                    HirFileId(loc.module_id.file_id()),
+                    TextRange::empty(TextSize::from(0)),
+                ),
+            },
+            DefinitionOrigin::Package(InFile { value, file_id }) => {
+                let range = file_id.to_container_src_map(db).get(value).range();
+                InFile::new(file_id, range)
+            }
+            DefinitionOrigin::PackageImport(InModule { value, module_id }) => {
+                let range = module_id.to_container_src_map(db).get(value.import).range();
+                InFile::new(module_id.file_id, range)
+            }
+            DefinitionOrigin::Subroutine(InContainer { value, cont_id }) => match cont_id {
+                ContainerId::ModuleId(module_id) => {
+                    let range = module_id.to_container_src_map(db).get(value).range();
+                    InFile::new(module_id.file_id, range)
+                }
+                ContainerId::PackageId(package_id) => {
+                    let range = package_id.to_container_src_map(db).get(value).range();
+                    InFile::new(package_id.file_id, range)
+                }
+                ContainerId::BlockId(block_id) => {
+                    let file_id = HirFileId(block_id.file_id(db));
+                    InFile::new(file_id, TextRange::empty(TextSize::from(0)))
+                }
+                ContainerId::HirFileId(file_id) => {
+                    InFile::new(file_id, TextRange::empty(TextSize::from(0)))
+                }
+                ContainerId::SubroutineId(loc) => {
+                    let module_id = loc.module_id;
+                    let range = module_id.to_container_src_map(db).get(loc.value).range();
+                    InFile::new(module_id.file_id, range)
+                }
+            },
         }
     }
 }
@@ -244,8 +453,11 @@ impl Definition {
                     )
                 }
             }
-            // Future PathResolution variants not yet handled in this branch.
-            _ => unreachable!("Definition navigation not yet supported for this item type"),
+            PathResolution::Typedef(typedef) => typedef.into(),
+            PathResolution::Class(class_id) => class_id.into(),
+            PathResolution::PackageImport(import) => import.into(),
+            PathResolution::Package(package) => package.into(),
+            PathResolution::Subroutine(sub) => sub.into(),
         }
     }
 }

@@ -642,36 +642,34 @@ impl<'db> SemanticsImpl<'db> {
             ContainerId::HirFileId(file_id) => {
                 let file = self.db.hir_file(file_id);
                 file.classes.iter().find_map(|(idx, class_def)| {
-                    class_def
-                        .name
-                        .as_ref()
-                        .filter(|name| name.as_str() == class_name)
-                        .map(|_| InContainer::new(container_id, idx))
+                    if class_def.name.as_ref()?.as_str() == class_name {
+                        Some(InContainer::new(container_id, idx))
+                    } else {
+                        None
+                    }
                 })
             }
             ContainerId::ModuleId(module_id) => {
                 let module = self.db.module(module_id);
                 module.classes.iter().find_map(|(idx, class_def)| {
-                    class_def
-                        .name
-                        .as_ref()
-                        .filter(|name| name.as_str() == class_name)
-                        .map(|_| InContainer::new(container_id, idx))
+                    if class_def.name.as_ref()?.as_str() == class_name {
+                        Some(InContainer::new(container_id, idx))
+                    } else {
+                        None
+                    }
                 })
             }
             ContainerId::PackageId(package_id) => {
                 let package = self.db.package(package_id);
                 package.classes.iter().find_map(|(idx, class_def)| {
-                    class_def
-                        .name
-                        .as_ref()
-                        .filter(|name| name.as_str() == class_name)
-                        .map(|_| InContainer::new(container_id, idx))
+                    if class_def.name.as_ref()?.as_str() == class_name {
+                        Some(InContainer::new(container_id, idx))
+                    } else {
+                        None
+                    }
                 })
             }
-            ContainerId::BlockId(_)
-            | ContainerId::SubroutineId(_)
-            | ContainerId::FileSubroutineId(_) => None,
+            _ => None,
         }
     }
 
@@ -693,7 +691,9 @@ impl<'db> SemanticsImpl<'db> {
                 let package = self.db.package(package_id);
                 self.collect_class_scope_entries(package.classes.get(class_ref.value), prefix)
             }
-            ContainerId::BlockId(_) | ContainerId::SubroutineId(_) | ContainerId::FileSubroutineId(_) => Vec::new(),
+            ContainerId::BlockId(_)
+            | ContainerId::SubroutineId(_)
+            | ContainerId::FileSubroutineId(_) => Vec::new(),
         }
     }
 

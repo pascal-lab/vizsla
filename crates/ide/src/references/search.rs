@@ -83,13 +83,18 @@ impl SearchScope {
                 let range = file_id.to_container_src_map(db).get(local_module_id).range();
                 Self::single_range(file_id.file_id(), range)
             }
+            ContainerId::PackageId(InFile { value: local_package_id, file_id }) => {
+                let range = file_id.to_container_src_map(db).get(local_package_id).range();
+                Self::single_range(file_id.file_id(), range)
+            }
             ContainerId::BlockId(block_id) => {
                 let range = block_id.lookup(db).src.value.range();
                 Self::single_range(block_id.file_id(db), range)
             }
-            ContainerId::PackageId(_) | ContainerId::SubroutineId(_) | ContainerId::FileSubroutineId(_) => {
-                // TODO: implement search scope for these container types
-                Self::all(db)
+            ContainerId::SubroutineId(loc) => {
+                let module_id = loc.module_id;
+                let range = module_id.to_container_src_map(db).get(loc.value).range();
+                Self::single_range(module_id.file_id.file_id(), range)
             }
         }
     }
