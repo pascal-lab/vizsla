@@ -53,6 +53,10 @@ impl Source2DefCtx<'_, '_> {
                 let subroutine = db.subroutine(loc);
                 resolve(&subroutine.exprs[expr_id])
             }
+            ContainerId::FileSubroutineId(loc) => {
+                let subroutine = loc.to_container(db);
+                resolve(&subroutine.exprs[expr_id])
+            }
         }
     }
 
