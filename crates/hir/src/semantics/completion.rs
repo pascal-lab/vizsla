@@ -546,17 +546,31 @@ impl<'db> SemanticsImpl<'db> {
         match class_ref.cont_id {
             ContainerId::HirFileId(file_id) => {
                 let file = self.db.hir_file(file_id);
-                self.collect_class_def_fields(file.classes.get(class_ref.value), prefix)
+                self.collect_class_def_fields(
+                    file.classes.get(class_ref.value),
+                    prefix,
+                    class_ref.cont_id,
+                )
             }
             ContainerId::ModuleId(module_id) => {
                 let module = self.db.module(module_id);
-                self.collect_class_def_fields(module.classes.get(class_ref.value), prefix)
+                self.collect_class_def_fields(
+                    module.classes.get(class_ref.value),
+                    prefix,
+                    class_ref.cont_id,
+                )
             }
             ContainerId::PackageId(package_id) => {
                 let package = self.db.package(package_id);
-                self.collect_class_def_fields(package.classes.get(class_ref.value), prefix)
+                self.collect_class_def_fields(
+                    package.classes.get(class_ref.value),
+                    prefix,
+                    class_ref.cont_id,
+                )
             }
-            ContainerId::BlockId(_) | ContainerId::SubroutineId(_) | ContainerId::FileSubroutineId(_) => Vec::new(),
+            ContainerId::BlockId(_)
+            | ContainerId::SubroutineId(_)
+            | ContainerId::FileSubroutineId(_) => Vec::new(),
         }
     }
 
@@ -576,8 +590,20 @@ impl<'db> SemanticsImpl<'db> {
         items
     }
 
-    fn collect_class_def_fields(&self, def: &ClassDef, prefix: &str) -> Vec<DotField> {
+    fn collect_class_def_fields(
+        &self,
+        def: &ClassDef,
+        prefix: &str,
+        container_id: ContainerId,
+    ) -> Vec<DotField> {
         let mut items = Vec::new();
+
+        if let Some(base_class_name) = &def.base_class_name {
+            if let Some(base_class_ref) = self.find_class_in_scope(base_class_name, container_id) {
+                let base_items = self.collect_class_fields(base_class_ref, prefix);
+                items.extend(base_items);
+            }
+        }
 
         for member in &def.members {
             let Some(name) = &member.name else { continue };
@@ -605,6 +631,46 @@ impl<'db> SemanticsImpl<'db> {
         items
     }
 
+    fn find_class_in_scope(
+        &self,
+        class_name: &str,
+        container_id: ContainerId,
+    ) -> Option<InContainer<ClassId>> {
+        match container_id {
+            ContainerId::HirFileId(file_id) => {
+                let file = self.db.hir_file(file_id);
+                file.classes.iter().find_map(|(idx, class_def)| {
+                    if class_def.name.as_ref()?.as_str() == class_name {
+                        Some(InContainer::new(container_id, idx))
+                    } else {
+                        None
+                    }
+                })
+            }
+            ContainerId::ModuleId(module_id) => {
+                let module = self.db.module(module_id);
+                module.classes.iter().find_map(|(idx, class_def)| {
+                    if class_def.name.as_ref()?.as_str() == class_name {
+                        Some(InContainer::new(container_id, idx))
+                    } else {
+                        None
+                    }
+                })
+            }
+            ContainerId::PackageId(package_id) => {
+                let package = self.db.package(package_id);
+                package.classes.iter().find_map(|(idx, class_def)| {
+                    if class_def.name.as_ref()?.as_str() == class_name {
+                        Some(InContainer::new(container_id, idx))
+                    } else {
+                        None
+                    }
+                })
+            }
+            _ => None,
+        }
+    }
+
     fn class_scope_completions(
         &self,
         class_ref: InContainer<ClassId>,
@@ -623,7 +689,9 @@ impl<'db> SemanticsImpl<'db> {
                 let package = self.db.package(package_id);
                 self.collect_class_scope_entries(package.classes.get(class_ref.value), prefix)
             }
-            ContainerId::BlockId(_) | ContainerId::SubroutineId(_) | ContainerId::FileSubroutineId(_) => Vec::new(),
+            ContainerId::BlockId(_)
+            | ContainerId::SubroutineId(_)
+            | ContainerId::FileSubroutineId(_) => Vec::new(),
         }
     }
 
