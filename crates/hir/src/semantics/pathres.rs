@@ -94,6 +94,7 @@ impl SemanticsImpl<'_> {
             UnitEntry::TypedefId(_) => None,
             UnitEntry::ClassId(_) => None,
             UnitEntry::PackageId(_) => None,
+            UnitEntry::SubroutineId(_) => None,
         }
     }
 
@@ -134,6 +135,7 @@ impl From<UnitEntry> for PathResolution {
             TypedefId(idx) => Self::Typedef(idx.into()),
             ClassId(idx) => Self::Class(idx.into()),
             PackageId(idx) => Self::Package(idx),
+            SubroutineId(idx) => Self::Subroutine(idx.into()),
         }
     }
 }
