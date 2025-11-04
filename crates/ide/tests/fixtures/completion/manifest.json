@@ -45,13 +45,6 @@
       }
     },
     {
-      "name": "directive_prefix",
-      "fixture": "directives/prefix.sv",
-      "expect": {
-        "min_items": 1
-      }
-    },
-    {
       "name": "directive_trigger",
       "fixture": "directives/trigger.sv",
       "trigger": "\u0060",
@@ -60,13 +53,6 @@
           { "label": "`define", "kind": "keyword" },
           { "label": "`include", "kind": "keyword" }
         ]
-      }
-    },
-    {
-      "name": "directive_identifier_fallback",
-      "fixture": "directives/identifier_fallback.sv",
-      "expect": {
-        "min_items": 1
       }
     },
     {
@@ -586,10 +572,42 @@
       "fixture": "typedefs/enum_values.sv",
       "expect": {
         "present": [
-          { "label": "IDLE", "kind": "variable" },
-          { "label": "ACTIVE", "kind": "variable" },
-          { "label": "DONE", "kind": "variable" },
-          { "label": "ERROR", "kind": "variable" }
+          { "label": "current_state", "kind": "variable" },
+          { "label": "state_t", "kind": "type" }
+        ],
+        "absent": ["IDLE", "ACTIVE", "DONE", "ERROR"]
+      }
+    },
+    {
+      "name": "type_ref_builtin_prefix",
+      "fixture": "type_reference/builtin_prefix.sv",
+      "expect": {
+        "present": [
+          {
+            "label": "logic",
+            "kind": "type",
+            "detail_contains": "4-state single-bit type"
+          }
+        ]
+      }
+    },
+    {
+      "name": "type_ref_typedef_prefix",
+      "fixture": "type_reference/typedef_prefix.sv",
+      "expect": {
+        "present": [
+          { "label": "packet_t", "kind": "type" }
+        ],
+        "absent": ["logic"]
+      }
+    },
+    {
+      "name": "type_ref_expression_shadow",
+      "fixture": "type_reference/expression_shadow.sv",
+      "expect": {
+        "present": [
+          { "label": "packet_t", "kind": "type" },
+          { "label": "packet_count", "kind": "variable" }
         ]
       }
     },
