@@ -2,6 +2,7 @@
 #![feature(trait_alias)]
 #![feature(decl_macro)]
 
+pub mod completion;
 pub mod container;
 pub mod db;
 pub mod display;

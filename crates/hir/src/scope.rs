@@ -1165,11 +1165,11 @@ mod tests {
 
     use super::{BlockEntry, ModuleEntry, ModuleScope, PackageEntry, UnitEntry};
     use crate::{
-        CompletionEntryKind,
         container::{InFile, InPackage},
         db::HirDb,
         file::HirFileId,
         hir_def::module::ModuleId,
+        scope::CompletionEntryKind,
     };
 
     #[salsa::database(
