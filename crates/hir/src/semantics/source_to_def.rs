@@ -80,12 +80,6 @@ impl Source2DefCtx<'_, '_> {
                 let local_block_id = *subroutine_src_map.block_srcs.get(&block_src)?;
                 subroutine.stmts.get(local_block_id).block_id
             }
-            ContainerId::FileSubroutineId(loc) => {
-                let subroutine = loc.to_container(self.db);
-                let subroutine_src_map = loc.to_container_src_map(self.db);
-                let local_block_id = *subroutine_src_map.block_srcs.get(&block_src)?;
-                subroutine.stmts.get(local_block_id).block_id
-            }
         };
 
         Some(block_id)

@@ -15,7 +15,7 @@ use crate::{
         package::{self, Package, PackageId, PackageSourceMap},
         subroutine::{self, Subroutine, SubroutineId, SubroutineSourceMap},
     },
-    scope::{BlockScope, ModuleScope, UnitScope},
+    scope::{BlockScope, ModuleScope, PackageScope, SubroutineScope, UnitScope},
 };
 
 pub(crate) macro impl_intern($id:ident, $loc:ident, $intern:ident, $lookup:ident) {
@@ -83,8 +83,14 @@ pub trait HirDb: InternDb {
     #[salsa::invoke(ModuleScope::module_scope_query)]
     fn module_scope(&self, module_id: ModuleId) -> Arc<ModuleScope>;
 
+    #[salsa::invoke(PackageScope::package_scope_query)]
+    fn package_scope(&self, package_id: PackageId) -> Arc<PackageScope>;
+
     #[salsa::invoke(BlockScope::block_scope_query)]
     fn block_scope(&self, block_id: BlockId) -> Arc<BlockScope>;
+
+    #[salsa::invoke(SubroutineScope::subroutine_scope_query)]
+    fn subroutine_scope(&self, subroutine: InModule<SubroutineId>) -> Arc<SubroutineScope>;
 }
 
 fn parse(db: &dyn HirDb, file_id: HirFileId) -> SyntaxTree {
