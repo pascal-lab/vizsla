@@ -81,17 +81,9 @@ impl Source2DefCtx<'_, '_> {
                 let entry = scope.get(&ident)?;
                 Some(InBlock::new(block_id, entry).into())
             }
-<<<<<<< HEAD
             ContainerId::PackageId(_) => None,
             ContainerId::SubroutineId(_) => None,
             ContainerId::FileSubroutineId(_) => None,
-=======
-            ContainerId::SubroutineId(loc) => {
-                let scope = db.subroutine_scope(loc);
-                let entry = scope.get(&ident)?;
-                Some(InSubroutine::new(loc, entry).into())
-            }
->>>>>>> 32145766 (feat(hir): add semantic completion infrastructure)
         })?;
         self.hir_cache.name_map.insert(InContainer::new(cont_id, ident), res);
         Some(res)
