@@ -5,7 +5,7 @@ use hir::{
 use ide_db::root_db::RootDb;
 use span::FilePosition;
 use syntax::{
-    SyntaxAncestors, SyntaxNode, SyntaxNodeExt, SyntaxToken,
+    SyntaxAncestors, SyntaxNode, SyntaxNodeExt,
     ast::{self, AstNode},
     has_text_range::HasTextRange,
 };
@@ -28,7 +28,7 @@ pub(super) fn complete_member_access(
         .find_node_at_offset::<ast::MemberAccessExpression>(root, position.offset)
         .or_else(|| member_access_at_offset(root, position.offset))
         .and_then(|access| members_for_expr(db, &sema, access.left()))
-        .or_else(|| members_before_dot(db, &sema, root, position.offset));
+        .or_else(|| members_for_incomplete_access(db, &sema, root, position.offset));
     let Some(members) = members else {
         return Vec::new();
     };
@@ -60,7 +60,7 @@ fn member_access_at_offset(
     SyntaxAncestors::start_from(prev.parent).find_map(ast::MemberAccessExpression::cast)
 }
 
-fn members_before_dot(
+fn members_for_incomplete_access(
     db: &RootDb,
     sema: &Semantics<'_, RootDb>,
     root: SyntaxNode<'_>,
@@ -70,32 +70,22 @@ fn members_before_dot(
     if dot.kind() != syntax::Token![.] {
         return None;
     }
-    let dot_range = dot.text_range()?;
-    let prev = root.token_before_offset(dot_range.start())?;
 
-    if let Some(access) = SyntaxAncestors::start_from(prev.parent)
-        .find_map(ast::MemberAccessExpression::cast)
-        .filter(|access| access.name() == Some(prev.tok))
-    {
-        let expr = ast::Expression::cast(access.syntax())?;
-        return members_for_expr(db, sema, expr);
-    }
+    let dot_start = dot.text_range()?.start();
+    let expr = expr_before_dot(dot.parent, dot_start)?;
 
-    if let Some(scoped) = SyntaxAncestors::start_from(prev.parent)
-        .find_map(ast::ScopedName::cast)
-        .filter(|scoped| scoped_right_token(*scoped) == Some(prev.tok))
-    {
-        let expr = ast::Expression::cast(scoped.syntax())?;
-        return members_for_expr(db, sema, expr);
-    }
-
-    if let Some(expr) = SyntaxAncestors::start_from(prev.parent).find_map(ast::Expression::cast) {
-        return members_for_expr(db, sema, expr);
-    }
-
-    let name = SyntaxAncestors::start_from(prev.parent).find_map(ast::Name::cast)?;
-    let expr = ast::Expression::cast(name.syntax())?;
     members_for_expr(db, sema, expr)
+}
+
+fn expr_before_dot(
+    parent: SyntaxNode<'_>,
+    dot_start: utils::text_edit::TextSize,
+) -> Option<ast::Expression<'_>> {
+    parent
+        .children()
+        .filter_map(|elem| elem.as_node())
+        .filter_map(ast::Expression::cast)
+        .find(|expr| expr.syntax().text_range().is_some_and(|r| r.end() == dot_start))
 }
 
 fn members_for_expr(
@@ -106,13 +96,4 @@ fn members_for_expr(
     let ty = type_of_expr(db, sema.resolve_expr(expr)).ty;
     let members = members_of_ty(db, &ty);
     (!members.is_empty()).then_some(members)
-}
-
-fn scoped_right_token(scoped: ast::ScopedName<'_>) -> Option<SyntaxToken<'_>> {
-    use ast::Name::*;
-    match scoped.right() {
-        IdentifierName(ident) => ident.identifier(),
-        IdentifierSelectName(ident) => ident.identifier(),
-        _ => None,
-    }
 }

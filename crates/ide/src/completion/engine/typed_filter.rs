@@ -4,7 +4,9 @@ use hir::{
     hir_def::{Ident, declaration::Declaration, module::ModuleId},
     scope::ModuleEntry,
     semantics::pathres::PathResolution,
-    type_infer::{Ty, is_compatible_ty, type_of_decl, type_of_path_resolution},
+    type_infer::{
+        Ty, TyClass, packed_bit_width, type_class, type_of_decl, type_of_path_resolution,
+    },
 };
 use ide_db::root_db::RootDb;
 use utils::get::{Get, GetRef};
@@ -121,7 +123,23 @@ pub(super) fn const_candidates_in_module(db: &RootDb, module_id: ModuleId) -> Ve
 }
 
 pub(super) fn is_compatible_typed_value(db: &RootDb, expected: &Ty, candidate: &Ty) -> bool {
-    is_compatible_ty(db, expected, candidate)
+    let (Some(expected_class), Some(candidate_class)) =
+        (type_class(db, expected), type_class(db, candidate))
+    else {
+        return false;
+    };
+    if expected_class != candidate_class {
+        return false;
+    }
+
+    if expected_class != TyClass::Integral {
+        return true;
+    }
+
+    match (packed_bit_width(db, expected), packed_bit_width(db, candidate)) {
+        (Some(expected), Some(candidate)) => expected == candidate,
+        _ => false,
+    }
 }
 
 fn is_overridable_parameter_decl(

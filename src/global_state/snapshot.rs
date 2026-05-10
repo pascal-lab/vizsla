@@ -58,15 +58,56 @@ impl GlobalStateSnapshot {
         &self,
         file_id: FileId,
     ) -> Cancellable<Vec<ide::diagnostics::Diagnostic>> {
-        if self.config.semantic_diagnostics_enabled() {
+        if self.config.diagnostics_config().semantic.enabled {
             return self.analysis.diagnostics(file_id);
         }
 
         self.analysis.parse_diagnostics(file_id)
     }
 
+    pub(crate) fn source_root_diagnostics(
+        &self,
+        file_id: FileId,
+    ) -> Cancellable<Vec<ide::diagnostics::Diagnostic>> {
+        if self.config.diagnostics_config().semantic.enabled {
+            return self.analysis.source_root_diagnostics(file_id);
+        }
+
+        self.analysis.parse_diagnostics(file_id)
+    }
+
     pub(crate) fn file_version(&self, file_id: FileId) -> Option<i32> {
-        self.mem_docs.get(self.vfs_read().file_path(file_id)).map(|it| it.version)
+        self.mem_docs.version(file_id)
+    }
+
+    pub(crate) fn diagnostic_result_id(&self, file_id: FileId) -> Option<String> {
+        let diagnostics_config = self.config.diagnostics_config();
+        let file_ids = if diagnostics_config.semantic.enabled {
+            self.analysis.source_root_file_ids(file_id).ok()?
+        } else {
+            vec![file_id]
+        };
+
+        let mut versions = file_ids
+            .into_iter()
+            .filter_map(|file_id| self.file_version(file_id).map(|version| (file_id.0, version)))
+            .collect::<Vec<_>>();
+
+        if versions.is_empty() {
+            return None;
+        }
+
+        versions.sort_unstable();
+        let file_versions = versions
+            .into_iter()
+            .map(|(file_id, version)| format!("{file_id}:{version}"))
+            .collect::<Vec<_>>()
+            .join(",");
+        Some(format!("diag:{}:{file_versions}", diagnostics_config.revision))
+    }
+
+    pub(crate) fn source_root_file_ids(&self, file_id: FileId) -> Vec<FileId> {
+        self.analysis.source_root_file_ids(file_id).unwrap_or_else(|_| vec![file_id])
     }
 
     pub(crate) fn file_ids(&self) -> Vec<FileId> {
@@ -83,6 +124,6 @@ impl GlobalStateSnapshot {
 
     pub(crate) fn url_file_version(&self, url: &Url) -> Option<i32> {
         let path = from_proto::vfs_path(url).ok()?;
-        Some(self.mem_docs.get(&path)?.version)
+        self.mem_docs.file_id(&path).and_then(|file_id| self.file_version(file_id))
     }
 }

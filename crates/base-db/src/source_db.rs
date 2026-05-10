@@ -4,7 +4,10 @@ use triomphe::Arc;
 use utils::line_index::TextSize;
 use vfs::{FileId, anchored_path::AnchoredPath};
 
-use crate::source_root::{SourceRoot, SourceRootId};
+use crate::{
+    diagnostics_config::{DiagnosticSource, DiagnosticsConfig},
+    source_root::{SourceRoot, SourceRootId},
+};
 
 pub trait FileLoader {
     fn resolve_path(&self, path: AnchoredPath<'_>) -> Option<FileId>;
@@ -20,10 +23,12 @@ pub trait SourceDb: FileLoader + std::fmt::Debug {
     fn parse_src(&self, file_id: FileId) -> SyntaxTree;
     fn expected_identifier_offsets(&self, file_id: FileId) -> Arc<Vec<TextSize>>;
     fn parse_diagnostics(&self, file_id: FileId) -> Arc<[SyntaxDiagnostic]>;
-    fn semantic_diagnostics(&self, file_id: FileId) -> Arc<[SyntaxDiagnostic]>;
 
     #[salsa::input]
     fn files(&self) -> Box<FxHashSet<FileId>>;
+
+    #[salsa::input]
+    fn diagnostics_config(&self) -> Arc<DiagnosticsConfig>;
 }
 
 fn parse_src(db: &dyn SourceDb, file_id: FileId) -> SyntaxTree {
@@ -36,8 +41,9 @@ fn expected_identifier_offsets(db: &dyn SourceDb, file_id: FileId) -> Arc<Vec<Te
     let tree = db.parse_src(file_id);
     let mut compilation = Compilation::new();
     compilation.add_syntax_tree(tree.clone());
+    let config = db.diagnostics_config();
     let mut out: Vec<TextSize> = compilation
-        .parse_diag_offsets_by_name("ExpectedIdentifier")
+        .parse_diag_offsets_by_name("ExpectedIdentifier", &config.slang.warnings)
         .into_iter()
         .filter_map(|offset| u32::try_from(offset).ok().map(TextSize::from))
         .collect();
@@ -47,16 +53,17 @@ fn expected_identifier_offsets(db: &dyn SourceDb, file_id: FileId) -> Arc<Vec<Te
 }
 
 fn parse_diagnostics(db: &dyn SourceDb, file_id: FileId) -> Arc<[SyntaxDiagnostic]> {
-    let tree = db.parse_src(file_id);
-    let diags = tree.diagnostics();
-    Arc::from(diags)
-}
+    let config = db.diagnostics_config();
+    if !config.enabled || !config.parse.enabled {
+        return Arc::from(Vec::<SyntaxDiagnostic>::new());
+    }
 
-fn semantic_diagnostics(db: &dyn SourceDb, file_id: FileId) -> Arc<[SyntaxDiagnostic]> {
     let tree = db.parse_src(file_id);
-    let mut compilation = Compilation::new();
-    compilation.add_syntax_tree(tree.clone());
-    let diags = compilation.semantic_diagnostics();
+    let diags = tree
+        .diagnostics_with_options(&config.slang.warnings)
+        .into_iter()
+        .filter_map(|diag| config.apply_rules(DiagnosticSource::Parse, diag))
+        .collect::<Vec<_>>();
     Arc::from(diags)
 }
 
@@ -68,4 +75,53 @@ pub trait SourceRootDb: SourceDb {
 
     #[salsa::input]
     fn source_root(&self, id: SourceRootId) -> Arc<SourceRoot>;
+
+    fn semantic_diagnostics(&self, file_id: FileId) -> Arc<[SyntaxDiagnostic]>;
+    fn source_root_semantic_diagnostics(
+        &self,
+        file_id: FileId,
+    ) -> Arc<[(FileId, SyntaxDiagnostic)]>;
+}
+
+fn semantic_diagnostics(db: &dyn SourceRootDb, file_id: FileId) -> Arc<[SyntaxDiagnostic]> {
+    Arc::from(
+        db.source_root_semantic_diagnostics(file_id)
+            .iter()
+            .filter_map(|(diag_file_id, diag)| (*diag_file_id == file_id).then_some(diag.clone()))
+            .collect::<Vec<_>>(),
+    )
+}
+
+fn source_root_semantic_diagnostics(
+    db: &dyn SourceRootDb,
+    file_id: FileId,
+) -> Arc<[(FileId, SyntaxDiagnostic)]> {
+    let source_root_id = db.source_root_id(file_id);
+    let config = db.diagnostics_config();
+    if !config.enabled || !config.semantic.enabled {
+        return Arc::from(Vec::<(FileId, SyntaxDiagnostic)>::new());
+    }
+
+    let source_root = db.source_root(source_root_id);
+    let mut compilation = Compilation::new();
+    let mut buffer_file_ids = rustc_hash::FxHashMap::default();
+
+    for file_id in source_root.iter() {
+        let tree = db.parse_src(file_id);
+        buffer_file_ids.insert(tree.buffer_id(), file_id);
+        compilation.add_syntax_tree(tree);
+    }
+
+    let diagnostics = compilation
+        .semantic_diagnostics_with_options(&config.slang.warnings)
+        .into_iter()
+        .filter_map(|diag| {
+            let diag_file_id =
+                diag.buffer_id.and_then(|buffer_id| buffer_file_ids.get(&buffer_id).copied())?;
+            let diag = config.apply_rules(DiagnosticSource::Semantic, diag)?;
+            Some((diag_file_id, diag))
+        })
+        .collect::<Vec<_>>();
+
+    Arc::from(diagnostics)
 }

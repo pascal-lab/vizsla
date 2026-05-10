@@ -6,6 +6,90 @@ use vfs::FileId;
 
 use crate::source_change::{SourceChange, SourceChangeBuilder};
 
+#[derive(Debug, Clone, Default)]
+pub struct CodeActionDiagnostics {
+    pub items: Vec<CodeActionDiagnostic>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CodeActionDiagnostic {
+    pub source: Option<DiagnosticSource>,
+    pub code: Option<DiagnosticCode>,
+    pub name: Option<String>,
+    pub option: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DiagnosticSource {
+    Parse,
+    Semantic,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DiagnosticCode {
+    pub subsystem: u16,
+    pub code: u16,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RepairKind {
+    MissingConnection,
+    MissingParameter,
+    ConvertOrderedPorts,
+    ConvertOrderedParams,
+    AddImplicitNamedPortParens,
+    AddInstanceParens,
+}
+
+pub(crate) fn append_missing_list_entries(entries: Vec<String>, has_existing: bool) -> String {
+    let mut text = entries.join(", ");
+    if has_existing && !text.is_empty() {
+        text.insert_str(0, ", ");
+    }
+    text
+}
+
+impl CodeActionDiagnostics {
+    pub fn allows_repair(&self, repair: RepairKind) -> bool {
+        self.items.iter().any(|diag| diag.allows_repair(repair))
+    }
+}
+
+impl CodeActionDiagnostic {
+    fn allows_repair(&self, repair: RepairKind) -> bool {
+        match repair {
+            RepairKind::MissingConnection => {
+                self.source == Some(DiagnosticSource::Semantic)
+                    && (matches!(
+                        self.option.as_deref(),
+                        Some("unconnected-port" | "unconnected-unnamed-port")
+                    ) || self.code == Some(DiagnosticCode { subsystem: 2, code: 260 })
+                        || self.code == Some(DiagnosticCode { subsystem: 2, code: 261 }))
+            }
+            RepairKind::MissingParameter => {
+                self.source == Some(DiagnosticSource::Semantic)
+                    && self.name.as_deref() == Some("ParamHasNoValue")
+            }
+            RepairKind::ConvertOrderedPorts => {
+                self.source == Some(DiagnosticSource::Semantic)
+                    && self.name.as_deref() == Some("MixingOrderedAndNamedPorts")
+            }
+            RepairKind::ConvertOrderedParams => {
+                self.source == Some(DiagnosticSource::Semantic)
+                    && self.name.as_deref() == Some("MixingOrderedAndNamedParams")
+            }
+            RepairKind::AddImplicitNamedPortParens => {
+                self.source == Some(DiagnosticSource::Semantic)
+                    && self.name.as_deref() == Some("ImplicitNamedPortNotFound")
+            }
+            RepairKind::AddInstanceParens => {
+                self.source == Some(DiagnosticSource::Semantic)
+                    && self.name.as_deref() == Some("InstanceMissingParens")
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum CodeActionResolveStrategy {
     None,
@@ -120,13 +204,19 @@ struct CodeActionCtx<'a> {
     sema: &'a Semantics<'a, RootDb>,
     file_id: FileId,
     range: TextRange,
+    diagnostics: CodeActionDiagnostics,
     compilation_unit: CompilationUnit<'a>,
 }
 
 impl<'a> CodeActionCtx<'a> {
-    fn new(sema: &'a Semantics<'a, RootDb>, file_id: FileId, range: TextRange) -> Self {
+    fn new(
+        sema: &'a Semantics<'a, RootDb>,
+        file_id: FileId,
+        range: TextRange,
+        diagnostics: CodeActionDiagnostics,
+    ) -> Self {
         let compilation_unit = sema.parse(file_id);
-        Self { sema, file_id, range, compilation_unit }
+        Self { sema, file_id, range, diagnostics, compilation_unit }
     }
 
     fn offset(&self) -> TextSize {
@@ -142,10 +232,11 @@ pub(crate) fn code_action(
     db: &RootDb,
     file_id: FileId,
     range: TextRange,
+    diagnostics: CodeActionDiagnostics,
     resolve_strategy: CodeActionResolveStrategy,
 ) -> Vec<CodeAction> {
     let sema = Semantics::new(db);
-    let ctx = CodeActionCtx::new(&sema, file_id, range);
+    let ctx = CodeActionCtx::new(&sema, file_id, range, diagnostics);
 
     let mut collector = CodeActionCollector::new(&ctx, resolve_strategy);
     handlers::all().iter().for_each(|handler| {
@@ -160,13 +251,302 @@ mod handlers {
 
     pub(crate) type Handler = fn(&mut CodeActionCollector, &CodeActionCtx<'_>) -> Option<()>;
 
+    mod add_implicit_named_port_parens;
+    mod add_instance_parens;
     mod add_missing_connections;
     mod add_missing_parameters;
+    mod convert_ordered_connections;
 
     pub(crate) fn all() -> &'static [Handler] {
         &[
             add_missing_connections::add_missing_connections,
             add_missing_parameters::add_missing_parameters,
+            convert_ordered_connections::convert_ordered_ports,
+            convert_ordered_connections::convert_ordered_params,
+            add_implicit_named_port_parens::add_implicit_named_port_parens,
+            add_instance_parens::add_instance_parens,
         ]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use base_db::{change::Change, source_root::SourceRoot};
+    use ide_db::root_db::RootDb;
+    use triomphe::Arc;
+    use utils::{lines::LineEnding, text_edit::TextSize};
+    use vfs::{ChangeKind, ChangedFile, FileId, FileSet, VfsPath};
+
+    use super::*;
+
+    fn db_with_file(text: &str) -> (RootDb, FileId, TextSize) {
+        let marker = "/*caret*/";
+        let offset = text.find(marker).expect("missing caret marker");
+        let text = text.replace(marker, "");
+        let file_id = FileId(0);
+        let mut file_set = FileSet::default();
+        file_set.insert(file_id, VfsPath::new_virtual_path("/test.sv".to_owned()));
+
+        let mut change = Change::new();
+        change.set_roots(vec![SourceRoot::new_local(file_set)]);
+        change.add_changed_file(ChangedFile {
+            file_id,
+            change_kind: ChangeKind::Create(Arc::from(text.as_str()), LineEnding::Unix),
+        });
+
+        let mut db = RootDb::new(None);
+        db.apply_change(change);
+        (db, file_id, TextSize::from(offset as u32))
+    }
+
+    fn apply_action(text: &str, repair: RepairKind) -> Option<String> {
+        let (db, file_id, offset) = db_with_file(text);
+        let diagnostics = CodeActionDiagnostics { items: vec![diagnostic_for_repair(repair)] };
+        let actions = code_action(
+            &db,
+            file_id,
+            utils::text_edit::TextRange::empty(offset),
+            diagnostics,
+            CodeActionResolveStrategy::All,
+        );
+        let action = actions.into_iter().find(|action| match repair {
+            RepairKind::MissingConnection => action.id.name == "add_missing_connections",
+            RepairKind::MissingParameter => action.id.name == "add_missing_parameters",
+            RepairKind::ConvertOrderedPorts => action.id.name == "convert_ordered_ports",
+            RepairKind::ConvertOrderedParams => action.id.name == "convert_ordered_params",
+            RepairKind::AddImplicitNamedPortParens => {
+                action.id.name == "add_implicit_named_port_parens"
+            }
+            RepairKind::AddInstanceParens => action.id.name == "add_instance_parens",
+        })?;
+        let mut text = text.replace("/*caret*/", "");
+        let edit = action.source_change?.text_edits.remove(&file_id)?;
+        edit.apply(&mut text);
+        Some(text)
+    }
+
+    fn diagnostic_for_repair(repair: RepairKind) -> CodeActionDiagnostic {
+        match repair {
+            RepairKind::MissingConnection => CodeActionDiagnostic {
+                source: Some(DiagnosticSource::Semantic),
+                code: None,
+                name: Some("UnconnectedNamedPort".to_owned()),
+                option: Some("unconnected-port".to_owned()),
+            },
+            RepairKind::MissingParameter => CodeActionDiagnostic {
+                source: Some(DiagnosticSource::Semantic),
+                code: Some(DiagnosticCode { subsystem: 2, code: 29 }),
+                name: Some("ParamHasNoValue".to_owned()),
+                option: None,
+            },
+            RepairKind::ConvertOrderedPorts => CodeActionDiagnostic {
+                source: Some(DiagnosticSource::Semantic),
+                code: None,
+                name: Some("MixingOrderedAndNamedPorts".to_owned()),
+                option: None,
+            },
+            RepairKind::ConvertOrderedParams => CodeActionDiagnostic {
+                source: Some(DiagnosticSource::Semantic),
+                code: None,
+                name: Some("MixingOrderedAndNamedParams".to_owned()),
+                option: None,
+            },
+            RepairKind::AddImplicitNamedPortParens => CodeActionDiagnostic {
+                source: Some(DiagnosticSource::Semantic),
+                code: None,
+                name: Some("ImplicitNamedPortNotFound".to_owned()),
+                option: None,
+            },
+            RepairKind::AddInstanceParens => CodeActionDiagnostic {
+                source: Some(DiagnosticSource::Semantic),
+                code: None,
+                name: Some("InstanceMissingParens".to_owned()),
+                option: None,
+            },
+        }
+    }
+
+    fn action_labels(text: &str, repair: RepairKind) -> Vec<String> {
+        let (db, file_id, offset) = db_with_file(text);
+        let diagnostics = CodeActionDiagnostics { items: vec![diagnostic_for_repair(repair)] };
+        code_action(
+            &db,
+            file_id,
+            utils::text_edit::TextRange::empty(offset),
+            diagnostics,
+            CodeActionResolveStrategy::None,
+        )
+        .into_iter()
+        .map(|action| action.label)
+        .collect()
+    }
+
+    fn action_labels_without_diagnostics(text: &str) -> Vec<String> {
+        let (db, file_id, offset) = db_with_file(text);
+        code_action(
+            &db,
+            file_id,
+            utils::text_edit::TextRange::empty(offset),
+            CodeActionDiagnostics::default(),
+            CodeActionResolveStrategy::None,
+        )
+        .into_iter()
+        .map(|action| action.label)
+        .collect()
+    }
+
+    #[test]
+    fn missing_connection_repair_requires_matching_diagnostic() {
+        let (db, file_id, offset) = db_with_file(
+            "module child(input a, input b); endmodule\nmodule top; child u(/*caret*/.a()); endmodule\n",
+        );
+        let actions = code_action(
+            &db,
+            file_id,
+            utils::text_edit::TextRange::empty(offset),
+            CodeActionDiagnostics {
+                items: vec![diagnostic_for_repair(RepairKind::MissingParameter)],
+            },
+            CodeActionResolveStrategy::All,
+        );
+
+        assert!(actions.iter().all(|action| action.id.name != "add_missing_connections"));
+    }
+
+    #[test]
+    fn repair_actions_require_diagnostics() {
+        let labels = action_labels_without_diagnostics(
+            "module child(input a, input b); endmodule\nmodule top; child u(/*caret*/.a()); endmodule\n",
+        );
+
+        assert!(!labels.iter().any(|label| label == "Fill connections"));
+        assert!(!labels.iter().any(|label| label == "Fill parameters"));
+    }
+
+    #[test]
+    fn missing_connection_repair_fills_named_connections() {
+        let text = "module child(input a, input b); endmodule\nmodule top; child u(/*caret*/.a()); endmodule\n";
+        let fixed = apply_action(text, RepairKind::MissingConnection).unwrap();
+        assert_eq!(
+            fixed,
+            "module child(input a, input b); endmodule\nmodule top; child u(.a(), .b()); endmodule\n"
+        );
+    }
+
+    #[test]
+    fn missing_connection_repair_fills_empty_named_connection_list() {
+        let text = "module child(input a, input b); endmodule\nmodule top; child u(/*caret*/); endmodule\n";
+        let fixed = apply_action(text, RepairKind::MissingConnection).unwrap();
+        assert_eq!(
+            fixed,
+            "module child(input a, input b); endmodule\nmodule top; child u(.a(), .b()); endmodule\n"
+        );
+    }
+
+    #[test]
+    fn missing_connection_repair_fills_ordered_connections() {
+        let text = "module child(input a, input b, input c); endmodule\nmodule top; logic b, c; child u(/*caret*/1'b0); endmodule\n";
+        let fixed = apply_action(text, RepairKind::MissingConnection).unwrap();
+        assert_eq!(
+            fixed,
+            "module child(input a, input b, input c); endmodule\nmodule top; logic b, c; child u(1'b0, b, c); endmodule\n"
+        );
+    }
+
+    #[test]
+    fn missing_connection_repair_uses_valid_ordered_placeholders() {
+        let text = "module child(input a, input b, input c); endmodule\nmodule top; child u(/*caret*/1'b0); endmodule\n";
+        let fixed = apply_action(text, RepairKind::MissingConnection).unwrap();
+        assert_eq!(
+            fixed,
+            "module child(input a, input b, input c); endmodule\nmodule top; child u(1'b0, /* b */ '0, /* c */ '0); endmodule\n"
+        );
+    }
+
+    #[test]
+    fn missing_parameter_repair_fills_named_parameters() {
+        let text = "module child #(parameter A = 1, parameter B) (); endmodule\nmodule top; child #(/*caret*/.A(1)) u(); endmodule\n";
+        let fixed = apply_action(text, RepairKind::MissingParameter).unwrap();
+        assert_eq!(
+            fixed,
+            "module child #(parameter A = 1, parameter B) (); endmodule\nmodule top; child #(.A(1), .B()) u(); endmodule\n"
+        );
+    }
+
+    #[test]
+    fn missing_parameter_repair_fills_empty_parameter_list() {
+        let text = "module child #(parameter A, parameter B) (); endmodule\nmodule top; child #(/*caret*/) u(); endmodule\n";
+        let fixed = apply_action(text, RepairKind::MissingParameter).unwrap();
+        assert_eq!(
+            fixed,
+            "module child #(parameter A, parameter B) (); endmodule\nmodule top; child #(.A(), .B()) u(); endmodule\n"
+        );
+    }
+
+    #[test]
+    fn missing_parameter_repair_fills_ordered_parameters() {
+        let text = "module child #(parameter A, parameter B, parameter C) (); endmodule\nmodule top; parameter B = 2; parameter C = 3; child #(/*caret*/1) u(); endmodule\n";
+        let fixed = apply_action(text, RepairKind::MissingParameter).unwrap();
+        assert_eq!(
+            fixed,
+            "module child #(parameter A, parameter B, parameter C) (); endmodule\nmodule top; parameter B = 2; parameter C = 3; child #(1, B, C) u(); endmodule\n"
+        );
+    }
+
+    #[test]
+    fn missing_parameter_repair_uses_valid_ordered_placeholders() {
+        let text = "module child #(parameter A, parameter B, parameter C) (); endmodule\nmodule top; child #(/*caret*/1) u(); endmodule\n";
+        let fixed = apply_action(text, RepairKind::MissingParameter).unwrap();
+        assert_eq!(
+            fixed,
+            "module child #(parameter A, parameter B, parameter C) (); endmodule\nmodule top; child #(1, /* B */ 0, /* C */ 0) u(); endmodule\n"
+        );
+    }
+
+    #[test]
+    fn missing_parameter_repair_is_not_offered_when_nothing_is_missing() {
+        let labels = action_labels(
+            "module child #(parameter A = 1) (); endmodule\nmodule top; child #(/*caret*/.A(1)) u(); endmodule\n",
+            RepairKind::MissingParameter,
+        );
+        assert!(!labels.iter().any(|label| label == "Fill parameters"));
+    }
+
+    #[test]
+    fn convert_ordered_ports_repair_names_ordered_connections() {
+        let text = "module child(input a, input b); endmodule\nmodule top; child u(/*caret*/x, .b(y)); endmodule\n";
+        let fixed = apply_action(text, RepairKind::ConvertOrderedPorts).unwrap();
+        assert_eq!(
+            fixed,
+            "module child(input a, input b); endmodule\nmodule top; child u(.a(x), .b(y)); endmodule\n"
+        );
+    }
+
+    #[test]
+    fn convert_ordered_params_repair_names_ordered_assignments() {
+        let text = "module child #(parameter A = 1, parameter B = 2) (); endmodule\nmodule top; child #(/*caret*/8, .B(16)) u(); endmodule\n";
+        let fixed = apply_action(text, RepairKind::ConvertOrderedParams).unwrap();
+        assert_eq!(
+            fixed,
+            "module child #(parameter A = 1, parameter B = 2) (); endmodule\nmodule top; child #(.A(8), .B(16)) u(); endmodule\n"
+        );
+    }
+
+    #[test]
+    fn implicit_named_port_repair_adds_empty_parens() {
+        let text =
+            "module child(input a); endmodule\nmodule top; child u(/*caret*/.a); endmodule\n";
+        let fixed = apply_action(text, RepairKind::AddImplicitNamedPortParens).unwrap();
+        assert_eq!(
+            fixed,
+            "module child(input a); endmodule\nmodule top; child u(.a()); endmodule\n"
+        );
+    }
+
+    #[test]
+    fn instance_missing_parens_repair_adds_port_list() {
+        let text = "module child; endmodule\nmodule top; child u/*caret*/; endmodule\n";
+        let fixed = apply_action(text, RepairKind::AddInstanceParens).unwrap();
+        assert_eq!(fixed, "module child; endmodule\nmodule top; child u(); endmodule\n");
     }
 }

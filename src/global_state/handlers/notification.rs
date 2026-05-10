@@ -5,16 +5,18 @@ use lsp_types::{
     DidChangeWorkspaceFoldersParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
     DidSaveTextDocumentParams,
 };
+use rustc_hash::FxHashSet;
 use triomphe::Arc;
 use utils::{
     line_index::LineIndex,
     lines::{LineEnding, LineInfo, PositionEncoding},
 };
-use vfs::loader::LoadResult;
+use vfs::{VfsPath, loader::LoadResult};
 
 use crate::{
     DEFAULT_PROCESS_NAME,
-    global_state::{GlobalState, mem_docs::DocumentData, reload},
+    config::user_config::DiagnosticsUpdateUserConfig,
+    global_state::{GlobalState, process_changes::DiagnosticInvalidation, reload},
     lsp_ext::from_proto,
 };
 
@@ -35,16 +37,14 @@ pub(crate) fn handle_did_open_text_document(
     params: DidOpenTextDocumentParams,
 ) -> anyhow::Result<()> {
     if let Ok(path) = from_proto::vfs_path(&params.text_document.uri) {
-        let data = DocumentData {
-            version: params.text_document.version,
-            data: params.text_document.text.clone(),
-        };
-        if state.mem_docs.insert(path.clone(), data).is_some() {
+        let file_id = set_vfs_file_contents(state, &path, params.text_document.text.clone());
+        if state
+            .mem_docs
+            .insert(file_id, path.clone(), params.text_document.version, params.text_document.text)
+            .is_some()
+        {
             tracing::error!("duplicate DidOpenTextDocument: {}", path);
         }
-
-        let (text, endings) = LineEnding::normalize(params.text_document.text);
-        state.vfs.write().0.set_file_contents(&path, LoadResult::Loaded(text, endings));
     }
     Ok(())
 }
@@ -54,7 +54,7 @@ pub(crate) fn handle_did_change_text_document(
     params: DidChangeTextDocumentParams,
 ) -> anyhow::Result<()> {
     if let Ok(path) = from_proto::vfs_path(&params.text_document.uri) {
-        let data = match state.mem_docs.get_mut(&path) {
+        let data = match state.mem_docs.get_mut_by_path(&path) {
             Some(doc) => {
                 // The version in DidChangeTextDocument is the one after all edits,
                 // so we should apply it before the vfs is notified.
@@ -73,11 +73,9 @@ pub(crate) fn handle_did_change_text_document(
             params.content_changes,
         );
 
-        let (text, endings) = LineEnding::normalize(text);
-
         if *data != text {
             *data = text.clone();
-            state.vfs.write().0.set_file_contents(&path, LoadResult::Loaded(text, endings));
+            set_vfs_file_contents(state, &path, text);
         }
     }
     Ok(())
@@ -88,7 +86,7 @@ pub(crate) fn handle_did_close_text_document(
     params: DidCloseTextDocumentParams,
 ) -> anyhow::Result<()> {
     if let Ok(path) = from_proto::vfs_path(&params.text_document.uri) {
-        if state.mem_docs.remove(&path).is_none() {
+        if state.mem_docs.remove_path(&path).is_none() {
             tracing::error!("orphan DidCloseTextDocument: {}", path);
         }
 
@@ -110,6 +108,14 @@ pub(crate) fn handle_did_save_text_document(
     {
         // Re-fetch workspaces if a workspace related file has changed
         state.fetch_workspaces_task.request(format!("DidSaveTextDocument {abs_path}"));
+    }
+
+    if state.config.user_config.diagnostics.update == DiagnosticsUpdateUserConfig::OnSave
+        && let Ok(file_id) = state.make_snapshot().file_id(&params.text_document.uri)
+    {
+        state.invalidate_diagnostics(DiagnosticInvalidation::FileChanges(FxHashSet::from_iter([
+            file_id,
+        ])));
     }
 
     Ok(())
@@ -188,6 +194,13 @@ pub(crate) fn handle_did_change_watched_files(
         }
     }
     Ok(())
+}
+
+fn set_vfs_file_contents(state: &mut GlobalState, path: &VfsPath, text: String) -> vfs::FileId {
+    let (text, endings) = LineEnding::normalize(text);
+    let mut vfs = state.vfs.write();
+    vfs.0.set_file_contents(path, LoadResult::Loaded(text, endings));
+    vfs.0.file_id(path).expect("loaded file must have a FileId")
 }
 
 fn apply_document_changes(

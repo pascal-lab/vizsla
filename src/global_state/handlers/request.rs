@@ -1,7 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
 use ide::{
-    code_action::{CodeActionKind, CodeActionResolveStrategy},
+    code_action::{
+        CodeActionDiagnostic, CodeActionDiagnostics, CodeActionKind, CodeActionResolveStrategy,
+        DiagnosticCode, DiagnosticSource,
+    },
     folding_ranges::FoldingConfig,
     references::References,
 };
@@ -116,7 +119,7 @@ pub(crate) fn handle_document_diagnostic(
         Err(_) => Vec::new(),
     };
 
-    let result_id = file_result_id(snap.file_version(file_id));
+    let result_id = snap.diagnostic_result_id(file_id);
     Ok(document_diagnostic_report(result_id, items, params.previous_result_id.as_deref()).into())
 }
 
@@ -127,16 +130,35 @@ pub(crate) fn handle_workspace_diagnostic(
     let previous_result_ids = params
         .previous_result_ids
         .into_iter()
-        .map(|prev| (prev.uri, prev.value))
+        .map(|prev| {
+            let uri = from_proto::abs_path(&prev.uri)
+                .map(|path| to_proto::url_from_abs_path(path.as_ref()))
+                .unwrap_or(prev.uri);
+            (uri, prev.value)
+        })
         .collect::<HashMap<_, _>>();
     let mut seen = HashSet::new();
     let mut items = Vec::new();
+    let mut diagnostics_by_file = HashMap::new();
+    let mut diagnosed_roots = HashSet::new();
+
+    for file_id in snap.file_ids() {
+        let mut source_root_file_ids = snap.source_root_file_ids(file_id);
+        source_root_file_ids.sort_unstable_by_key(|file_id| file_id.0);
+        if !diagnosed_roots.insert(source_root_file_ids) {
+            continue;
+        }
+
+        for diag in snap.source_root_diagnostics(file_id).unwrap_or_default() {
+            diagnostics_by_file.entry(diag.file_id).or_insert_with(Vec::new).push(diag);
+        }
+    }
 
     for file_id in snap.file_ids() {
         let uri = to_proto::url(&snap, file_id);
         seen.insert(uri.clone());
 
-        let diagnostics = snap.diagnostics(file_id).unwrap_or_default();
+        let diagnostics = diagnostics_by_file.remove(&file_id).unwrap_or_default();
 
         let diag_items = match snap.line_info(file_id) {
             Ok(line_info) => {
@@ -145,7 +167,7 @@ pub(crate) fn handle_workspace_diagnostic(
             Err(_) => Vec::new(),
         };
 
-        let result_id = file_result_id(snap.file_version(file_id));
+        let result_id = snap.diagnostic_result_id(file_id);
         let version = snap.file_version(file_id).map(|version| version as i64);
         let previous_result_id = previous_result_ids.get(&uri).map(String::as_str);
 
@@ -171,23 +193,19 @@ pub(crate) fn handle_workspace_diagnostic(
     }))
 }
 
-fn file_result_id(version: Option<i32>) -> Option<String> {
-    version.map(|it| it.to_string())
-}
-
 fn document_diagnostic_report(
     result_id: Option<String>,
     items: Vec<lsp_types::Diagnostic>,
     previous_result_id: Option<&str>,
 ) -> lsp_types::DocumentDiagnosticReport {
-    if result_id.as_deref() == previous_result_id {
+    if let Some(result_id) = result_id.as_ref()
+        && Some(result_id.as_str()) == previous_result_id
+    {
         return lsp_types::DocumentDiagnosticReport::Unchanged(
             lsp_types::RelatedUnchangedDocumentDiagnosticReport {
                 related_documents: None,
                 unchanged_document_diagnostic_report:
-                    lsp_types::UnchangedDocumentDiagnosticReport {
-                        result_id: result_id.expect("matching previous result id must exist"),
-                    },
+                    lsp_types::UnchangedDocumentDiagnosticReport { result_id: result_id.clone() },
             },
         );
     }
@@ -195,7 +213,7 @@ fn document_diagnostic_report(
     lsp_types::DocumentDiagnosticReport::Full(lsp_types::RelatedFullDocumentDiagnosticReport {
         related_documents: None,
         full_document_diagnostic_report: lsp_types::FullDocumentDiagnosticReport {
-            result_id,
+            result_id: result_id.clone(),
             items,
         },
     })
@@ -208,15 +226,15 @@ fn workspace_diagnostic_report(
     items: Vec<lsp_types::Diagnostic>,
     previous_result_id: Option<&str>,
 ) -> lsp_types::WorkspaceDocumentDiagnosticReport {
-    if result_id.as_deref() == previous_result_id {
+    if let Some(result_id) = result_id.as_ref()
+        && Some(result_id.as_str()) == previous_result_id
+    {
         return lsp_types::WorkspaceDocumentDiagnosticReport::Unchanged(
             lsp_types::WorkspaceUnchangedDocumentDiagnosticReport {
                 uri,
                 version,
                 unchanged_document_diagnostic_report:
-                    lsp_types::UnchangedDocumentDiagnosticReport {
-                        result_id: result_id.expect("matching previous result id must exist"),
-                    },
+                    lsp_types::UnchangedDocumentDiagnosticReport { result_id: result_id.clone() },
             },
         );
     }
@@ -226,7 +244,7 @@ fn workspace_diagnostic_report(
             uri,
             version,
             full_document_diagnostic_report: lsp_types::FullDocumentDiagnosticReport {
-                result_id,
+                result_id: result_id.clone(),
                 items,
             },
         },
@@ -597,7 +615,9 @@ pub(crate) fn handle_code_action(
         CodeActionResolveStrategy::All
     };
 
-    let action = snap.analysis.code_action(file_id, range, resolve_strategy.clone())?;
+    let repair_diagnostics = code_action_diagnostics(&params.context.diagnostics);
+    let action =
+        snap.analysis.code_action(file_id, range, repair_diagnostics, resolve_strategy.clone())?;
     let diag_context =
         (!params.context.diagnostics.is_empty()).then(|| params.context.diagnostics.clone());
 
@@ -623,24 +643,63 @@ fn quick_fix_diagnostics(
     action_name: &str,
     diagnostics: &[lsp_types::Diagnostic],
 ) -> Option<Vec<lsp_types::Diagnostic>> {
-    let predicate: fn(&lsp_types::Diagnostic) -> bool = match action_name {
-        "add_missing_connections" => is_missing_connection_diagnostic,
-        "add_missing_parameters" => is_missing_parameter_diagnostic,
+    let repair = match action_name {
+        "add_missing_connections" => ide::code_action::RepairKind::MissingConnection,
+        "add_missing_parameters" => ide::code_action::RepairKind::MissingParameter,
+        "convert_ordered_ports" => ide::code_action::RepairKind::ConvertOrderedPorts,
+        "convert_ordered_params" => ide::code_action::RepairKind::ConvertOrderedParams,
+        "add_implicit_named_port_parens" => {
+            ide::code_action::RepairKind::AddImplicitNamedPortParens
+        }
+        "add_instance_parens" => ide::code_action::RepairKind::AddInstanceParens,
         _ => return None,
     };
 
-    let matches = diagnostics.iter().filter(|diag| predicate(diag)).cloned().collect::<Vec<_>>();
+    let matches = diagnostics
+        .iter()
+        .filter(|diag| {
+            code_action_diagnostic(diag).is_some_and(|diag| {
+                CodeActionDiagnostics { items: vec![diag] }.allows_repair(repair)
+            })
+        })
+        .cloned()
+        .collect::<Vec<_>>();
     if matches.is_empty() { None } else { Some(matches) }
 }
 
-fn is_missing_connection_diagnostic(diag: &lsp_types::Diagnostic) -> bool {
-    let msg = diag.message.as_str();
-    msg.contains("has no connection")
-        || msg.contains("does not provide a connection for an unnamed port")
+fn code_action_diagnostics(diagnostics: &[lsp_types::Diagnostic]) -> CodeActionDiagnostics {
+    CodeActionDiagnostics { items: diagnostics.iter().filter_map(code_action_diagnostic).collect() }
 }
 
-fn is_missing_parameter_diagnostic(diag: &lsp_types::Diagnostic) -> bool {
-    diag.message.contains("does not provide a value for parameter")
+fn code_action_diagnostic(diag: &lsp_types::Diagnostic) -> Option<CodeActionDiagnostic> {
+    if diag.source.as_deref() != Some("slang") {
+        return None;
+    }
+
+    let data = diag.data.as_ref()?;
+    let source =
+        data.get("source").and_then(|value| value.as_str()).and_then(|value| match value {
+            "parse" => Some(DiagnosticSource::Parse),
+            "semantic" => Some(DiagnosticSource::Semantic),
+            _ => None,
+        });
+    let subsystem = data
+        .get("subsystem")
+        .and_then(|value| value.as_u64())
+        .and_then(|value| u16::try_from(value).ok());
+    let code = data
+        .get("code")
+        .and_then(|value| value.as_u64())
+        .and_then(|value| u16::try_from(value).ok());
+    let option = data.get("option").and_then(|value| value.as_str()).map(ToOwned::to_owned);
+    let name = data.get("name").and_then(|value| value.as_str()).map(ToOwned::to_owned);
+
+    Some(CodeActionDiagnostic {
+        source,
+        code: subsystem.zip(code).map(|(subsystem, code)| DiagnosticCode { subsystem, code }),
+        name,
+        option,
+    })
 }
 
 pub(crate) fn handle_code_action_resolve(
@@ -673,7 +732,14 @@ pub(crate) fn handle_code_action_resolve(
     let (idx, name) = parse_action_id(&data.id).map_err(CodeActionResolveError::InvalidId)?;
     let resolve_strategy = CodeActionResolveStrategy::Single { name };
 
-    let action = snap.analysis.code_action(file_id, range, resolve_strategy)?.remove(idx);
+    let repair_diagnostics = code_action_diagnostics(&data.code_action_params.context.diagnostics);
+    let mut actions =
+        snap.analysis.code_action(file_id, range, repair_diagnostics, resolve_strategy)?;
+    let action = if idx < actions.len() {
+        actions.remove(idx)
+    } else {
+        return Err(CodeActionResolveError::Stable.into());
+    };
 
     let resolved_action = to_proto::code_action(&snap, action, None, None)?;
     code_action.edit = resolved_action.edit;
@@ -685,11 +751,11 @@ pub(crate) fn handle_code_action_resolve(
 #[cfg(test)]
 mod tests {
     use lsp_types::{
-        DocumentDiagnosticReport, UnchangedDocumentDiagnosticReport, Url,
-        WorkspaceDocumentDiagnosticReport,
+        Diagnostic, DocumentDiagnosticReport, NumberOrString, Range,
+        UnchangedDocumentDiagnosticReport, Url, WorkspaceDocumentDiagnosticReport,
     };
 
-    use super::{document_diagnostic_report, workspace_diagnostic_report};
+    use super::{document_diagnostic_report, quick_fix_diagnostics, workspace_diagnostic_report};
 
     #[test]
     fn document_diagnostic_report_uses_unchanged_for_matching_result_id() {
@@ -745,5 +811,142 @@ mod tests {
             }
             other => panic!("expected unchanged report, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn quick_fix_diagnostics_use_stable_diagnostic_data() {
+        let diag = Diagnostic {
+            range: Range::default(),
+            severity: None,
+            code: Some(NumberOrString::String("2:29".to_owned())),
+            code_description: None,
+            source: Some("slang".to_owned()),
+            message: "localized message that should not be matched".to_owned(),
+            related_information: None,
+            tags: None,
+            data: Some(serde_json::json!({
+                "source": "semantic",
+                "subsystem": 2,
+                "code": 29,
+                "name": "ParamHasNoValue",
+                "option": null,
+                "groups": [],
+                "selectorHints": ["code:2:29", "source:semantic"]
+            })),
+        };
+
+        assert!(quick_fix_diagnostics("add_missing_parameters", &[diag]).is_some());
+    }
+
+    #[test]
+    fn quick_fix_diagnostics_match_connection_options() {
+        let diag = Diagnostic {
+            range: Range::default(),
+            severity: None,
+            code: Some(NumberOrString::String("2:260".to_owned())),
+            code_description: None,
+            source: Some("slang".to_owned()),
+            message: "localized message that should not be matched".to_owned(),
+            related_information: None,
+            tags: None,
+            data: Some(serde_json::json!({
+                "source": "semantic",
+                "subsystem": 2,
+                "code": 260,
+                "name": "UnconnectedNamedPort",
+                "option": "unconnected-port",
+                "groups": [],
+                "selectorHints": ["code:2:260", "option:unconnected-port", "source:semantic"]
+            })),
+        };
+
+        assert!(quick_fix_diagnostics("add_missing_connections", &[diag]).is_some());
+    }
+
+    #[test]
+    fn quick_fix_diagnostics_match_new_repairs() {
+        let ports = Diagnostic {
+            range: Range::default(),
+            severity: None,
+            code: Some(NumberOrString::String("2:998".to_owned())),
+            code_description: None,
+            source: Some("slang".to_owned()),
+            message: "localized message".to_owned(),
+            related_information: None,
+            tags: None,
+            data: Some(serde_json::json!({
+                "source": "semantic",
+                "subsystem": 2,
+                "code": 998,
+                "name": "MixingOrderedAndNamedPorts",
+                "option": null,
+                "groups": [],
+                "selectorHints": ["name:MixingOrderedAndNamedPorts", "source:semantic"]
+            })),
+        };
+        assert!(quick_fix_diagnostics("convert_ordered_ports", &[ports]).is_some());
+
+        let params = Diagnostic {
+            range: Range::default(),
+            severity: None,
+            code: Some(NumberOrString::String("2:997".to_owned())),
+            code_description: None,
+            source: Some("slang".to_owned()),
+            message: "localized message".to_owned(),
+            related_information: None,
+            tags: None,
+            data: Some(serde_json::json!({
+                "source": "semantic",
+                "subsystem": 2,
+                "code": 997,
+                "name": "MixingOrderedAndNamedParams",
+                "option": null,
+                "groups": [],
+                "selectorHints": ["name:MixingOrderedAndNamedParams", "source:semantic"]
+            })),
+        };
+        assert!(quick_fix_diagnostics("convert_ordered_params", &[params]).is_some());
+
+        let implicit = Diagnostic {
+            range: Range::default(),
+            severity: None,
+            code: Some(NumberOrString::String("2:996".to_owned())),
+            code_description: None,
+            source: Some("slang".to_owned()),
+            message: "localized message".to_owned(),
+            related_information: None,
+            tags: None,
+            data: Some(serde_json::json!({
+                "source": "semantic",
+                "subsystem": 2,
+                "code": 996,
+                "name": "ImplicitNamedPortNotFound",
+                "option": null,
+                "groups": [],
+                "selectorHints": ["name:ImplicitNamedPortNotFound", "source:semantic"]
+            })),
+        };
+        assert!(quick_fix_diagnostics("add_implicit_named_port_parens", &[implicit]).is_some());
+
+        let instance = Diagnostic {
+            range: Range::default(),
+            severity: None,
+            code: Some(NumberOrString::String("2:999".to_owned())),
+            code_description: None,
+            source: Some("slang".to_owned()),
+            message: "localized message".to_owned(),
+            related_information: None,
+            tags: None,
+            data: Some(serde_json::json!({
+                "source": "semantic",
+                "subsystem": 2,
+                "code": 999,
+                "name": "InstanceMissingParens",
+                "option": null,
+                "groups": [],
+                "selectorHints": ["name:InstanceMissingParens", "source:semantic"]
+            })),
+        };
+        assert!(quick_fix_diagnostics("add_instance_parens", &[instance]).is_some());
     }
 }

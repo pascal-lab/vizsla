@@ -13,7 +13,7 @@ use vfs::FileId;
 
 use crate::{
     Cancellable,
-    code_action::{self, CodeAction, CodeActionResolveStrategy},
+    code_action::{self, CodeAction, CodeActionDiagnostics, CodeActionResolveStrategy},
     code_lens::{self, CodeLens, CodeLensConfig, CodeLensKind},
     completion::{
         CompletionItem,
@@ -62,8 +62,19 @@ impl Analysis {
         self.with_db(|db| diagnostics::diagnostics(db, file_id))
     }
 
+    pub fn source_root_diagnostics(
+        &self,
+        file_id: FileId,
+    ) -> Cancellable<Vec<diagnostics::Diagnostic>> {
+        self.with_db(|db| diagnostics::source_root_diagnostics(db, file_id))
+    }
+
     pub fn parse_diagnostics(&self, file_id: FileId) -> Cancellable<Vec<diagnostics::Diagnostic>> {
         self.with_db(|db| diagnostics::parse_diagnostics(db, file_id))
+    }
+
+    pub fn source_root_file_ids(&self, file_id: FileId) -> Cancellable<Vec<FileId>> {
+        self.with_db(|db| diagnostics::source_root_file_ids(db, file_id))
     }
 }
 
@@ -213,8 +224,11 @@ impl Analysis {
         &self,
         file_id: FileId,
         range: TextRange,
+        diagnostics: CodeActionDiagnostics,
         resolve_strategy: CodeActionResolveStrategy,
     ) -> Cancellable<Vec<CodeAction>> {
-        self.with_db(|db| code_action::code_action(db, file_id, range, resolve_strategy))
+        self.with_db(|db| {
+            code_action::code_action(db, file_id, range, diagnostics, resolve_strategy)
+        })
     }
 }

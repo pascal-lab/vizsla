@@ -112,7 +112,7 @@ fn complete_parameter_port_list_with_typedefs(
     let Some(module) =
         sema.find_node_at_offset::<ast::ModuleDeclaration>(file.syntax(), position.offset)
     else {
-        return complete_parameter_port_list(prefix, ctx);
+        return Vec::new();
     };
     let file_id = sema.find_file(module.syntax());
     let (_, file_src_map) = db.hir_file_with_source_map(file_id);
@@ -345,17 +345,9 @@ fn separated_list_index_at_offset<'a, T: AstNode<'a>>(
 }
 
 fn resolve_target_module_id(
-    db: &RootDb,
+    _db: &RootDb,
     sema: &Semantics<'_, RootDb>,
     instantiation: ast::HierarchyInstantiation<'_>,
 ) -> Option<hir::hir_def::module::ModuleId> {
-    if let Some(module_id) = sema.nameres_instantiation(instantiation) {
-        return Some(module_id);
-    }
-
-    let name = hir::hir_def::lower_ident_opt(instantiation.type_())?;
-    match db.unit_scope().get(&name)? {
-        hir::scope::UnitEntry::ModuleId(module_id) => Some(module_id),
-        _ => None,
-    }
+    sema.nameres_instantiation(instantiation)
 }

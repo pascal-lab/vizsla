@@ -3,7 +3,6 @@ use hir::{
     db::HirDb,
     hir_def::module::{instantiation::PortConn, port::Ports},
 };
-use itertools::Either;
 use rustc_hash::FxHashSet;
 use smol_str::SmolStr;
 use syntax::{
@@ -12,7 +11,10 @@ use syntax::{
 };
 use utils::get::GetRef;
 
-use crate::code_action::{CodeActionCollector, CodeActionCtx, CodeActionId, CodeActionKind};
+use crate::code_action::{
+    CodeActionCollector, CodeActionCtx, CodeActionId, CodeActionKind, RepairKind,
+    append_missing_list_entries,
+};
 
 const ID: CodeActionId =
     CodeActionId { name: "add_missing_connections", kind: CodeActionKind::Generate };
@@ -22,6 +24,10 @@ pub(super) fn add_missing_connections(
     collector: &mut CodeActionCollector,
     ctx: &CodeActionCtx,
 ) -> Option<()> {
+    if !ctx.diagnostics.allows_repair(RepairKind::MissingConnection) {
+        return None;
+    }
+
     let sema = ctx.sema;
     let db = sema.db;
 
@@ -35,6 +41,7 @@ pub(super) fn add_missing_connections(
     let target_module_id = sema.nameres_instantiation(instantiation)?;
     let target_module = db.module(target_module_id);
 
+    let has_existing_connections = !instance.connections.is_empty();
     let is_ordered = instance
         .connections
         .first()
@@ -63,13 +70,26 @@ pub(super) fn add_missing_connections(
                     });
             }
         }
-        Either::Left(names)
+        names
     } else {
-        let mut names = FxHashSet::default();
+        let mut connected_names = FxHashSet::default();
+        for conn_id in instance.connections.iter() {
+            match module.get(*conn_id) {
+                PortConn::Named(Some(name), _) => {
+                    connected_names.insert(name.clone());
+                }
+                PortConn::Ordered(_) => return None,
+                _ => {}
+            }
+        }
+
+        let mut names = Vec::default();
         match &target_module.ports {
             Ports::NonAnsi { ports, .. } => {
                 ports.values().filter_map(|port| port.label.clone()).for_each(|label| {
-                    names.insert(label);
+                    if !connected_names.contains(&label) {
+                        names.push(label);
+                    }
                 });
             }
             Ports::Ansi(ports) => {
@@ -78,52 +98,36 @@ pub(super) fn add_missing_connections(
                     .flat_map(|port| port.decls.clone())
                     .filter_map(|decl| target_module.get(decl).name.clone())
                     .for_each(|name| {
-                        names.insert(name);
+                        if !connected_names.contains(&name) {
+                            names.push(name);
+                        }
                     });
             }
         }
-
-        for conn_id in instance.connections.iter() {
-            match module.get(*conn_id) {
-                PortConn::Named(Some(name), _) => {
-                    names.remove(name);
-                }
-                PortConn::Ordered(_) => return None,
-                _ => {}
-            }
-        }
-
-        Either::Right(names)
+        names
     };
 
+    if names.is_empty() {
+        return None;
+    }
+
     collector.add(ID, LABEL, ctx.range, |builder| {
-        let mut text = String::new();
+        let mut entries = Vec::new();
         let cont_id = module_id.into();
         let mut add_to_text = |name: SmolStr| match (
             sema.name_to_def(InContainer::new(cont_id, name.clone())),
             is_ordered,
         ) {
-            (None, true) => text.push_str(&format!("/* {name} */, ")),
-            (None, false) => text.push_str(&format!(".{name}(), ")),
-            (Some(_), true) => text.push_str(&format!("{name}, ")),
-            (Some(_), false) => text.push_str(&format!(".{name}, ")),
+            (None, true) => entries.push(format!("/* {name} */ '0")),
+            (None, false) => entries.push(format!(".{name}()")),
+            (Some(_), true) => entries.push(name.to_string()),
+            (Some(_), false) => entries.push(format!(".{name}")),
         };
 
-        match names {
-            Either::Left(names) => {
-                names.into_iter().for_each(&mut add_to_text);
-            }
-            Either::Right(names) => {
-                names.into_iter().for_each(&mut add_to_text);
-            }
-        }
+        names.into_iter().for_each(&mut add_to_text);
 
-        if !text.is_empty() {
-            assert!(text.pop() == Some(' '));
-            assert!(text.pop() == Some(','));
-        }
-
-        builder.insert(insert_offset, text);
+        builder
+            .insert(insert_offset, append_missing_list_entries(entries, has_existing_connections));
     });
 
     Some(())
