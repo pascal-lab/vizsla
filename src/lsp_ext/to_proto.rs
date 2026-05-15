@@ -127,7 +127,6 @@ pub(crate) fn document_highlight(
 }
 
 const SLANG_DIAGNOSTIC_SOURCE: &str = "slang";
-
 pub(crate) fn diagnostic(
     line_info: &LineInfo,
     diag: ide_diagnostics::Diagnostic,
@@ -138,7 +137,13 @@ pub(crate) fn diagnostic(
         severity: diagnostic_severity(diag.severity),
         code: Some(lsp_types::NumberOrString::String(format!("{}:{}", diag.subsystem, diag.code))),
         code_description: None,
-        source: Some(SLANG_DIAGNOSTIC_SOURCE.to_string()),
+        source: Some(
+            match diag.source {
+                ide_diagnostics::DiagnosticSource::SlangParse
+                | ide_diagnostics::DiagnosticSource::SlangSemantic => SLANG_DIAGNOSTIC_SOURCE,
+            }
+            .to_string(),
+        ),
         message: diag.message,
         related_information: None,
         tags: None,
@@ -193,19 +198,26 @@ fn symbol_kind(symbol_kind: SymbolKind) -> lsp_types::SymbolKind {
     use lsp_types::SymbolKind as LspSymbolKind;
     match symbol_kind {
         SymbolKind::Module => LspSymbolKind::MODULE,
+        SymbolKind::Config => LspSymbolKind::NAMESPACE,
+        SymbolKind::Primitive => LspSymbolKind::OBJECT,
         SymbolKind::NonAnsiPortLabel => LspSymbolKind::FIELD,
         SymbolKind::PortDecl => LspSymbolKind::FIELD,
         SymbolKind::ParamDecl => LspSymbolKind::TYPE_PARAMETER,
         SymbolKind::NetDecl => LspSymbolKind::PROPERTY,
         SymbolKind::DataDecl => LspSymbolKind::VARIABLE,
+        SymbolKind::Genvar => LspSymbolKind::VARIABLE,
+        SymbolKind::Specparam => LspSymbolKind::TYPE_PARAMETER,
         SymbolKind::Typedef => LspSymbolKind::TYPE_PARAMETER,
         SymbolKind::Instance => LspSymbolKind::OBJECT,
         SymbolKind::Block => LspSymbolKind::NAMESPACE,
         SymbolKind::Stmt => LspSymbolKind::NAMESPACE,
         SymbolKind::Fn => LspSymbolKind::FUNCTION,
         SymbolKind::Generate => LspSymbolKind::NAMESPACE,
+        SymbolKind::Specify => LspSymbolKind::NAMESPACE,
         SymbolKind::Interface => LspSymbolKind::INTERFACE,
+        SymbolKind::Library => LspSymbolKind::NAMESPACE,
         SymbolKind::Region => LspSymbolKind::NAMESPACE,
+        SymbolKind::Unknown => LspSymbolKind::NAMESPACE,
     }
 }
 

@@ -14,7 +14,7 @@ use crate::{
         HirData, alloc_idx_and_src,
         expr::{
             Expr, ExprSrc, LowerExpr,
-            data_ty::DataTy,
+            data_ty::{BuiltinDataTy, DataTy, IntKind},
             declarator::{Declarator, DeclaratorSrc, LowerDecl},
             timing_control::{DelayControl, EventExpr, EventExprSrc, LowerEventExpr},
         },
@@ -31,6 +31,8 @@ define_enum_deriving_from! {
         DataDecl,
         NetDecl,
         ParamDecl,
+        GenvarDecl,
+        SpecparamDecl,
     }
 }
 
@@ -38,8 +40,12 @@ pub type DeclarationId = Idx<Declaration>;
 define_src!(DeclarationSrc(
     ast::DataDeclaration,
     ast::NetDeclaration,
+    ast::PortDeclaration,
     ast::ParameterDeclaration,
-    ast::LocalVariableDeclaration
+    ast::TypeParameterDeclaration,
+    ast::LocalVariableDeclaration,
+    ast::GenvarDeclaration,
+    ast::SpecparamDeclaration
 ));
 
 impl DeclarationSrc {
@@ -47,8 +53,12 @@ impl DeclarationSrc {
         match self {
             DeclarationSrc::DataDeclaration(ptr)
             | DeclarationSrc::NetDeclaration(ptr)
+            | DeclarationSrc::PortDeclaration(ptr)
             | DeclarationSrc::ParameterDeclaration(ptr)
-            | DeclarationSrc::LocalVariableDeclaration(ptr) => *ptr,
+            | DeclarationSrc::TypeParameterDeclaration(ptr)
+            | DeclarationSrc::LocalVariableDeclaration(ptr)
+            | DeclarationSrc::GenvarDeclaration(ptr)
+            | DeclarationSrc::SpecparamDeclaration(ptr) => *ptr,
         }
     }
 }
@@ -59,6 +69,8 @@ impl Declaration {
             Declaration::DataDecl(data_decl) => data_decl.decls.clone(),
             Declaration::NetDecl(net_decl) => net_decl.decls.clone(),
             Declaration::ParamDecl(param_decl) => param_decl.decls.clone(),
+            Declaration::GenvarDecl(genvar_decl) => genvar_decl.decls.clone(),
+            Declaration::SpecparamDecl(specparam_decl) => specparam_decl.decls.clone(),
         }
     }
 
@@ -67,6 +79,8 @@ impl Declaration {
             Declaration::DataDecl(data_decl) => data_decl.ty,
             Declaration::NetDecl(net_decl) => net_decl.ty,
             Declaration::ParamDecl(param_decl) => param_decl.ty,
+            Declaration::GenvarDecl(genvar_decl) => genvar_decl.ty,
+            Declaration::SpecparamDecl(specparam_decl) => specparam_decl.ty,
         }
     }
 }
@@ -97,6 +111,18 @@ pub enum NetStrength {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ParamDecl {
+    pub ty: DataTy,
+    pub decls: DeclsRange,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct GenvarDecl {
+    pub ty: DataTy,
+    pub decls: DeclsRange,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct SpecparamDecl {
     pub ty: DataTy,
     pub decls: DeclsRange,
 }
@@ -197,6 +223,26 @@ impl LowerDeclarationCtx<'_> {
         }
     }
 
+    pub(crate) fn lower_port_decl_as_data_decl(
+        &mut self,
+        port_decl: ast::PortDeclaration,
+    ) -> Option<DeclarationId> {
+        use ast::PortHeader::*;
+        let ty = match port_decl.header() {
+            VariablePortHeader(header) => self.expr_ctx().lower_data_ty(header.data_type()),
+            NetPortHeader(header) => self.expr_ctx().lower_data_ty(header.data_type()),
+            InterfacePortHeader(_) => return None,
+        };
+
+        let parent = self.declarations.nxt_idx().into();
+        let decls = self.decl_ctx().lower_declarators(port_decl.declarators(), parent);
+
+        Some(alloc_idx_and_src! {
+            DataDecl { ty, const_kw: false, var_kw: false, decls } => self.declarations,
+            port_decl => self.declaration_srcs,
+        })
+    }
+
     pub(crate) fn lower_param_decl_base(
         &mut self,
         param_decl: ast::ParameterDeclarationBase,
@@ -204,7 +250,25 @@ impl LowerDeclarationCtx<'_> {
         use ast::ParameterDeclarationBase::*;
         match param_decl {
             ParameterDeclaration(param_decl) => self.lower_param_decl(param_decl),
-            TypeParameterDeclaration(_) => unimplemented!(),
+            TypeParameterDeclaration(type_param_decl) => {
+                self.lower_type_param_decl(type_param_decl)
+            }
+        }
+    }
+
+    fn lower_type_param_decl(
+        &mut self,
+        type_param_decl: ast::TypeParameterDeclaration,
+    ) -> DeclarationId {
+        let start = self.decls.nxt_idx();
+        let ty = DataTy::Builtin(
+            self.db.intern_ty(crate::hir_def::expr::data_ty::BuiltinDataTy::default()),
+        );
+        let decls = DeclsRange::new(start..self.decls.nxt_idx());
+
+        alloc_idx_and_src! {
+            ParamDecl { ty, decls } => self.declarations,
+            type_param_decl => self.declaration_srcs,
         }
     }
 
@@ -217,6 +281,37 @@ impl LowerDeclarationCtx<'_> {
         alloc_idx_and_src! {
             ParamDecl { ty, decls } => self.declarations,
             param_decl => self.declaration_srcs,
+        }
+    }
+
+    pub(crate) fn lower_genvar_decl(
+        &mut self,
+        genvar_decl: ast::GenvarDeclaration,
+    ) -> DeclarationId {
+        let ty = DataTy::Builtin(
+            self.db.intern_ty(BuiltinDataTy::Int { kind: IntKind::Integer, signing: true }),
+        );
+        let parent = self.declarations.nxt_idx().into();
+        let decls = self.decl_ctx().lower_identifier_names(genvar_decl.identifiers(), parent);
+
+        alloc_idx_and_src! {
+            GenvarDecl { ty, decls } => self.declarations,
+            genvar_decl => self.declaration_srcs,
+        }
+    }
+
+    pub(crate) fn lower_specparam_decl(
+        &mut self,
+        specparam_decl: ast::SpecparamDeclaration,
+    ) -> DeclarationId {
+        let ty = self.expr_ctx().lower_implicit_data_ty(specparam_decl.type_());
+        let parent = self.declarations.nxt_idx().into();
+        let decls =
+            self.decl_ctx().lower_specparam_declarators(specparam_decl.declarators(), parent);
+
+        alloc_idx_and_src! {
+            SpecparamDecl { ty, decls } => self.declarations,
+            specparam_decl => self.declaration_srcs,
         }
     }
 }

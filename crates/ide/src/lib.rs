@@ -38,33 +38,47 @@ pub mod semantic_tokens;
 pub mod signature_help;
 #[cfg(test)]
 mod test_utils;
+#[cfg(test)]
+mod verilog_2005;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum SymbolKind {
     Module,
+    Config,
+    Primitive,
     NonAnsiPortLabel,
     PortDecl,
     ParamDecl,
     NetDecl,
     DataDecl,
+    Genvar,
+    Specparam,
     Typedef,
     Instance,
     Block,
     Stmt,
     Fn,
     Generate,
+    Specify,
     Interface,
+    Library,
     Region,
+    Unknown,
 }
 
 impl SymbolKind {
     pub fn from_syntax_kind(kind: SyntaxKind) -> Self {
         match_ast_kind! { kind,
             ast::ModuleDeclaration where kind == SyntaxKind::MODULE_DECLARATION => SymbolKind::Module,
+            ast::ConfigDeclaration => SymbolKind::Config,
+            ast::UdpDeclaration => SymbolKind::Primitive,
             ast::NonAnsiPort => SymbolKind::NonAnsiPortLabel,
             ast::PortDeclaration => SymbolKind::PortDecl,
             ast::ParameterDeclaration => SymbolKind::ParamDecl,
             ast::NetDeclaration => SymbolKind::NetDecl,
             ast::DataDeclaration => SymbolKind::DataDecl,
+            ast::GenvarDeclaration => SymbolKind::Genvar,
+            ast::LibraryDeclaration => SymbolKind::Library,
+            ast::SpecparamDeclaration => SymbolKind::Specparam,
             ast::TypedefDeclaration => SymbolKind::Typedef,
             ast::Declarator => SymbolKind::DataDecl,
             ast::HierarchicalInstance => SymbolKind::Instance,
@@ -73,7 +87,8 @@ impl SymbolKind {
             ast::Statement => SymbolKind::Stmt, // the order of these two is important
 
             ast::FunctionDeclaration => SymbolKind::Fn,
-            _ => unreachable!(),
+            ast::SpecifyBlock => SymbolKind::Specify,
+            _ => SymbolKind::Unknown,
         }
     }
 }

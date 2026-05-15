@@ -6,18 +6,23 @@ use utils::get::GetRef;
 
 use super::SemanticsImpl;
 use crate::{
-    container::{ContainerId, InBlock, InContainer, InFile, InModule, InSubroutine},
+    container::{
+        ContainerId, InBlock, InContainer, InFile, InGenerateBlock, InModule, InSubroutine,
+    },
     hir_def::{
         block::BlockId,
         declaration::Declaration,
         expr::declarator::{DeclId, DeclaratorParent},
+        file::{config::ConfigDeclId, library::LibraryDeclId, udp::UdpDeclId},
         lower_ident_opt,
-        module::{ModuleId, instantiation::InstanceId, port::NonAnsiPortId},
+        module::{
+            ModuleId, generate::GenerateBlockId, instantiation::InstanceId, port::NonAnsiPortId,
+        },
         stmt::StmtId,
         subroutine::{SubroutineId, SubroutinePortId},
         typedef::TypedefId,
     },
-    scope::{self, BlockEntry, ModuleEntry, SubroutineEntry, UnitEntry},
+    scope::{self, BlockEntry, GenerateBlockEntry, ModuleEntry, SubroutineEntry, UnitEntry},
 };
 
 impl SemanticsImpl<'_> {
@@ -86,7 +91,11 @@ impl SemanticsImpl<'_> {
         let module_name = lower_ident_opt(instantiation.type_())?;
         match self.db.unit_scope().get(&module_name)? {
             UnitEntry::ModuleId(module_id) => Some(module_id),
-            UnitEntry::FiledDeclId(_) | UnitEntry::FiledTypedefId(_) => None,
+            UnitEntry::FiledConfigDeclId(_)
+            | UnitEntry::FiledLibraryDeclId(_)
+            | UnitEntry::FiledUdpDeclId(_)
+            | UnitEntry::FiledDeclId(_)
+            | UnitEntry::FiledTypedefId(_) => None,
         }
     }
 
@@ -98,6 +107,9 @@ impl SemanticsImpl<'_> {
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum PathResolution {
     Module(ModuleId),
+    Config(InFile<ConfigDeclId>),
+    Library(InFile<LibraryDeclId>),
+    Udp(InFile<UdpDeclId>),
     Decl(InContainer<DeclId>),
     Typedef(InContainer<TypedefId>),
     ParamDecl(InModule<DeclId>),
@@ -114,6 +126,7 @@ pub enum PathResolution {
     Instance(InModule<InstanceId>),
     Stmt(InContainer<StmtId>),
     Block(BlockId),
+    GenerateBlock(GenerateBlockId),
 }
 
 impl From<UnitEntry> for PathResolution {
@@ -121,6 +134,9 @@ impl From<UnitEntry> for PathResolution {
         use UnitEntry::*;
         match entry {
             ModuleId(idx) => Self::Module(idx),
+            FiledConfigDeclId(idx) => Self::Config(idx),
+            FiledLibraryDeclId(idx) => Self::Library(idx),
+            FiledUdpDeclId(idx) => Self::Udp(idx),
             FiledDeclId(idx) => Self::Decl(idx.into()),
             FiledTypedefId(idx) => Self::Typedef(idx.into()),
         }
@@ -134,6 +150,7 @@ impl From<InModule<ModuleEntry>> for PathResolution {
             DeclId(decl_id) => Self::Decl(entry.with_value(decl_id).into()),
             TypedefId(typedef_id) => Self::Typedef(entry.with_value(typedef_id).into()),
             InstanceId(idx) => Self::Instance(entry.with_value(idx)),
+            GenerateBlockId(generate_block_id) => Self::GenerateBlock(generate_block_id),
             StmtId(idx) => Self::Stmt(entry.with_value(idx).into()),
             SubroutineId(subroutine_id) => Self::Subroutine(subroutine_id),
             NonAnsiPortEntry(scope::NonAnsiPortEntry { label, port_decl, data_decl }) => {
@@ -141,6 +158,20 @@ impl From<InModule<ModuleEntry>> for PathResolution {
             }
             AnsiPortEntry(scope::AnsiPortEntry(idx)) => Self::AnsiPort(entry.with_value(idx)),
             BlockId(block_id) => Self::Block(block_id),
+        }
+    }
+}
+
+impl From<InGenerateBlock<GenerateBlockEntry>> for PathResolution {
+    fn from(entry: InGenerateBlock<GenerateBlockEntry>) -> Self {
+        use GenerateBlockEntry::*;
+        match entry.value {
+            DeclId(idx) => Self::Decl(entry.with_value(idx).into()),
+            TypedefId(idx) => Self::Typedef(entry.with_value(idx).into()),
+            GenerateBlockId(generate_block_id) => Self::GenerateBlock(generate_block_id),
+            StmtId(idx) => Self::Stmt(entry.with_value(idx).into()),
+            BlockId(block_id) => Self::Block(block_id),
+            SubroutineId(subroutine_id) => Self::Subroutine(subroutine_id),
         }
     }
 }

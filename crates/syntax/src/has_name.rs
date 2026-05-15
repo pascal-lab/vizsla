@@ -1,8 +1,10 @@
 use slang::{
     SyntaxToken,
     ast::{
-        AstNode, BlockStatement, Declarator, FunctionDeclaration, HierarchicalInstance,
-        ModuleDeclaration, NonAnsiPort, ParamAssignment, PortConnection, PortReference, Statement,
+        AstNode, BlockStatement, ConfigDeclaration, Declarator, FunctionDeclaration, GenerateBlock,
+        HierarchicalInstance, IdentifierName, LibraryDeclaration, ModuleDeclaration, NonAnsiPort,
+        ParamAssignment, PortConnection, PortReference, SpecparamDeclarator, Statement,
+        UdpDeclaration,
     },
 };
 
@@ -16,9 +18,35 @@ impl<'a> HasName<'a> for ModuleDeclaration<'a> {
     }
 }
 
+impl<'a> HasName<'a> for ConfigDeclaration<'a> {
+    fn name(&self) -> Option<SyntaxToken<'a>> {
+        self.name()
+    }
+}
+
+impl<'a> HasName<'a> for UdpDeclaration<'a> {
+    fn name(&self) -> Option<SyntaxToken<'a>> {
+        self.name()
+    }
+}
+
+impl<'a> HasName<'a> for LibraryDeclaration<'a> {
+    fn name(&self) -> Option<SyntaxToken<'a>> {
+        self.name()
+    }
+}
+
 impl<'a> HasName<'a> for BlockStatement<'a> {
     fn name(&self) -> Option<SyntaxToken<'a>> {
         self.block_name()?.name()
+    }
+}
+
+impl<'a> HasName<'a> for GenerateBlock<'a> {
+    fn name(&self) -> Option<SyntaxToken<'a>> {
+        self.label()
+            .and_then(|label| label.name())
+            .or_else(|| self.begin_name().and_then(|name| name.name()))
     }
 }
 
@@ -35,6 +63,18 @@ impl<'a> HasName<'a> for PortReference<'a> {
 }
 
 impl<'a> HasName<'a> for Declarator<'a> {
+    fn name(&self) -> Option<SyntaxToken<'a>> {
+        self.name()
+    }
+}
+
+impl<'a> HasName<'a> for IdentifierName<'a> {
+    fn name(&self) -> Option<SyntaxToken<'a>> {
+        self.identifier()
+    }
+}
+
+impl<'a> HasName<'a> for SpecparamDeclarator<'a> {
     fn name(&self) -> Option<SyntaxToken<'a>> {
         self.name()
     }

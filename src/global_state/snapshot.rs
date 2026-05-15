@@ -58,22 +58,26 @@ impl GlobalStateSnapshot {
         &self,
         file_id: FileId,
     ) -> Cancellable<Vec<ide::diagnostics::Diagnostic>> {
-        if self.config.diagnostics_config().semantic.enabled {
-            return self.analysis.diagnostics(file_id);
-        }
+        let diagnostics = if self.config.diagnostics_config().semantic.enabled {
+            self.analysis.diagnostics(file_id)?
+        } else {
+            self.analysis.parse_diagnostics(file_id)?
+        };
 
-        self.analysis.parse_diagnostics(file_id)
+        Ok(diagnostics)
     }
 
     pub(crate) fn source_root_diagnostics(
         &self,
         file_id: FileId,
     ) -> Cancellable<Vec<ide::diagnostics::Diagnostic>> {
-        if self.config.diagnostics_config().semantic.enabled {
-            return self.analysis.source_root_diagnostics(file_id);
-        }
+        let diagnostics = if self.config.diagnostics_config().semantic.enabled {
+            self.analysis.source_root_diagnostics(file_id)?
+        } else {
+            self.analysis.parse_diagnostics(file_id)?
+        };
 
-        self.analysis.parse_diagnostics(file_id)
+        Ok(diagnostics)
     }
 
     pub(crate) fn file_version(&self, file_id: FileId) -> Option<i32> {

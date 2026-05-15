@@ -1,6 +1,8 @@
 use std::iter::Peekable;
 
+use base_db::intern::Lookup;
 use hir::{
+    container::InFile,
     db::HirDb,
     file::HirFileId,
     hir_def::{
@@ -8,9 +10,25 @@ use hir::{
         block::{BlockId, BlockInfo, BlockItem, BlockSrc, LocalBlockId},
         declaration::{Declaration, DeclarationId, DeclarationSrc},
         expr::declarator::{DeclId, Declarator, DeclaratorSrc, DeclsRange},
-        file::FileItem,
-        module::{ModuleId, ModuleItem, ModuleSrc, port::Ports},
+        file::{
+            FileItem,
+            config::{ConfigDecl, ConfigDeclId, ConfigDeclSrc},
+            library::{LibraryDecl, LibraryDeclId, LibraryDeclSrc},
+            udp::{UdpDecl, UdpDeclId, UdpDeclSrc},
+        },
+        module::{
+            ModuleId, ModuleItem, ModuleSrc,
+            generate::{
+                GenerateBlockId, GenerateBlockItem, GenerateBlockLoc, GenerateItem, GenerateRegion,
+                GenerateRegionId, GenerateRegionSrc,
+            },
+            instantiation::{Instance, InstanceId, Instantiation, InstantiationId},
+            port::Ports,
+            specify::{SpecifyBlock, SpecifyBlockId, SpecifyBlockItem, SpecifyBlockSrc},
+        },
+        proc::{Proc, ProcId},
         stmt::{CaseItem, ForInit, Stmt, StmtId, StmtKind, StmtSrc},
+        subroutine::{LocalSubroutineId, Subroutine, SubroutineSrc},
         typedef::{Typedef, TypedefId, TypedefSrc},
     },
     region_tree::{RegionNode, RegionTreeIterator},
@@ -195,9 +213,20 @@ pub(crate) fn document_symbols(db: &RootDb, file_id: FileId) -> Vec<DocumentSymb
             FileItem::TypedefId(typedef_id) => {
                 build_typedef(&mut collector, typedef_id, file, src_map)
             }
-            FileItem::StructId(_) | FileItem::SubroutineId(_) => {
+            FileItem::SubroutineId(subroutine_id) => {
+                build_subroutine(&mut collector, subroutine_id, file, src_map)
+            }
+            FileItem::StructId(_) => {
                 // TODO: implement document symbols for these items
             }
+            FileItem::ConfigDeclId(config_id) => {
+                build_config_decl(&mut collector, config_id, file, src_map)
+            }
+            FileItem::LibraryDeclId(library_id) => {
+                build_library_decl(&mut collector, library_id, file, src_map)
+            }
+            FileItem::LibraryIncludeId(_) => {}
+            FileItem::UdpDeclId(udp_id) => build_udp_decl(&mut collector, udp_id, file, src_map),
         }
     }
 
@@ -271,10 +300,21 @@ fn collect_module_items(
                 build_decls(collector, &port_decl.decls, SymbolKind::PortDecl, module, src_map)
             }
             ModuleItem::ContAssignId(_) => {}
+            ModuleItem::DefParamId(_) => {}
+            ModuleItem::GenerateRegionId(generate_region_id) => {
+                build_generate_region(db, collector, generate_region_id, module, src_map)
+            }
+            ModuleItem::SpecifyBlockId(specify_block_id) => {
+                build_specify_block(collector, specify_block_id, module, src_map)
+            }
+            ModuleItem::SpecifyItemId(_) => {}
             ModuleItem::TypedefId(typedef_id) => {
                 build_typedef(collector, typedef_id, module, src_map)
             }
-            ModuleItem::StructId(_) | ModuleItem::SubroutineId(_) => {
+            ModuleItem::SubroutineId(subroutine_id) => {
+                build_subroutine(collector, subroutine_id, module, src_map)
+            }
+            ModuleItem::StructId(_) => {
                 // TODO: implement document symbols for these items
             }
         }
@@ -347,6 +387,7 @@ fn build_stmt<Arn, SrcMap>(
         | StmtKind::TimingCtrl(_, stmt_id)
         | StmtKind::Forever(stmt_id)
         | StmtKind::DoWhile(stmt_id, _)
+        | StmtKind::Repeat(_, stmt_id)
         | StmtKind::While(_, stmt_id) => build_stmt(db, collector, *stmt_id, arena, src_map),
         StmtKind::Cond { then_stmt, else_stmt, .. } => {
             build_stmt(db, collector, *then_stmt, arena, src_map);
@@ -376,6 +417,7 @@ fn build_stmt<Arn, SrcMap>(
         StmtKind::Empty
         | StmtKind::Expr(_)
         | StmtKind::Jump(_)
+        | StmtKind::EventTrigger(_)
         | StmtKind::ProcAssign(_)
         | StmtKind::Disable(_) => {}
 
@@ -403,6 +445,145 @@ fn build_declaration<Arn, SrcMap>(
         arena,
         src_map,
     );
+}
+
+#[inline]
+fn build_generate_region<Arn, SrcMap>(
+    db: &RootDb,
+    collector: &mut SymbolCollecter,
+    generate_region_id: GenerateRegionId,
+    arena: &Arn,
+    src_map: &SrcMap,
+) where
+    Arn: GetRef<GenerateRegionId, Output = GenerateRegion>
+        + GetRef<DeclarationId, Output = Declaration>
+        + GetRef<DeclId, Output = Declarator>
+        + GetRef<InstanceId, Output = Instance>
+        + GetRef<InstantiationId, Output = Instantiation>
+        + GetRef<LocalBlockId, Output = BlockInfo>
+        + GetRef<LocalSubroutineId, Output = Subroutine>
+        + GetRef<ProcId, Output = Proc>
+        + GetRef<StmtId, Output = Stmt>
+        + GetRef<TypedefId, Output = Typedef>,
+    SrcMap: Get<GenerateRegionId, Output = GenerateRegionSrc>
+        + Get<DeclarationId, Output = DeclarationSrc>
+        + Get<DeclId, Output = DeclaratorSrc>
+        + Get<InstanceId, Output = hir::hir_def::module::instantiation::InstanceSrc>
+        + Get<LocalBlockId, Output = BlockSrc>
+        + Get<LocalSubroutineId, Output = SubroutineSrc>
+        + Get<StmtId, Output = StmtSrc>
+        + Get<TypedefId, Output = TypedefSrc>,
+{
+    let hir = arena.get(generate_region_id);
+    let src = src_map.get(generate_region_id);
+    let name = Some(SmolStr::new_static("generate"));
+    collector.push_symbol_with_kind(&name, src, SymbolKind::Generate);
+    for item in hir.items.iter() {
+        match *item {
+            GenerateItem::ContAssignId(_) | GenerateItem::DefParamId(_) => {}
+            GenerateItem::DeclarationId(declaration_id) => {
+                build_declaration(collector, declaration_id, arena, src_map);
+            }
+            GenerateItem::GenerateBlockId(generate_block_id) => {
+                build_generate_block(db, collector, generate_block_id);
+            }
+            GenerateItem::InstantiationId(instantiation_id) => {
+                for &instance_id in arena.get(instantiation_id).instances.iter() {
+                    let hir = arena.get(instance_id);
+                    let src = src_map.get(instance_id);
+                    collector.push_symbol(&hir.name, src);
+                    collector.pop();
+                }
+            }
+            GenerateItem::ProcId(proc_id) => {
+                let proc = arena.get(proc_id);
+                build_stmt(db, collector, proc.stmt, arena, src_map);
+            }
+            GenerateItem::StructId(_) => {}
+            GenerateItem::SubroutineId(subroutine_id) => {
+                build_subroutine(collector, subroutine_id, arena, src_map);
+            }
+            GenerateItem::TypedefId(typedef_id) => {
+                build_typedef(collector, typedef_id, arena, src_map);
+            }
+        }
+    }
+    collector.pop();
+}
+
+fn build_generate_block(
+    db: &RootDb,
+    collector: &mut SymbolCollecter,
+    generate_block_id: GenerateBlockId,
+) {
+    let GenerateBlockLoc { src: InFile { value: generate_block_src, .. }, .. } =
+        generate_block_id.lookup(db);
+    let (generate_block, src_map) = db.generate_block_with_source_map(generate_block_id);
+    let (generate_block, src_map) = (generate_block.as_ref(), src_map.as_ref());
+    let name = generate_block.name.clone();
+
+    collector.push_symbol_with_kind(&name, generate_block_src, SymbolKind::Generate);
+    for item in &generate_block.items {
+        match *item {
+            GenerateBlockItem::DeclarationId(declaration_id) => {
+                build_declaration(collector, declaration_id, generate_block, src_map);
+            }
+            GenerateBlockItem::GenerateBlockId(child_id) => {
+                build_generate_block(db, collector, child_id);
+            }
+            GenerateBlockItem::TypedefId(typedef_id) => {
+                build_typedef(collector, typedef_id, generate_block, src_map);
+            }
+            GenerateBlockItem::SubroutineId(subroutine_id) => {
+                build_subroutine(collector, subroutine_id, generate_block, src_map);
+            }
+            GenerateBlockItem::ProcId(proc_id) => {
+                let proc = generate_block.get(proc_id);
+                build_stmt(db, collector, proc.stmt, generate_block, src_map);
+            }
+            GenerateBlockItem::InstantiationId(instantiation_id) => {
+                for &instance_id in generate_block.get(instantiation_id).instances.iter() {
+                    let hir = generate_block.get(instance_id);
+                    let src = src_map.get(instance_id);
+                    collector.push_symbol(&hir.name, src);
+                    collector.pop();
+                }
+            }
+            GenerateBlockItem::ContAssignId(_)
+            | GenerateBlockItem::DefParamId(_)
+            | GenerateBlockItem::StructId(_) => {}
+        }
+    }
+    collector.pop();
+}
+
+#[inline]
+fn build_specify_block<Arn, SrcMap>(
+    collector: &mut SymbolCollecter,
+    specify_block_id: SpecifyBlockId,
+    arena: &Arn,
+    src_map: &SrcMap,
+) where
+    Arn: GetRef<SpecifyBlockId, Output = SpecifyBlock>
+        + GetRef<DeclarationId, Output = Declaration>
+        + GetRef<DeclId, Output = Declarator>,
+    SrcMap: Get<SpecifyBlockId, Output = SpecifyBlockSrc>
+        + Get<DeclarationId, Output = DeclarationSrc>
+        + Get<DeclId, Output = DeclaratorSrc>,
+{
+    let hir = arena.get(specify_block_id);
+    let src = src_map.get(specify_block_id);
+    let name = Some(SmolStr::new_static("specify"));
+    collector.push_symbol_with_kind(&name, src, SymbolKind::Specify);
+    for item in hir.items.iter() {
+        match *item {
+            SpecifyBlockItem::DeclarationId(declaration_id) => {
+                build_declaration(collector, declaration_id, arena, src_map);
+            }
+            SpecifyBlockItem::SpecifyItemId(_) => {}
+        }
+    }
+    collector.pop();
 }
 
 #[inline]
@@ -451,5 +632,69 @@ fn build_typedef<Arn, SrcMap>(
     let hir = arena.get(typedef_id);
     let src = src_map.get(typedef_id);
     collector.push_symbol_with_kind(&hir.name, src, SymbolKind::Typedef);
+    collector.pop();
+}
+
+#[inline]
+fn build_subroutine<Arn, SrcMap>(
+    collector: &mut SymbolCollecter,
+    subroutine_id: LocalSubroutineId,
+    arena: &Arn,
+    src_map: &SrcMap,
+) where
+    Arn: GetRef<LocalSubroutineId, Output = Subroutine>,
+    SrcMap: Get<LocalSubroutineId, Output = SubroutineSrc>,
+{
+    let hir = arena.get(subroutine_id);
+    let src = src_map.get(subroutine_id);
+    collector.push_symbol_with_kind(&hir.name, src, SymbolKind::Fn);
+    collector.pop();
+}
+
+#[inline]
+fn build_config_decl<Arn, SrcMap>(
+    collector: &mut SymbolCollecter,
+    config_id: ConfigDeclId,
+    arena: &Arn,
+    src_map: &SrcMap,
+) where
+    Arn: GetRef<ConfigDeclId, Output = ConfigDecl>,
+    SrcMap: Get<ConfigDeclId, Output = ConfigDeclSrc>,
+{
+    let hir = arena.get(config_id);
+    let src = src_map.get(config_id);
+    collector.push_symbol_with_kind(&hir.name, src, SymbolKind::Config);
+    collector.pop();
+}
+
+#[inline]
+fn build_udp_decl<Arn, SrcMap>(
+    collector: &mut SymbolCollecter,
+    udp_id: UdpDeclId,
+    arena: &Arn,
+    src_map: &SrcMap,
+) where
+    Arn: GetRef<UdpDeclId, Output = UdpDecl>,
+    SrcMap: Get<UdpDeclId, Output = UdpDeclSrc>,
+{
+    let hir = arena.get(udp_id);
+    let src = src_map.get(udp_id);
+    collector.push_symbol_with_kind(&hir.name, src, SymbolKind::Primitive);
+    collector.pop();
+}
+
+#[inline]
+fn build_library_decl<Arn, SrcMap>(
+    collector: &mut SymbolCollecter,
+    library_id: LibraryDeclId,
+    arena: &Arn,
+    src_map: &SrcMap,
+) where
+    Arn: GetRef<LibraryDeclId, Output = LibraryDecl>,
+    SrcMap: Get<LibraryDeclId, Output = LibraryDeclSrc>,
+{
+    let hir = arena.get(library_id);
+    let src = src_map.get(library_id);
+    collector.push_symbol_with_kind(&hir.name, src, SymbolKind::Library);
     collector.pop();
 }

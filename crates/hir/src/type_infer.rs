@@ -2,7 +2,9 @@ use rustc_hash::FxHashSet;
 use utils::get::GetRef;
 
 use crate::{
-    container::{ContainerId, ContainerParent, InContainer, InModule, InSubroutine},
+    container::{
+        ContainerId, ContainerParent, InContainer, InGenerateBlock, InModule, InSubroutine,
+    },
     db::HirDb,
     hir_def::{
         Ident,
@@ -14,7 +16,7 @@ use crate::{
             declarator::{DeclId, DeclaratorParent},
         },
         literal::Literal,
-        module::{ModuleId, port::PortDeclId},
+        module::{ModuleId, generate::GenerateBlockId, port::PortDeclId},
         stmt::{ForInit, StmtKind},
         subroutine::SubroutinePortId,
         typedef::TypedefId,
@@ -37,6 +39,7 @@ pub enum Ty {
     Struct(InContainer<StructId>),
     Alias { typedef: InContainer<TypedefId>, target: Box<Ty> },
     Module(ModuleId),
+    GenerateBlock(GenerateBlockId),
     Block(crate::hir_def::block::BlockId),
 }
 
@@ -104,8 +107,15 @@ pub fn type_of_path_resolution(db: &dyn HirDb, res: PathResolution) -> TyResult 
                 .map(|module_id| TyResult::new(Ty::Module(module_id)))
                 .unwrap_or_else(|| TyResult::new(Ty::Unknown))
         }
+        PathResolution::GenerateBlock(generate_block_id) => {
+            TyResult::new(Ty::GenerateBlock(generate_block_id))
+        }
         PathResolution::Block(block_id) => TyResult::new(Ty::Block(block_id)),
-        PathResolution::Subroutine(_) | PathResolution::Stmt(_) => TyResult::new(Ty::Unknown),
+        PathResolution::Config(_)
+        | PathResolution::Library(_)
+        | PathResolution::Udp(_)
+        | PathResolution::Subroutine(_)
+        | PathResolution::Stmt(_) => TyResult::new(Ty::Unknown),
     }
 }
 
@@ -141,6 +151,7 @@ pub fn members_of_ty(db: &dyn HirDb, ty: &Ty) -> Vec<TyMember> {
         Ty::Alias { target, .. } => members_of_ty(db, target),
         Ty::Struct(struct_id) => struct_members(db, *struct_id),
         Ty::Module(module_id) => module_members(db, *module_id),
+        Ty::GenerateBlock(generate_block_id) => generate_block_members(db, *generate_block_id),
         Ty::Block(block_id) => block_members(db, *block_id),
         Ty::Unknown | Ty::Error | Ty::Void | Ty::Builtin(_) => Vec::new(),
     }
@@ -163,7 +174,13 @@ pub fn type_class(db: &dyn HirDb, ty: &Ty) -> Option<TyClass> {
             BuiltinDataTy::String => Some(TyClass::String),
             BuiltinDataTy::Void => None,
         },
-        Ty::Unknown | Ty::Error | Ty::Void | Ty::Struct(_) | Ty::Module(_) | Ty::Block(_) => None,
+        Ty::Unknown
+        | Ty::Error
+        | Ty::Void
+        | Ty::Struct(_)
+        | Ty::Module(_)
+        | Ty::GenerateBlock(_)
+        | Ty::Block(_) => None,
     }
 }
 
@@ -215,7 +232,13 @@ pub fn packed_bit_width(db: &dyn HirDb, ty: &Ty) -> Option<u64> {
                 Some(product)
             }
         },
-        Ty::Unknown | Ty::Error | Ty::Void | Ty::Struct(_) | Ty::Module(_) | Ty::Block(_) => None,
+        Ty::Unknown
+        | Ty::Error
+        | Ty::Void
+        | Ty::Struct(_)
+        | Ty::Module(_)
+        | Ty::GenerateBlock(_)
+        | Ty::Block(_) => None,
     }
 }
 
@@ -324,6 +347,20 @@ fn module_members(db: &dyn HirDb, module_id: ModuleId) -> Vec<TyMember> {
     members
 }
 
+fn generate_block_members(db: &dyn HirDb, generate_block_id: GenerateBlockId) -> Vec<TyMember> {
+    let mut members: Vec<_> = db
+        .generate_block_scope(generate_block_id)
+        .iter()
+        .map(|(name, entry)| {
+            let origin = PathResolution::from(InGenerateBlock::new(generate_block_id, entry));
+            let ty = type_of_path_resolution(db, origin).ty;
+            TyMember { name: name.clone(), ty, origin: Some(origin) }
+        })
+        .collect();
+    sort_members(&mut members);
+    members
+}
+
 fn block_members(db: &dyn HirDb, block_id: crate::hir_def::block::BlockId) -> Vec<TyMember> {
     let mut members: Vec<_> = db
         .block_scope(block_id)
@@ -395,6 +432,10 @@ fn resolve_name(db: &dyn HirDb, cont_id: ContainerId, ident: &Ident) -> Option<P
             .module_scope(module_id)
             .get(ident)
             .map(|entry| PathResolution::from(InModule::new(module_id, entry))),
+        ContainerId::GenerateBlockId(generate_block_id) => db
+            .generate_block_scope(generate_block_id)
+            .get(ident)
+            .map(|entry| PathResolution::from(InGenerateBlock::new(generate_block_id, entry))),
         ContainerId::BlockId(block_id) => db
             .block_scope(block_id)
             .get(ident)
@@ -472,6 +513,9 @@ fn expr_of(db: &dyn HirDb, expr: InContainer<ExprId>) -> Option<Expr> {
     match expr.cont_id {
         ContainerId::HirFileId(file_id) => Some(db.hir_file(file_id).get(expr.value).clone()),
         ContainerId::ModuleId(module_id) => Some(db.module(module_id).get(expr.value).clone()),
+        ContainerId::GenerateBlockId(generate_block_id) => {
+            Some(db.generate_block(generate_block_id).get(expr.value).clone())
+        }
         ContainerId::BlockId(block_id) => Some(db.block(block_id).get(expr.value).clone()),
         ContainerId::SubroutineId(subroutine_id) => {
             Some(db.subroutine(subroutine_id).get(expr.value).clone())
@@ -486,6 +530,9 @@ fn decl_of(
     match decl.cont_id {
         ContainerId::HirFileId(file_id) => Some(db.hir_file(file_id).get(decl.value).clone()),
         ContainerId::ModuleId(module_id) => Some(db.module(module_id).get(decl.value).clone()),
+        ContainerId::GenerateBlockId(generate_block_id) => {
+            Some(db.generate_block(generate_block_id).get(decl.value).clone())
+        }
         ContainerId::BlockId(block_id) => Some(db.block(block_id).get(decl.value).clone()),
         ContainerId::SubroutineId(subroutine_id) => {
             Some(db.subroutine(subroutine_id).get(decl.value).clone())
@@ -500,6 +547,9 @@ fn declaration_of(
     match decl.cont_id {
         ContainerId::HirFileId(file_id) => Some(db.hir_file(file_id).get(decl.value).clone()),
         ContainerId::ModuleId(module_id) => Some(db.module(module_id).get(decl.value).clone()),
+        ContainerId::GenerateBlockId(generate_block_id) => {
+            Some(db.generate_block(generate_block_id).get(decl.value).clone())
+        }
         ContainerId::BlockId(block_id) => Some(db.block(block_id).get(decl.value).clone()),
         ContainerId::SubroutineId(subroutine_id) => {
             Some(db.subroutine(subroutine_id).get(decl.value).clone())
@@ -514,6 +564,9 @@ fn typedef_of(
     match typedef.cont_id {
         ContainerId::HirFileId(file_id) => Some(db.hir_file(file_id).get(typedef.value).clone()),
         ContainerId::ModuleId(module_id) => Some(db.module(module_id).get(typedef.value).clone()),
+        ContainerId::GenerateBlockId(generate_block_id) => {
+            Some(db.generate_block(generate_block_id).get(typedef.value).clone())
+        }
         ContainerId::BlockId(block_id) => Some(db.block(block_id).get(typedef.value).clone()),
         ContainerId::SubroutineId(subroutine_id) => {
             Some(db.subroutine(subroutine_id).get(typedef.value).clone())
@@ -528,6 +581,9 @@ fn struct_of(
     match struct_id.cont_id {
         ContainerId::HirFileId(file_id) => Some(db.hir_file(file_id).get(struct_id.value).clone()),
         ContainerId::ModuleId(module_id) => Some(db.module(module_id).get(struct_id.value).clone()),
+        ContainerId::GenerateBlockId(generate_block_id) => {
+            Some(db.generate_block(generate_block_id).get(struct_id.value).clone())
+        }
         ContainerId::BlockId(block_id) => Some(db.block(block_id).get(struct_id.value).clone()),
         ContainerId::SubroutineId(subroutine_id) => {
             Some(db.subroutine(subroutine_id).get(struct_id.value).clone())
@@ -542,6 +598,9 @@ fn stmt_of(
     match stmt.cont_id {
         ContainerId::HirFileId(file_id) => Some(db.hir_file(file_id).get(stmt.value).clone()),
         ContainerId::ModuleId(module_id) => Some(db.module(module_id).get(stmt.value).clone()),
+        ContainerId::GenerateBlockId(generate_block_id) => {
+            Some(db.generate_block(generate_block_id).get(stmt.value).clone())
+        }
         ContainerId::BlockId(block_id) => Some(db.block(block_id).get(stmt.value).clone()),
         ContainerId::SubroutineId(subroutine_id) => {
             Some(db.subroutine(subroutine_id).get(stmt.value).clone())

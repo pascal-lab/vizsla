@@ -44,6 +44,7 @@ pub enum StmtKind {
     Expr(ExprId),
     TimingCtrl(TimingControl, StmtId),
     ProcAssign(ProcAssignKind),
+    EventTrigger(EventTrigger),
     Block(BlockInfo),
 
     Cond {
@@ -61,6 +62,7 @@ pub enum StmtKind {
 
     Forever(StmtId),
     DoWhile(StmtId, ExprId),
+    Repeat(ExprId, StmtId),
     While(ExprId, StmtId),
     For {
         inits: ForInit,
@@ -82,6 +84,19 @@ pub enum ProcAssignKind {
     Force(ExprId),
     Deassign(ExprId),
     Release(ExprId),
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct EventTrigger {
+    pub kind: EventTriggerKind,
+    pub timing: Option<TimingControl>,
+    pub event: ExprId,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+pub enum EventTriggerKind {
+    Blocking,
+    Nonblocking,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -199,6 +214,7 @@ impl LowerStmtCtx<'_> {
             TimingControlStatement(stmt) => self.lower_timing_ctrl_stmt(stmt),
             ProceduralAssignStatement(stmt) => self.lower_assign_stmt(stmt),
             ProceduralDeassignStatement(stmt) => self.lower_deassign_stmt(stmt),
+            EventTriggerStatement(stmt) => self.lower_event_trigger_stmt(stmt),
 
             WaitStatement(stmt) => self.lower_wait_stmt(stmt),
             DisableStatement(stmt) => self.lower_disable_stmt(stmt),
@@ -216,7 +232,18 @@ impl LowerStmtCtx<'_> {
             BlockStatement(stmt) => self.lower_block_stmt(stmt),
 
             EmptyStatement(_) => StmtKind::Empty,
-            _ => unimplemented!("lower_stmt: {:?}", stmt.syntax().kind()),
+
+            // SystemVerilog-only statement forms are intentionally skipped by the Verilog model.
+            ConcurrentAssertionStatement(_)
+            | CheckerInstanceStatement(_)
+            | DisableForkStatement(_)
+            | ForeachLoopStatement(_)
+            | ImmediateAssertionStatement(_)
+            | RandCaseStatement(_)
+            | RandSequenceStatement(_)
+            | VoidCastedCallStatement(_)
+            | WaitForkStatement(_)
+            | WaitOrderStatement(_) => StmtKind::Empty,
         };
 
         Stmt { label, kind }
@@ -249,6 +276,24 @@ impl LowerStmtCtx<'_> {
         };
 
         StmtKind::ProcAssign(kind)
+    }
+
+    fn lower_event_trigger_stmt(&mut self, stmt: ast::EventTriggerStatement) -> StmtKind {
+        let event = ast::Expression::cast(stmt.name().syntax())
+            .map(|expr| self.expr_ctx().lower_expr(expr))
+            .unwrap_or_else(|| self.expr_ctx().lower_expr_opt(None));
+        let timing = stmt.timing().map(|timing| self.event_expr_ctx().lower_timing_control(timing));
+
+        let kind = match stmt {
+            ast::EventTriggerStatement::BlockingEventTriggerStatement(_) => {
+                EventTriggerKind::Blocking
+            }
+            ast::EventTriggerStatement::NonblockingEventTriggerStatement(_) => {
+                EventTriggerKind::Nonblocking
+            }
+        };
+
+        StmtKind::EventTrigger(EventTrigger { kind, timing, event })
     }
 
     fn lower_forever_stmt(&mut self, stmt: ast::ForeverStatement) -> StmtKind {
@@ -307,8 +352,12 @@ impl LowerStmtCtx<'_> {
 
     fn lower_loop_stmt(&mut self, stmt: ast::LoopStatement) -> StmtKind {
         let expr = self.expr_ctx().lower_expr(stmt.expr());
-        let stmt = self.lower_stmt(stmt.statement());
-        StmtKind::While(expr, stmt)
+        let body = self.lower_stmt(stmt.statement());
+        match stmt.repeat_or_while().map(|tok| tok.kind()) {
+            Some(TokenKind::REPEAT_KEYWORD) => StmtKind::Repeat(expr, body),
+            Some(TokenKind::WHILE_KEYWORD) | None => StmtKind::While(expr, body),
+            _ => unreachable!(),
+        }
     }
 
     fn lower_wait_stmt(&mut self, stmt: ast::WaitStatement) -> StmtKind {
@@ -387,7 +436,14 @@ impl LowerStmtCtx<'_> {
                             self.lower_stmt_opt(ast::Statement::cast(item.clause().syntax()));
                         CaseItem::Case { exprs, clause }
                     }
-                    PatternCaseItem(_) => unimplemented!(),
+                    PatternCaseItem(item) => {
+                        let mut exprs = SmallVec::new();
+                        if let Some(expr) = item.expr() {
+                            exprs.push(self.expr_ctx().lower_expr(expr));
+                        }
+                        let clause = self.lower_stmt(item.statement());
+                        CaseItem::Case { exprs, clause }
+                    }
                 }
             })
             .collect();

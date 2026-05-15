@@ -299,17 +299,26 @@ impl LowerSubroutineBodyCtx<'_> {
                     let decl_id = self.declaration_ctx().lower_data_decl(it);
                     self.subroutine_source_map.items.push(BlockItem::DeclarationId(decl_id));
                 },
+                ast::PortDeclaration[it] => {
+                    if let Some(decl_id) =
+                        self.declaration_ctx().lower_port_decl_as_data_decl(it)
+                    {
+                        self.subroutine_source_map.items.push(BlockItem::DeclarationId(decl_id));
+                    }
+                },
                 ast::LocalVariableDeclaration[it] => {
                     let decl_id = self.lower_local_variable_decl(it);
+                    self.subroutine_source_map.items.push(BlockItem::DeclarationId(decl_id));
+                },
+                ast::ParameterDeclarationStatement[it] => {
+                    let decl_id = self.declaration_ctx().lower_param_decl_base(it.parameter());
                     self.subroutine_source_map.items.push(BlockItem::DeclarationId(decl_id));
                 },
                 ast::TypedefDeclaration[it] => {
                     let typedef_id = self.lower_typedef(it);
                     self.subroutine_source_map.items.push(BlockItem::TypedefId(typedef_id));
                 },
-                _ => {
-                    // TODO: handle other function items (assertions, cover, etc.) as needed
-                },
+                _ => {},
             }
         }
 

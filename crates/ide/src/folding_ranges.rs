@@ -37,10 +37,15 @@ pub enum FoldKind {
     Imports, // TODO: fold macros
     Region,
     Module,
+    Config,
+    Library,
     PortList,
     Decl,
     Declaration,
     ContAssign,
+    DefParam,
+    Generate,
+    Specify,
     Instance,
     Stmt,
     Block,
@@ -124,6 +129,9 @@ pub(crate) fn folding_ranges(db: &RootDb, file_id: FileId, _config: &FoldingConf
         collect_module(db, &mut folds, ModuleId::new(file_id, idx), *src, line_index)
     });
 
+    folds.collect_folds(&src_map.config_decl_srcs, FoldKind::Config, line_index);
+    folds.collect_folds(&src_map.library_decl_srcs, FoldKind::Library, line_index);
+    folds.collect_folds(&src_map.library_include_srcs, FoldKind::Library, line_index);
     folds.collect_folds(&src_map.declaration_srcs, FoldKind::Declaration, line_index);
     folds.collect_folds(&src_map.decl_srcs, FoldKind::Decl, line_index);
     collect_stmt(db, &mut folds, &file.stmts, &src_map.stmt_srcs, line_index);
@@ -274,9 +282,12 @@ fn collect_module(
     }
 
     folds.collect_folds(&src_map.assign_srcs, FoldKind::ContAssign, line_index);
+    folds.collect_folds(&src_map.defparam_srcs, FoldKind::DefParam, line_index);
+    folds.collect_folds(&src_map.generate_region_srcs, FoldKind::Generate, line_index);
+    folds.collect_folds(&src_map.specify_block_srcs, FoldKind::Specify, line_index);
+    folds.collect_folds(&src_map.specify_item_srcs, FoldKind::Specify, line_index);
     folds.collect_folds(&src_map.declaration_srcs, FoldKind::Declaration, line_index);
     folds.collect_folds(&src_map.decl_srcs, FoldKind::Decl, line_index);
-
     folds.extend(src_map.instance_srcs.iter().filter_map(|(instance_id, src)| {
         let instantiation_id = module.get(instance_id).parent;
 

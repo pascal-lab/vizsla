@@ -83,7 +83,9 @@ impl LowerExprCtx<'_> {
             IntegerType(ty) => Either::Left(self.lower_integer_type(ty)),
             ImplicitType(ty) => Either::Left(self.lower_implicit_type(ty)),
             EnumType(enum_ty) => Either::Right(self.lower_enum_type(enum_ty)),
-            _ => unimplemented!("{:?}", ty.syntax().kind()),
+            StructUnionType(_) | TypeReference(_) | VirtualInterfaceType(_) => {
+                return self.default_data_ty();
+            }
         };
         match ty {
             Either::Left(ty) => DataTy::Builtin(self.db.intern_ty(ty)),
@@ -99,7 +101,7 @@ impl LowerExprCtx<'_> {
             ShortRealType(_) => BuiltinDataTy::Real(Real::ShortReal),
             RealTimeType(_) => BuiltinDataTy::Real(Real::RealTime),
             VoidType(_) => BuiltinDataTy::Void,
-            _ => unimplemented!("{:?}", ty.syntax().kind()),
+            _ => BuiltinDataTy::default(),
         }
     }
 
@@ -153,6 +155,10 @@ impl LowerExprCtx<'_> {
         BuiltinDataTy::Vector { kind: VecKind::Logic, signing, dimensions }
     }
 
+    pub(crate) fn lower_implicit_data_ty(&mut self, ty: ast::ImplicitType) -> DataTy {
+        DataTy::Builtin(self.db.intern_ty(self.lower_implicit_type(ty)))
+    }
+
     fn lower_signing(signing: Option<SyntaxToken>) -> Option<bool> {
         match signing?.kind() {
             TokenKind::SIGNED_KEYWORD => Some(true),
@@ -170,8 +176,12 @@ impl LowerExprCtx<'_> {
                 Selector::Range(left, right) => Some(Dimension::Range(left, right)),
                 _ => unreachable!("{:?}", spec.syntax().kind()),
             },
-            _ => unimplemented!("{:?}", dim.syntax().kind()),
+            _ => None,
         }
+    }
+
+    fn default_data_ty(&self) -> DataTy {
+        DataTy::Builtin(self.db.intern_ty(BuiltinDataTy::default()))
     }
 }
 

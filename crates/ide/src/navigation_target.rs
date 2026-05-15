@@ -6,7 +6,13 @@ use hir::{
         block::{BlockId, BlockLoc},
         declaration::Declaration,
         expr::declarator::{DeclId, DeclaratorParent},
-        module::{ModuleId, instantiation::InstanceId, port::NonAnsiPortId},
+        file::{config::ConfigDeclId, library::LibraryDeclId, udp::UdpDeclId},
+        module::{
+            ModuleId,
+            generate::{GenerateBlockId, GenerateBlockLoc},
+            instantiation::InstanceId,
+            port::NonAnsiPortId,
+        },
         stmt::StmtId,
         subroutine::{SubroutineId, SubroutinePortId},
         typedef::TypedefId,
@@ -51,7 +57,11 @@ impl ToNav for DefinitionOrigin {
     fn to_nav(&self, db: &RootDb) -> NavTarget {
         match self {
             DefinitionOrigin::ModuleId(module_id) => module_id.to_nav(db),
+            DefinitionOrigin::Config(config_id) => config_id.to_nav(db),
+            DefinitionOrigin::Library(library_id) => library_id.to_nav(db),
+            DefinitionOrigin::Udp(udp_id) => udp_id.to_nav(db),
             DefinitionOrigin::BlockId(block_id) => block_id.to_nav(db),
+            DefinitionOrigin::GenerateBlockId(generate_block_id) => generate_block_id.to_nav(db),
             DefinitionOrigin::SubroutineId(subroutine_id) => subroutine_id.to_nav(db),
             DefinitionOrigin::SubroutinePort(subroutine_port_id) => subroutine_port_id.to_nav(db),
             DefinitionOrigin::NonAnsiPort(nonansi_port_id) => nonansi_port_id.to_nav(db),
@@ -74,6 +84,36 @@ impl ToNav for ModuleId {
     }
 }
 
+impl ToNav for InFile<ConfigDeclId> {
+    fn to_nav(&self, db: &RootDb) -> NavTarget {
+        let InFile { value: config_id, file_id } = *self;
+        let src = file_id.to_container_src_map(db).get(config_id);
+        let name = file_id.to_container(db).get(config_id).name.clone();
+
+        build(file_id.file_id(), src.name_range(), src.range(), name, SymbolKind::Config, None)
+    }
+}
+
+impl ToNav for InFile<LibraryDeclId> {
+    fn to_nav(&self, db: &RootDb) -> NavTarget {
+        let InFile { value: library_id, file_id } = *self;
+        let src = file_id.to_container_src_map(db).get(library_id);
+        let name = file_id.to_container(db).get(library_id).name.clone();
+
+        build(file_id.file_id(), src.name_range(), src.range(), name, SymbolKind::Library, None)
+    }
+}
+
+impl ToNav for InFile<UdpDeclId> {
+    fn to_nav(&self, db: &RootDb) -> NavTarget {
+        let InFile { value: udp_id, file_id } = *self;
+        let src = file_id.to_container_src_map(db).get(udp_id);
+        let name = file_id.to_container(db).get(udp_id).name.clone();
+
+        build(file_id.file_id(), src.name_range(), src.range(), name, SymbolKind::Primitive, None)
+    }
+}
+
 impl ToNav for BlockId {
     fn to_nav(&self, db: &RootDb) -> NavTarget {
         let BlockLoc { cont_id, src: InFile { value: src, file_id } } = self.lookup(db);
@@ -82,6 +122,23 @@ impl ToNav for BlockId {
 
         let file_id = file_id.file_id();
         build(file_id, src.name_range(), src.range(), name, SymbolKind::Block, cont_name)
+    }
+}
+
+impl ToNav for GenerateBlockId {
+    fn to_nav(&self, db: &RootDb) -> NavTarget {
+        let GenerateBlockLoc { cont_id, src: InFile { value: src, file_id } } = self.lookup(db);
+        let name = self.to_container(db).name.clone();
+        let cont_name = cont_id.to_container(db).name().cloned();
+
+        build(
+            file_id.file_id(),
+            src.name_range(),
+            src.range(),
+            name,
+            SymbolKind::Generate,
+            cont_name,
+        )
     }
 }
 
@@ -162,6 +219,8 @@ impl ToNav for InContainer<DeclId> {
                 Declaration::DataDecl(_) => SymbolKind::DataDecl,
                 Declaration::NetDecl(_) => SymbolKind::NetDecl,
                 Declaration::ParamDecl(_) => SymbolKind::ParamDecl,
+                Declaration::GenvarDecl(_) => SymbolKind::Genvar,
+                Declaration::SpecparamDecl(_) => SymbolKind::Specparam,
             },
             DeclaratorParent::StmtId(_) => SymbolKind::DataDecl,
         };

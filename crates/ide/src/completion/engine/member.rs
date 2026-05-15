@@ -21,8 +21,7 @@ pub(super) fn complete_member_access(
     ctx: &CompletionContext,
 ) -> Vec<CompletionItem> {
     let sema = Semantics::new(db);
-    let file = sema.parse(position.file_id);
-    let root = file.syntax();
+    let root = sema.parse_root(position.file_id);
 
     let members = sema
         .find_node_at_offset::<ast::MemberAccessExpression>(root, position.offset)

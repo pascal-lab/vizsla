@@ -1,7 +1,11 @@
-use continuous_assgin::{ContAssign, ContAssignId, ContAssignSrc};
+use continuous_assgin::{
+    ContAssign, ContAssignId, ContAssignSrc, LowerContAssign, impl_lower_cont_assign,
+};
+use defparam::{DefParam, DefParamId, DefParamSrc, LowerDefParam, impl_lower_defparam};
+use generate::{GenerateRegion, GenerateRegionId, GenerateRegionSrc};
 use instantiation::{
-    Instance, InstanceSrc, Instantiation, InstantiationId, InstantiationSrc, ParamAssign,
-    ParamAssignSrc, PortConn, PortConnSrc,
+    Instance, InstanceSrc, Instantiation, InstantiationId, InstantiationSrc, LowerInstantiation,
+    ParamAssign, ParamAssignSrc, PortConn, PortConnSrc, impl_lower_instantiation,
 };
 use la_arena::{Arena, Idx, IdxRange, RawIdx};
 use port::{
@@ -10,6 +14,9 @@ use port::{
 };
 use proc_macro_utils::define_container;
 use rustc_hash::FxHashMap;
+use specify::{
+    SpecifyBlock, SpecifyBlockId, SpecifyBlockSrc, SpecifyItem, SpecifyItemId, SpecifyItemSrc,
+};
 use syntax::{
     ast::{self, AstNode, PortList},
     ptr::SyntaxNodePtr,
@@ -54,8 +61,11 @@ use crate::{
 };
 
 pub mod continuous_assgin;
+pub mod defparam;
+pub mod generate;
 pub mod instantiation;
 pub mod port;
+pub mod specify;
 
 define_container! {
     #[derive(Default, Debug, PartialEq, Eq)]
@@ -70,6 +80,10 @@ define_container! {
         },
 
         cont_assigns: [ContAssign],
+        defparams: [DefParam],
+        generate_regions: [GenerateRegion],
+        specify_blocks: [SpecifyBlock],
+        specify_items: [SpecifyItem],
         declarations: [Declaration],
         typedefs: [Typedef],
         structs: [StructDef],
@@ -106,6 +120,10 @@ define_container! {
         },
 
         assign_srcs: [ContAssign | ContAssignSrc],
+        defparam_srcs: [DefParam | DefParamSrc],
+        generate_region_srcs: [GenerateRegion | GenerateRegionSrc],
+        specify_block_srcs: [SpecifyBlock | SpecifyBlockSrc],
+        specify_item_srcs: [SpecifyItem | SpecifyItemSrc],
         declaration_srcs: [Declaration | DeclarationSrc],
         typedef_srcs: [Typedef | TypedefSrc],
         struct_srcs: [StructDef | StructSrc],
@@ -159,6 +177,10 @@ impl ModuleSourceMap {
     pub fn item_to_ptr(&self, item: &ModuleItem) -> SyntaxNodePtr {
         match item {
             ModuleItem::ContAssignId(idx) => self.get(*idx).0,
+            ModuleItem::DefParamId(idx) => self.get(*idx).0,
+            ModuleItem::GenerateRegionId(idx) => self.get(*idx).into(),
+            ModuleItem::SpecifyBlockId(idx) => self.get(*idx).0,
+            ModuleItem::SpecifyItemId(idx) => self.get(*idx).into(),
             ModuleItem::DeclarationId(idx) => self.get(*idx).ptr(),
             ModuleItem::StructId(idx) => self.get(*idx).node,
             ModuleItem::InstantiationId(idx) => self.get(*idx).into(),
@@ -174,6 +196,10 @@ define_enum_deriving_from! {
     #[derive(Debug, PartialEq, Eq, Clone)]
     pub enum ModuleItem {
         ContAssignId(ContAssignId),
+        DefParamId(DefParamId),
+        GenerateRegionId(GenerateRegionId),
+        SpecifyBlockId(SpecifyBlockId),
+        SpecifyItemId(SpecifyItemId),
         DeclarationId(DeclarationId),
         StructId(StructId),
         InstantiationId(InstantiationId),
@@ -208,6 +234,9 @@ impl_lower_decl!(LowerModuleCtx<'_>, module, module_source_map);
 impl_lower_event_expr!(LowerModuleCtx<'_>, module, module_source_map);
 impl_lower_stmt!(LowerModuleCtx<'_>, module_id, module, module_source_map);
 impl_lower_declaration!(LowerModuleCtx<'_>, module, module_source_map);
+impl_lower_cont_assign!(LowerModuleCtx<'_>, module, module_source_map);
+impl_lower_defparam!(LowerModuleCtx<'_>, module, module_source_map);
+impl_lower_instantiation!(LowerModuleCtx<'_>, module, module_source_map);
 
 impl LowerProc for LowerModuleCtx<'_> {
     fn proc_ctx(&mut self) -> LowerProcCtx<'_> {
@@ -325,7 +354,7 @@ impl LowerModuleCtx<'_> {
         match header.ports() {
             Some(PortList::AnsiPortList(port_list)) => self.lower_ansi_ports(port_list),
             Some(PortList::NonAnsiPortList(port_list)) => self.lower_nonansi_port(port_list),
-            Some(PortList::WildcardPortList(_)) => unimplemented!(),
+            Some(PortList::WildcardPortList(port_list)) => self.lower_wildcard_ports(port_list),
             None => {}
         };
 
@@ -333,50 +362,37 @@ impl LowerModuleCtx<'_> {
             use ast::Member::*;
             let idx = match member {
                 // Assignments
-                ContinuousAssign(assign) => self.lower_continuous_assign(assign).into(),
+                ContinuousAssign(assign) => {
+                    self.cont_assign_ctx().lower_continuous_assign(assign).into()
+                }
 
                 // Declarations
                 DataDeclaration(data_decl) => {
                     self.declaration_ctx().lower_data_decl(data_decl).into()
                 }
                 NetDeclaration(net_decl) => self.declaration_ctx().lower_net_decl(net_decl).into(),
-                LocalVariableDeclaration(_local_decl) => {
-                    // Local variable declarations shouldn't appear at module level,
-                    // they appear in function/task bodies
-                    continue;
-                }
+                LocalVariableDeclaration(_) => continue,
                 ParameterDeclarationStatement(param_decl) => {
                     self.declaration_ctx().lower_param_decl_base(param_decl.parameter()).into()
                 }
                 TypedefDeclaration(typedef_decl) => self.lower_typedef(typedef_decl).into(),
-                NetTypeDeclaration(_net_type_decl) => {
-                    // TODO: implement net type declaration lowering
-                    continue;
+                GenvarDeclaration(genvar_decl) => {
+                    self.declaration_ctx().lower_genvar_decl(genvar_decl).into()
                 }
-                ForwardTypedefDeclaration(_fwd_typedef) => {
-                    // TODO: implement forward typedef lowering
-                    continue;
-                }
-                UserDefinedNetDeclaration(_udn_decl) => {
-                    // TODO: implement user defined net declaration lowering
-                    continue;
-                }
-                GenvarDeclaration(_genvar_decl) => {
-                    // TODO: implement genvar declaration lowering
+                NetTypeDeclaration(_)
+                | ForwardTypedefDeclaration(_)
+                | UserDefinedNetDeclaration(_) => {
                     continue;
                 }
 
                 // Instantiations
                 HierarchyInstantiation(instantiation) => {
-                    self.lower_instantiation(instantiation).into()
+                    self.instantiation_ctx().lower_instantiation(instantiation).into()
                 }
                 PrimitiveInstantiation(instantiation) => {
-                    self.lower_primitive_instantiation(instantiation).into()
+                    self.instantiation_ctx().lower_primitive_instantiation(instantiation).into()
                 }
-                CheckerInstantiation(_checker_inst) => {
-                    // TODO: implement checker instantiation lowering
-                    continue;
-                }
+                CheckerInstantiation(_) => continue,
 
                 // Subroutines
                 FunctionDeclaration(fn_decl) => match self.lower_subroutine_decl(fn_decl) {
@@ -392,288 +408,111 @@ impl LowerModuleCtx<'_> {
                 ExplicitAnsiPort(_) | ImplicitAnsiPort(_) => unreachable!(),
 
                 // Imports
-                PackageImportDeclaration(_) => {
-                    // TODO: implement package import declaration lowering
-                    continue;
-                }
+                PackageImportDeclaration(_) => continue,
 
                 // Aggregates
-                ClassDeclaration(_) => {
-                    // TODO: implement class declaration lowering
-                    continue;
-                }
+                ClassDeclaration(_) => continue,
 
                 // Nested modules/interfaces/programs
-                ModuleDeclaration(_nested_module) => {
-                    // TODO: handle nested module declarations
-                    continue;
-                }
+                ModuleDeclaration(_) => continue,
 
                 // Generate constructs
-                GenerateRegion(_gen_region) => {
-                    // TODO: implement generate region lowering
-                    continue;
-                }
-                GenerateBlock(_gen_block) => {
-                    // TODO: implement generate block lowering
-                    continue;
-                }
-                IfGenerate(_if_gen) => {
-                    // TODO: implement if generate lowering
-                    continue;
-                }
-                CaseGenerate(_case_gen) => {
-                    // TODO: implement case generate lowering
-                    continue;
-                }
-                LoopGenerate(_loop_gen) => {
-                    // TODO: implement loop generate lowering
-                    continue;
-                }
+                GenerateRegion(region) => self.lower_generate_region(region).into(),
+                gen_item @ GenerateBlock(_)
+                | gen_item @ IfGenerate(_)
+                | gen_item @ CaseGenerate(_)
+                | gen_item @ LoopGenerate(_) => self.lower_direct_generate_region(gen_item).into(),
 
                 // Timing and clocking
-                TimeUnitsDeclaration(_time_units) => {
-                    // TODO: implement time units declaration lowering
-                    continue;
-                }
-                ClockingDeclaration(_clocking_decl) => {
-                    // TODO: implement clocking declaration lowering
-                    continue;
-                }
-                DefaultClockingReference(_default_clocking) => {
-                    // TODO: implement default clocking reference lowering
-                    continue;
-                }
-                ClockingItem(_clocking_item) => {
-                    // TODO: implement clocking item lowering
-                    continue;
-                }
+                TimeUnitsDeclaration(_)
+                | ClockingDeclaration(_)
+                | DefaultClockingReference(_)
+                | ClockingItem(_) => continue,
 
                 // Assertions and properties
-                PropertyDeclaration(_prop_decl) => {
-                    // TODO: implement property declaration lowering
-                    continue;
-                }
-                SequenceDeclaration(_seq_decl) => {
-                    // TODO: implement sequence declaration lowering
-                    continue;
-                }
-                ImmediateAssertionMember(_assert_member) => {
-                    // TODO: implement immediate assertion lowering
-                    continue;
-                }
-                ConcurrentAssertionMember(_assert_member) => {
-                    // TODO: implement concurrent assertion lowering
-                    continue;
-                }
+                PropertyDeclaration(_)
+                | SequenceDeclaration(_)
+                | ImmediateAssertionMember(_)
+                | ConcurrentAssertionMember(_) => continue,
 
                 // Coverage
-                CovergroupDeclaration(_covergroup) => {
-                    // TODO: implement covergroup lowering
-                    continue;
-                }
-                Coverpoint(_coverpoint) => {
-                    // TODO: implement coverpoint lowering
-                    continue;
-                }
-                CoverCross(_cover_cross) => {
-                    // TODO: implement cover cross lowering
-                    continue;
-                }
-                CoverageBins(_coverage_bins) => {
-                    // TODO: implement coverage bins lowering
-                    continue;
-                }
-                BinsSelection(_bins_selection) => {
-                    // TODO: implement bins selection lowering
-                    continue;
-                }
-                CoverageOption(_coverage_option) => {
-                    // TODO: implement coverage option lowering
-                    continue;
-                }
+                CovergroupDeclaration(_)
+                | Coverpoint(_)
+                | CoverCross(_)
+                | CoverageBins(_)
+                | BinsSelection(_)
+                | CoverageOption(_) => continue,
 
                 // Specify blocks
-                SpecifyBlock(_specify_block) => {
-                    // TODO: implement specify block lowering
-                    continue;
+                SpecifyBlock(block) => self.lower_specify_block(block).into(),
+                PathDeclaration(path) => self.lower_specify_path_item(path).into(),
+                ConditionalPathDeclaration(path) => {
+                    self.lower_conditional_specify_path_item(path).into()
                 }
-                PathDeclaration(_path_decl) => {
-                    // TODO: implement path declaration lowering
-                    continue;
-                }
-                ConditionalPathDeclaration(_cond_path) => {
-                    // TODO: implement conditional path declaration lowering
-                    continue;
-                }
-                IfNonePathDeclaration(_if_none_path) => {
-                    // TODO: implement if none path declaration lowering
-                    continue;
-                }
-                SystemTimingCheck(_timing_check) => {
-                    // TODO: implement system timing check lowering
-                    continue;
-                }
-                SpecparamDeclaration(_specparam) => {
-                    // TODO: implement specparam declaration lowering
-                    continue;
-                }
-                PulseStyleDeclaration(_pulse_style) => {
-                    // TODO: implement pulse style declaration lowering
-                    continue;
-                }
-                DefaultSkewItem(_default_skew) => {
-                    // TODO: implement default skew item lowering
-                    continue;
+                IfNonePathDeclaration(path) => self.lower_ifnone_specify_path_item(path).into(),
+                SystemTimingCheck(timing) => self.lower_system_timing_check_item(timing).into(),
+                PulseStyleDeclaration(pulse) => self.lower_pulse_style_item(pulse).into(),
+                DefaultSkewItem(_) => continue,
+                SpecparamDeclaration(specparam_decl) => {
+                    self.declaration_ctx().lower_specparam_decl(specparam_decl).into()
                 }
 
                 // DPI and external
-                DPIImport(_dpi_import) => {
-                    // TODO: implement DPI import lowering
-                    continue;
-                }
-                DPIExport(_dpi_export) => {
-                    // TODO: implement DPI export lowering
-                    continue;
-                }
-                ExternInterfaceMethod(_extern_method) => {
-                    // TODO: implement extern interface method lowering
-                    continue;
-                }
-                ExternModuleDecl(_extern_module) => {
-                    // TODO: implement extern module declaration lowering
-                    continue;
-                }
-                ExternUdpDecl(_extern_udp) => {
-                    // TODO: implement extern UDP declaration lowering
-                    continue;
-                }
+                DPIImport(_)
+                | DPIExport(_)
+                | ExternInterfaceMethod(_)
+                | ExternModuleDecl(_)
+                | ExternUdpDecl(_) => continue,
 
                 // UDP
-                UdpDeclaration(_udp_decl) => {
-                    // TODO: implement UDP declaration lowering
-                    continue;
-                }
+                UdpDeclaration(_) => continue,
 
                 // Defparam
-                DefParam(_defparam) => {
-                    // TODO: implement defparam lowering
-                    continue;
-                }
+                DefParam(defparam) => self.defparam_ctx().lower_defparam(defparam).into(),
 
                 // Net alias
-                NetAlias(_net_alias) => {
-                    // TODO: implement net alias lowering
-                    continue;
-                }
+                NetAlias(_) => continue,
 
                 // Modport
-                ModportDeclaration(_modport_decl) => {
-                    // TODO: implement modport declaration lowering
-                    continue;
-                }
-                ModportClockingPort(_modport_clocking) => {
-                    // TODO: implement modport clocking port lowering
-                    continue;
-                }
-                ModportSimplePortList(_modport_simple) => {
-                    // TODO: implement modport simple port list lowering
-                    continue;
-                }
-                ModportSubroutinePortList(_modport_subroutine) => {
-                    // TODO: implement modport subroutine port list lowering
-                    continue;
-                }
+                ModportDeclaration(_)
+                | ModportClockingPort(_)
+                | ModportSimplePortList(_)
+                | ModportSubroutinePortList(_) => continue,
 
                 // Class members (shouldn't appear in module but handle anyway)
-                ClassPropertyDeclaration(_class_prop) => {
-                    // Class property shouldn't appear directly in module
-                    continue;
-                }
-                ClassMethodDeclaration(_class_method) => {
-                    // Class method shouldn't appear directly in module
-                    continue;
-                }
-                ClassMethodPrototype(_class_method_proto) => {
-                    // Class method prototype shouldn't appear directly in module
-                    continue;
-                }
+                ClassPropertyDeclaration(_)
+                | ClassMethodDeclaration(_)
+                | ClassMethodPrototype(_) => continue,
 
                 // Checker
-                CheckerDeclaration(_checker_decl) => {
-                    // TODO: implement checker declaration lowering
-                    continue;
-                }
-                CheckerDataDeclaration(_checker_data) => {
-                    // TODO: implement checker data declaration lowering
-                    continue;
-                }
+                CheckerDeclaration(_) | CheckerDataDeclaration(_) => continue,
 
                 // Constraints
-                ConstraintDeclaration(_constraint_decl) => {
-                    // TODO: implement constraint declaration lowering
-                    continue;
-                }
-                ConstraintPrototype(_constraint_proto) => {
-                    // TODO: implement constraint prototype lowering
-                    continue;
-                }
+                ConstraintDeclaration(_) | ConstraintPrototype(_) => continue,
 
                 // Config
-                ConfigDeclaration(_config_decl) => {
-                    // TODO: implement config declaration lowering
-                    continue;
-                }
+                ConfigDeclaration(_) => continue,
 
                 // Bind
-                BindDirective(_bind_directive) => {
-                    // TODO: implement bind directive lowering
-                    continue;
-                }
+                BindDirective(_) => continue,
 
                 // Package exports
-                PackageExportDeclaration(_pkg_export) => {
-                    // TODO: implement package export declaration lowering
-                    continue;
-                }
-                PackageExportAllDeclaration(_pkg_export_all) => {
-                    // TODO: implement package export all declaration lowering
-                    continue;
-                }
+                PackageExportDeclaration(_) | PackageExportAllDeclaration(_) => continue,
 
                 // Library
-                LibraryDeclaration(_lib_decl) => {
-                    // TODO: implement library declaration lowering
-                    continue;
-                }
-                LibraryIncludeStatement(_lib_include) => {
-                    // TODO: implement library include statement lowering
-                    continue;
-                }
+                LibraryDeclaration(_) | LibraryIncludeStatement(_) => continue,
 
                 // Let declaration
-                LetDeclaration(_let_decl) => {
-                    // TODO: implement let declaration lowering
-                    continue;
-                }
+                LetDeclaration(_) => continue,
 
                 // Default disable
-                DefaultDisableDeclaration(_default_disable) => {
-                    // TODO: implement default disable declaration lowering
-                    continue;
-                }
+                DefaultDisableDeclaration(_) => continue,
 
                 // Elaboration system task
-                ElabSystemTask(_elab_task) => {
-                    // TODO: implement elaboration system task lowering
-                    continue;
-                }
+                ElabSystemTask(_) => continue,
 
                 // Anonymous program
-                AnonymousProgram(_anon_program) => {
-                    // TODO: implement anonymous program lowering
-                    continue;
-                }
+                AnonymousProgram(_) => continue,
 
                 // Empty member - skip
                 EmptyMember(_) => continue,

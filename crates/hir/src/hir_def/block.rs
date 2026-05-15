@@ -38,7 +38,7 @@ use crate::{
     define_src_with_name,
     file::HirFileId,
     region_tree::{RegionTree, RegionTreeBuilder},
-    source_map::{SourceMap, ToAstNode},
+    source_map::{IsNamedSrc, IsSrc, SourceMap, ToAstNode},
 };
 
 define_container! {
@@ -138,9 +138,35 @@ impl Get<BlockSrc> for SourceMap<StmtSrc, Stmt> {
     type Output = LocalBlockId;
 
     fn get(&self, block_src: BlockSrc) -> Self::Output {
-        let src: StmtSrc = block_src.into();
-        LocalBlockId(self.get(src))
+        find_local_block_id(self, block_src).unwrap()
     }
+}
+
+pub(crate) fn find_local_block_id(
+    stmt_srcs: &SourceMap<StmtSrc, Stmt>,
+    block_src: BlockSrc,
+) -> Option<LocalBlockId> {
+    let src: StmtSrc = block_src.into();
+    if let Some((stmt_id, _)) = stmt_srcs.iter().find(|(_, stmt_src)| **stmt_src == src) {
+        return Some(LocalBlockId(stmt_id));
+    }
+
+    let block_kind = block_src.kind();
+    let block_range = block_src.range();
+    let block_name_range = block_src.name_range();
+    let (stmt_id, _) = stmt_srcs
+        .iter()
+        .find(|(_, stmt_src)| {
+            stmt_src.kind() == block_kind
+                && stmt_src.range() == block_range
+                && stmt_src.name_range() == block_name_range
+        })
+        .or_else(|| {
+            stmt_srcs.iter().find(|(_, stmt_src)| {
+                stmt_src.kind() == block_kind && stmt_src.range() == block_range
+            })
+        })?;
+    Some(LocalBlockId(stmt_id))
 }
 
 impl GetRef<LocalBlockId> for Arena<Stmt> {
@@ -256,8 +282,11 @@ impl LowerBlockCtx<'_> {
                     stmt_id.into()
                 },
                 ast::DataDeclaration[it] => self.declaration_ctx().lower_data_decl(it).into(),
+                ast::ParameterDeclarationStatement[it] => {
+                    self.declaration_ctx().lower_param_decl_base(it.parameter()).into()
+                },
                 ast::TypedefDeclaration[it] => self.lower_typedef(it).into(),
-                _ => unimplemented!("{:?}", node.syntax().kind()),
+                _ => continue,
             };
             self.block_source_map.items.push(idx);
             self.region_tree.handle_node(node.syntax());
