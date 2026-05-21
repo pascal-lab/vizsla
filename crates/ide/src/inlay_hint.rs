@@ -90,6 +90,13 @@ impl InlayHintCollector {
             _ => range.start(),
         };
 
+        // LSP: hint position must lie within the requested range. The source
+        // range may extend past it (e.g. end-structure hints attached to a
+        // module whose body covers the requested range).
+        if !self.range.contains_inclusive(position) {
+            return;
+        }
+
         let (padding_left, padding_right) = match_ast_kind! { src.kind(),
             ast::ModuleDeclaration => (true, false),
             _ => (false, false),
@@ -378,6 +385,10 @@ mod tests {
         InlayHintConfig { port_connection: false, parameter_assignment: true, end_structure: false }
     }
 
+    fn end_structure_config() -> InlayHintConfig {
+        InlayHintConfig { port_connection: false, parameter_assignment: false, end_structure: true }
+    }
+
     fn port_hint_labels(text: &str) -> Vec<String> {
         let (db, file_id) = db_with_file(text);
         let range = TextRange::new(TextSize::from(0), TextSize::of(text));
@@ -418,5 +429,61 @@ mod tests {
         let text = "module child #(parameter P = 1) (); endmodule\nmodule top; child #(1, 2) u(); endmodule\n";
 
         assert_eq!(param_hint_labels(text), vec!["P: "]);
+    }
+
+    #[test]
+    fn end_structure_hint_skipped_when_position_outside_requested_range() {
+        // The module's source range covers the entire `module ... endmodule`,
+        // so it intersects a comment-only requested range inside the body,
+        // but the end-structure hint position (at `endmodule`) is outside it.
+        let prefix = "module a026_top();\n  ";
+        let comment = "// only-this-comment";
+        let suffix = "\nendmodule\n";
+        let text = format!("{prefix}{comment}{suffix}");
+
+        let (db, file_id) = db_with_file(&text);
+        let comment_start = TextSize::from(prefix.len() as u32);
+        let comment_end = comment_start + TextSize::of(comment);
+        let range = TextRange::new(comment_start, comment_end);
+
+        let hints = inlay_hint(&db, file_id, range, end_structure_config());
+        assert!(
+            hints.iter().all(|hint| !matches!(hint.kind, InlayKind::EndStructure)),
+            "comment-only range should not return an end-structure hint at `endmodule`",
+        );
+    }
+
+    #[test]
+    fn end_structure_hint_emitted_when_range_covers_endmodule() {
+        let text = "module a026_top();\nendmodule\n";
+        let (db, file_id) = db_with_file(text);
+        let endmodule_start = TextSize::from(text.find("endmodule").unwrap() as u32);
+        let range = TextRange::new(endmodule_start, TextSize::of(text));
+
+        let hints = inlay_hint(&db, file_id, range, end_structure_config());
+        let labels: Vec<_> = hints
+            .into_iter()
+            .filter(|hint| matches!(hint.kind, InlayKind::EndStructure))
+            .map(|hint| hint.label)
+            .collect();
+        assert_eq!(labels, vec![": a026_top"]);
+    }
+
+    #[test]
+    fn port_hint_skipped_when_position_before_requested_range() {
+        // The instance occupies `child u(1'b0);`. A request that begins after
+        // the `1'b0` start still intersects the connection range but the
+        // hint position at the connection start lies before the request.
+        let text = "module child(input a); endmodule\nmodule top; child u(1'b0); endmodule\n";
+        let (db, file_id) = db_with_file(text);
+        let conn_start = TextSize::from(text.find("1'b0").unwrap() as u32);
+        let after_conn_start = conn_start + TextSize::from(1);
+        let range = TextRange::new(after_conn_start, TextSize::of(text));
+
+        let hints = inlay_hint(&db, file_id, range, port_config());
+        assert!(
+            hints.iter().all(|hint| !matches!(hint.kind, InlayKind::Port)),
+            "port hint position lies before the requested range and should be skipped",
+        );
     }
 }
