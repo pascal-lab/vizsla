@@ -11,9 +11,8 @@ use std::{
 
 use anyhow::{Context, Result, anyhow, bail};
 use base_db::compilation_plan::CompilationPlan;
-use lsp_types::{
-    Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity, MessageType, NumberOrString,
-    ShowMessageParams,
+use lspt::{
+    Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity, MessageType, ShowMessageParams,
 };
 use project_model::project_manifest::MANIFEST_FILE_NAME;
 use regex::Regex;
@@ -134,10 +133,9 @@ impl GlobalState {
                     message.clone(),
                     self.config.i18n.text(keys::QIHE_FAILED).to_owned(),
                 );
-                self.send_notification::<lsp_types::notification::ShowMessage>(ShowMessageParams {
-                    typ: MessageType::ERROR,
-                    message,
-                });
+                self.send_notification::<lspt::notification::ShowMessageNotification>(
+                    ShowMessageParams { ty: MessageType::Error, message },
+                );
             }
         }
     }
@@ -639,15 +637,17 @@ impl<'a> DiagnosticConverter<'a> {
 
         Ok((
             file_id,
-            Diagnostic::new(
+            Diagnostic {
                 range,
-                Some(map_severity(&severity)),
-                Some(NumberOrString::String(analysis_code(&analysis_class))),
-                Some(QIHE.to_owned()),
+                severity: Some(map_severity(&severity)),
+                code: Some(lspt::Union2::B(analysis_code(&analysis_class))),
+                code_description: None,
+                source: Some(QIHE.to_owned()),
                 message,
-                related_info,
-                None,
-            ),
+                related_information: related_info,
+                tags: None,
+                data: None,
+            },
         ))
     }
 
@@ -719,11 +719,11 @@ fn resolve_file_name(base_dir: &Path, file_name: &str) -> Option<PathBuf> {
 
 fn map_severity(severity: &str) -> DiagnosticSeverity {
     match severity.trim().to_ascii_uppercase().as_str() {
-        "ERROR" => DiagnosticSeverity::ERROR,
-        "WARNING" | "WARN" => DiagnosticSeverity::WARNING,
-        "INFO" | "INFORMATION" => DiagnosticSeverity::INFORMATION,
-        "HINT" => DiagnosticSeverity::HINT,
-        _ => DiagnosticSeverity::WARNING,
+        "ERROR" => DiagnosticSeverity::Error,
+        "WARNING" | "WARN" => DiagnosticSeverity::Warning,
+        "INFO" | "INFORMATION" => DiagnosticSeverity::Information,
+        "HINT" => DiagnosticSeverity::Hint,
+        _ => DiagnosticSeverity::Warning,
     }
 }
 

@@ -19,18 +19,18 @@ pub(crate) struct ReqDispatcher<'a> {
 
 type FnReqSynMut<R> = fn(
     &mut GlobalState,
-    <R as lsp_types::request::Request>::Params,
-) -> anyhow::Result<<R as lsp_types::request::Request>::Result>;
+    <R as lspt::request::Request>::Params,
+) -> anyhow::Result<<R as lspt::request::Request>::Result>;
 type FnReqSynSnap<R> = fn(
     GlobalStateSnapshot,
-    <R as lsp_types::request::Request>::Params,
-) -> anyhow::Result<<R as lsp_types::request::Request>::Result>;
+    <R as lspt::request::Request>::Params,
+) -> anyhow::Result<<R as lspt::request::Request>::Result>;
 type FnReqErrHandler = fn(Request) -> Task;
 
 impl ReqDispatcher<'_> {
     fn parse<R>(&mut self) -> Option<(Request, R::Params, String)>
     where
-        R: lsp_types::request::Request,
+        R: lspt::request::Request,
         R::Params: DeserializeOwned + fmt::Debug,
     {
         let req = match &self.req {
@@ -54,7 +54,7 @@ impl ReqDispatcher<'_> {
 
     pub(crate) fn on_sync_mut<R>(&mut self, f: FnReqSynMut<R>) -> &mut Self
     where
-        R: lsp_types::request::Request,
+        R: lspt::request::Request,
         R::Params: DeserializeOwned + UnwindSafe + fmt::Debug,
         R::Result: Serialize,
     {
@@ -76,7 +76,7 @@ impl ReqDispatcher<'_> {
 
     pub(crate) fn on_sync<R>(&mut self, f: FnReqSynSnap<R>) -> &mut Self
     where
-        R: lsp_types::request::Request,
+        R: lspt::request::Request,
         R::Params: DeserializeOwned + UnwindSafe + fmt::Debug,
         R::Result: Serialize,
     {
@@ -100,7 +100,7 @@ impl ReqDispatcher<'_> {
 
     pub(crate) fn on_no_retry<R>(&mut self, f: FnReqSynSnap<R>) -> &mut Self
     where
-        R: lsp_types::request::Request + 'static,
+        R: lspt::request::Request + 'static,
         R::Params: DeserializeOwned + UnwindSafe + Send + fmt::Debug,
         R::Result: Serialize,
     {
@@ -118,7 +118,7 @@ impl ReqDispatcher<'_> {
         f: fn(GlobalStateSnapshot, R::Params) -> anyhow::Result<R::Result>,
     ) -> &mut Self
     where
-        R: lsp_types::request::Request + 'static,
+        R: lspt::request::Request + 'static,
         R::Params: DeserializeOwned + panic::UnwindSafe + Send + fmt::Debug,
         R::Result: Serialize,
     {
@@ -138,7 +138,7 @@ impl ReqDispatcher<'_> {
         err_handler: FnReqErrHandler,
     ) -> &mut Self
     where
-        R: lsp_types::request::Request + 'static,
+        R: lspt::request::Request + 'static,
         R::Params: DeserializeOwned + UnwindSafe + Send + fmt::Debug,
         R::Result: Serialize,
     {
@@ -164,7 +164,7 @@ impl ReqDispatcher<'_> {
 
     pub(crate) fn on<R>(&mut self, f: FnReqSynSnap<R>) -> &mut Self
     where
-        R: lsp_types::request::Request + 'static,
+        R: lspt::request::Request + 'static,
         R::Params: DeserializeOwned + UnwindSafe + Send + fmt::Debug,
         R::Result: Serialize,
     {
@@ -173,7 +173,7 @@ impl ReqDispatcher<'_> {
 
     pub(crate) fn on_latency_sensitive<R>(&mut self, f: FnReqSynSnap<R>) -> &mut Self
     where
-        R: lsp_types::request::Request + 'static,
+        R: lspt::request::Request + 'static,
         R::Params: DeserializeOwned + UnwindSafe + Send + fmt::Debug,
         R::Result: Serialize,
     {
@@ -201,7 +201,7 @@ fn result_to_response<R>(
     result: anyhow::Result<R::Result>,
 ) -> Result<Response, Cancelled>
 where
-    R: lsp_types::request::Request,
+    R: lspt::request::Request,
     R::Params: DeserializeOwned,
     R::Result: Serialize,
 {
@@ -227,7 +227,7 @@ fn thread_result_to_response<R>(
     result: thread::Result<anyhow::Result<R::Result>>,
 ) -> Result<Response, Cancelled>
 where
-    R: lsp_types::request::Request,
+    R: lspt::request::Request,
     R::Params: DeserializeOwned,
     R::Result: Serialize,
 {
@@ -255,15 +255,13 @@ pub(crate) struct NotifDispatcher<'a> {
     pub(crate) global_state: &'a mut GlobalState,
 }
 
-type FnNotifSynMut<N> = fn(
-    &mut GlobalState,
-    <N as lsp_types::notification::Notification>::Params,
-) -> anyhow::Result<()>;
+type FnNotifSynMut<N> =
+    fn(&mut GlobalState, <N as lspt::notification::Notification>::Params) -> anyhow::Result<()>;
 
 impl NotifDispatcher<'_> {
     pub(crate) fn on_sync_mut<N>(&mut self, f: FnNotifSynMut<N>) -> &mut Self
     where
-        N: lsp_types::notification::Notification,
+        N: lspt::notification::Notification,
         N::Params: DeserializeOwned + Send,
     {
         let notif = match self.notif.take() {

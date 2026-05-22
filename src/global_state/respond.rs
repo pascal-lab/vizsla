@@ -1,4 +1,5 @@
-use lsp_types::{notification, request};
+use lspt::{notification, request};
+use serde::Serialize;
 
 use super::DEFAULT_REQ_HANDLER;
 use crate::global_state::{GlobalState, ReqHandler};
@@ -16,6 +17,10 @@ impl Progress {
         assert!(done <= total);
         done as f64 / total.max(1) as f64
     }
+}
+
+fn progress_value<T: Serialize>(value: T) -> serde_json::Value {
+    serde_json::to_value(value).expect("work-done progress payload should serialize")
 }
 
 impl GlobalState {
@@ -72,39 +77,39 @@ impl GlobalState {
 
         let cancellable = Some(cancel_token.is_some());
 
-        let token = lsp_types::ProgressToken::String(
+        let token = lspt::Union2::B(
             cancel_token.unwrap_or_else(|| format!("{}/{title}", self.config.opt.process_name)),
         );
 
         let work_done_progress = match state {
             Progress::Begin => {
-                self.send_request::<request::WorkDoneProgressCreate>(
-                    lsp_types::WorkDoneProgressCreateParams { token: token.clone() },
+                self.send_request::<request::WorkDoneProgressCreateRequest>(
+                    lspt::WorkDoneProgressCreateParams { token: token.clone() },
                     DEFAULT_REQ_HANDLER,
                 );
 
-                lsp_types::WorkDoneProgress::Begin(lsp_types::WorkDoneProgressBegin {
-                    title: title.into(),
+                progress_value(lspt::WorkDoneProgressBegin {
+                    kind: "begin".to_owned(),
+                    title: title.to_owned(),
                     cancellable,
                     message,
                     percentage,
                 })
             }
-            Progress::Report => {
-                lsp_types::WorkDoneProgress::Report(lsp_types::WorkDoneProgressReport {
-                    cancellable,
-                    message,
-                    percentage,
-                })
-            }
+            Progress::Report => progress_value(lspt::WorkDoneProgressReport {
+                kind: "report".to_owned(),
+                cancellable,
+                message,
+                percentage,
+            }),
             Progress::End => {
-                lsp_types::WorkDoneProgress::End(lsp_types::WorkDoneProgressEnd { message })
+                progress_value(lspt::WorkDoneProgressEnd { kind: "end".to_owned(), message })
             }
         };
 
-        self.send_notification::<lsp_types::notification::Progress>(lsp_types::ProgressParams {
+        self.send_notification::<lspt::notification::ProgressNotification>(lspt::ProgressParams {
             token,
-            value: lsp_types::ProgressParamsValue::WorkDone(work_done_progress),
+            value: work_done_progress,
         });
     }
 }

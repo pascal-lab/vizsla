@@ -16,8 +16,8 @@ use crate::{
 
 pub(crate) fn handle_code_action(
     snap: GlobalStateSnapshot,
-    params: lsp_types::CodeActionParams,
-) -> anyhow::Result<Option<Vec<lsp_types::CodeActionOrCommand>>> {
+    params: lspt::CodeActionParams,
+) -> anyhow::Result<<lspt::request::CodeActionRequest as lspt::request::Request>::Result> {
     if !snap.config.cli_code_action_literals() {
         return Ok(None);
     }
@@ -60,7 +60,7 @@ pub(crate) fn handle_code_action(
                 None
             };
         let code_action = to_proto::code_action(&snap, assist, resolve_data, action_diags)?;
-        res.push(lsp_types::CodeActionOrCommand::CodeAction(code_action))
+        res.push(lspt::Union2::B(code_action))
     }
 
     Ok(Some(res))
@@ -88,7 +88,7 @@ fn server_diagnostics_for_code_action(
     snap: &GlobalStateSnapshot,
     file_id: FileId,
     range: TextRange,
-    client_diagnostics: &[lsp_types::Diagnostic],
+    client_diagnostics: &[lspt::Diagnostic],
     line_info: &utils::lines::LineInfo,
 ) -> anyhow::Result<Vec<ide_diagnostics::Diagnostic>> {
     let server_diagnostics = snap.diagnostics(file_id)?;
@@ -126,7 +126,7 @@ impl DiagnosticLocator {
         Self { range: diag.range, code: format!("{}:{}", diag.subsystem, diag.code) }
     }
 
-    fn from_lsp(line_info: &utils::lines::LineInfo, diag: &lsp_types::Diagnostic) -> Option<Self> {
+    fn from_lsp(line_info: &utils::lines::LineInfo, diag: &lspt::Diagnostic) -> Option<Self> {
         if diag.source.as_deref() != Some("slang") {
             return None;
         }
@@ -138,10 +138,10 @@ impl DiagnosticLocator {
     }
 }
 
-fn diagnostic_code_string(code: &lsp_types::NumberOrString) -> String {
+fn diagnostic_code_string(code: &lspt::Union2<i32, String>) -> String {
     match code {
-        lsp_types::NumberOrString::Number(code) => code.to_string(),
-        lsp_types::NumberOrString::String(code) => code.clone(),
+        lspt::Union2::A(code) => code.to_string(),
+        lspt::Union2::B(code) => code.clone(),
     }
 }
 
@@ -186,8 +186,8 @@ fn code_action_diagnostic_from_ide(diag: &ide_diagnostics::Diagnostic) -> CodeAc
 
 pub(crate) fn handle_code_action_resolve(
     snap: GlobalStateSnapshot,
-    mut code_action: lsp_types::CodeAction,
-) -> anyhow::Result<lsp_types::CodeAction> {
+    mut code_action: lspt::CodeAction,
+) -> anyhow::Result<lspt::CodeAction> {
     let data = from_proto::code_action_data(
         code_action.data.replace(Default::default()).ok_or_else(|| {
             to_proto::code_action_resolve_error(snap.config.i18n, CodeActionResolveError::NoData)
@@ -258,7 +258,7 @@ mod tests {
         code_action::RepairKind,
         diagnostics::{Diagnostic as IdeDiagnostic, DiagnosticSource as IdeDiagnosticSource},
     };
-    use lsp_types::{Diagnostic as LspDiagnostic, NumberOrString, Position, Range};
+    use lspt::{Diagnostic as LspDiagnostic, Position, Range, Union2};
     use syntax::DiagnosticSeverity;
     use triomphe::Arc;
     use utils::{
@@ -333,11 +333,14 @@ mod tests {
             ending: LineEnding::Unix,
             encoding: PositionEncoding::Utf8,
         };
-        let range = Range::new(Position::new(0, 6), Position::new(0, 6));
+        let range = Range {
+            start: Position { line: 0, character: 6 },
+            end: Position { line: 0, character: 6 },
+        };
         let lsp_diag = LspDiagnostic {
             range,
             severity: None,
-            code: Some(NumberOrString::String("6:129".to_owned())),
+            code: Some(Union2::B("6:129".to_owned())),
             code_description: None,
             source: Some("slang".to_owned()),
             message: "mixing ordered and named port connections is not allowed".to_owned(),

@@ -10,14 +10,14 @@ use vfs::{FileId, VfsPath};
 use super::ext;
 use crate::global_state::snapshot::GlobalStateSnapshot;
 
-pub(crate) fn vfs_path(url: &lsp_types::Url) -> anyhow::Result<vfs::VfsPath> {
+pub(crate) fn vfs_path(url: &lspt::Uri) -> anyhow::Result<vfs::VfsPath> {
     let path = url.to_file_path().map_err(|()| anyhow::format_err!("url is not a file"))?;
     let path = AbsPathBuf::try_from(path)
         .map_err(|path| anyhow::format_err!("file url path is not absolute UTF-8: {path:?}"))?;
     Ok(VfsPath::from(path))
 }
 
-pub(crate) fn abs_path(url: &lsp_types::Url) -> anyhow::Result<AbsPathBuf> {
+pub(crate) fn abs_path(url: &lspt::Uri) -> anyhow::Result<AbsPathBuf> {
     let path = url.to_file_path().map_err(|()| anyhow::format_err!("url is not a file"))?;
     AbsPathBuf::try_from(path)
         .map_err(|path| anyhow::format_err!("file url path is not absolute UTF-8: {path:?}"))
@@ -26,7 +26,7 @@ pub(crate) fn abs_path(url: &lsp_types::Url) -> anyhow::Result<AbsPathBuf> {
 // convert position (line, col) to Offset
 pub(crate) fn offset(
     LineInfo { index, encoding, .. }: &LineInfo,
-    pos: lsp_types::Position,
+    pos: lspt::Position,
 ) -> anyhow::Result<TextSize> {
     let line_col = match *encoding {
         PositionEncoding::Utf8 => LineCol { line: pos.line, col: pos.character },
@@ -43,7 +43,7 @@ pub(crate) fn offset(
 
 pub(crate) fn text_range(
     line_info: &LineInfo,
-    lsp_types::Range { start, end }: lsp_types::Range,
+    lspt::Range { start, end }: lspt::Range,
 ) -> anyhow::Result<TextRange> {
     let start = offset(line_info, start)?;
     let end = offset(line_info, end)?;
@@ -57,18 +57,19 @@ pub(crate) fn text_range(
 
 pub(crate) fn file_position(
     snap: &GlobalStateSnapshot,
-    pos_params: lsp_types::TextDocumentPositionParams,
+    text_document: lspt::TextDocumentIdentifier,
+    position: lspt::Position,
 ) -> anyhow::Result<FilePosition> {
-    let file_id = snap.file_id(&pos_params.text_document.uri)?;
+    let file_id = snap.file_id(&text_document.uri)?;
     let line_index = snap.line_info(file_id)?;
-    let offset = offset(&line_index, pos_params.position)?;
+    let offset = offset(&line_index, position)?;
     Ok(FilePosition { file_id, offset })
 }
 
 pub(crate) fn file_range(
     snap: &GlobalStateSnapshot,
-    url: &lsp_types::Url,
-    range: lsp_types::Range,
+    url: &lspt::Uri,
+    range: lspt::Range,
 ) -> anyhow::Result<FileRange> {
     let file_id = snap.file_id(url)?;
     let line_index = snap.line_info(file_id)?;
@@ -76,7 +77,7 @@ pub(crate) fn file_range(
     Ok(FileRange { file_id, range })
 }
 
-pub(crate) fn file_id(snap: &GlobalStateSnapshot, url: &lsp_types::Url) -> anyhow::Result<FileId> {
+pub(crate) fn file_id(snap: &GlobalStateSnapshot, url: &lspt::Uri) -> anyhow::Result<FileId> {
     snap.file_id(url)
 }
 
@@ -87,7 +88,7 @@ pub(crate) fn code_lens(
     let data = serde_json::from_value::<ext::CodeLensData>(data)?;
     let (file_id, kind) = match data.kind {
         ext::CodeLensDataKind::Instantiation(pos_params) => {
-            let pos = self::file_position(snap, pos_params)?;
+            let pos = self::file_position(snap, pos_params.text_document, pos_params.position)?;
             let file_id = pos.file_id;
             (file_id, CodeLensKind::ModuleInstance { pos, data: None })
         }

@@ -4,7 +4,7 @@ pub mod user_config;
 use std::fmt;
 
 use itertools::Itertools;
-use lsp_types::ClientCapabilities;
+use lspt::ClientCapabilities;
 use project_model::project_manifest::ProjectManifest;
 use utils::{
     lines::PositionEncoding,
@@ -77,7 +77,7 @@ impl ConfigError {
 pub struct Config {
     pub(crate) opt: Opt,
     pub(crate) workspace_roots: Vec<AbsPathBuf>,
-    pub(crate) client_caps: lsp_types::ClientCapabilities,
+    pub(crate) client_caps: lspt::ClientCapabilities,
     pub(crate) root_path: AbsPathBuf,
     pub(crate) i18n: I18n,
     pub(crate) user_config: UserConfig,

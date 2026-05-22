@@ -195,12 +195,12 @@ impl GlobalState {
             return;
         }
 
-        let registration_options = lsp_types::DidChangeWatchedFilesRegistrationOptions {
+        let registration_options = lspt::DidChangeWatchedFilesRegistrationOptions {
             watchers: globs
                 .iter()
                 .cloned()
-                .map(|glob_pattern| lsp_types::FileSystemWatcher {
-                    glob_pattern: lsp_types::GlobPattern::String(glob_pattern),
+                .map(|glob_pattern| lspt::FileSystemWatcher {
+                    glob_pattern: lspt::Union2::A(glob_pattern),
                     kind: None,
                 })
                 .collect(),
@@ -208,14 +208,14 @@ impl GlobalState {
 
         match serde_json::to_value(registration_options) {
             Ok(register_options) => {
-                let registration = lsp_types::Registration {
+                let registration = lspt::Registration {
                     id: CLIENT_FILE_WATCHER_REGISTRATION_ID.to_string(),
                     method: CLIENT_FILE_WATCHER_METHOD.to_string(),
                     register_options: Some(register_options),
                 };
 
-                self.send_request::<lsp_types::request::RegisterCapability>(
-                    lsp_types::RegistrationParams { registrations: vec![registration] },
+                self.send_request::<lspt::request::RegistrationRequest>(
+                    lspt::RegistrationParams { registrations: vec![registration] },
                     DEFAULT_REQ_HANDLER,
                 );
                 self.registered_client_file_watcher_globs = Some(globs);
@@ -231,9 +231,9 @@ impl GlobalState {
             return;
         }
 
-        self.send_request::<lsp_types::request::UnregisterCapability>(
-            lsp_types::UnregistrationParams {
-                unregisterations: vec![lsp_types::Unregistration {
+        self.send_request::<lspt::request::UnregistrationRequest>(
+            lspt::UnregistrationParams {
+                unregisterations: vec![lspt::Unregistration {
                     id: CLIENT_FILE_WATCHER_REGISTRATION_ID.to_string(),
                     method: CLIENT_FILE_WATCHER_METHOD.to_string(),
                 }],
@@ -281,7 +281,7 @@ mod tests {
                 log_filename: None,
             },
             root_path.clone(),
-            lsp_types::ClientCapabilities::default(),
+            lspt::ClientCapabilities::default(),
             vec![root_path],
             I18n::default(),
             UserConfig::default(),
@@ -289,7 +289,7 @@ mod tests {
         );
 
         let (server, client) = Connection::memory();
-        (GlobalState::new(server.sender, config, lsp_types::TraceValue::Off), client)
+        (GlobalState::new(server.sender, config, lspt::TraceValue::Off), client)
     }
 
     fn drain_client_requests(client: &Connection) -> Vec<LspRequest> {

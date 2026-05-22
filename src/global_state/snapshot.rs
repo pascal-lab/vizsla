@@ -3,7 +3,7 @@ use std::path::Path;
 use anyhow::Context;
 use base_db::source_root::SourceRootRole;
 use ide::{Cancellable, analysis::Analysis};
-use lsp_types::Url;
+use lspt::Uri as Url;
 use nohash_hasher::IntMap;
 use parking_lot::{MappedRwLockReadGuard, Mutex, RwLock, RwLockReadGuard};
 use project_model::Workspace;
@@ -27,7 +27,7 @@ pub(crate) struct GlobalStateSnapshot {
     pub(crate) config: Arc<Config>,
     pub(crate) analysis: Analysis,
     // pub(crate) check_fixes: CheckFixes,
-    pub(crate) sema_tokens_cache: Arc<Mutex<FxHashMap<Url, lsp_types::SemanticTokens>>>,
+    pub(crate) sema_tokens_cache: Arc<Mutex<FxHashMap<Url, lspt::SemanticTokens>>>,
     pub(crate) qihe_diagnostics: Arc<Mutex<FxHashMap<FileId, QiheDiagnosticState>>>,
     pub(crate) diagnostics_revision: u64,
     pub(crate) mem_docs: MemDocs,
@@ -43,7 +43,7 @@ impl GlobalStateSnapshot {
         RwLockReadGuard::map(self.vfs.read(), |(it, _)| it)
     }
 
-    pub(crate) fn file_id(&self, url: &lsp_types::Url) -> anyhow::Result<FileId> {
+    pub(crate) fn file_id(&self, url: &lspt::Uri) -> anyhow::Result<FileId> {
         let path = from_proto::vfs_path(url)?;
         let vfs = self.vfs_read();
         let file_id =
@@ -106,7 +106,7 @@ impl GlobalStateSnapshot {
         Ok(diagnostics)
     }
 
-    pub(crate) fn lsp_diagnostics(&self, file_id: FileId) -> Vec<lsp_types::Diagnostic> {
+    pub(crate) fn lsp_diagnostics(&self, file_id: FileId) -> Vec<lspt::Diagnostic> {
         let mut diagnostics = match (self.diagnostics(file_id), self.line_info(file_id)) {
             (Ok(diagnostics), Ok(line_info)) => diagnostics
                 .into_iter()
@@ -120,7 +120,7 @@ impl GlobalStateSnapshot {
         diagnostics
     }
 
-    pub(crate) fn qihe_diagnostics(&self, file_id: FileId) -> Vec<lsp_types::Diagnostic> {
+    pub(crate) fn qihe_diagnostics(&self, file_id: FileId) -> Vec<lspt::Diagnostic> {
         self.qihe_diagnostics
             .lock()
             .get(&file_id)

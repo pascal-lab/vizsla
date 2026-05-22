@@ -2,7 +2,7 @@ use std::collections::hash_map::Entry::{Occupied, Vacant};
 
 use base_db::change::Change;
 use itertools::Itertools;
-use lsp_types::request::WorkspaceDiagnosticRefresh;
+use lspt::request::DiagnosticRefreshRequest;
 use nohash_hasher::IntMap;
 use parking_lot::{RwLockUpgradableReadGuard, RwLockWriteGuard};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -98,7 +98,7 @@ impl GlobalState {
                 DiagnosticInvalidation::WorkspaceChanged => true,
             }
         {
-            self.send_request::<WorkspaceDiagnosticRefresh>((), DEFAULT_REQ_HANDLER);
+            self.send_request::<DiagnosticRefreshRequest>((), DEFAULT_REQ_HANDLER);
             return;
         }
 
@@ -262,7 +262,7 @@ impl GlobalState {
 
         if self.config.cli_pull_diagnostics_support() {
             if self.config.cli_workspace_diagnostic_refresh_support() {
-                self.send_request::<WorkspaceDiagnosticRefresh>((), DEFAULT_REQ_HANDLER);
+                self.send_request::<DiagnosticRefreshRequest>((), DEFAULT_REQ_HANDLER);
             }
             return;
         }
@@ -293,7 +293,7 @@ impl GlobalState {
 #[cfg(test)]
 mod tests {
     use lsp_server::Connection;
-    use lsp_types::{ClientCapabilities, TraceValue};
+    use lspt::{ClientCapabilities, TraceValue};
     use utils::{lines::LineEnding, test_support::TestDir};
     use vfs::{VfsPath, loader::LoadResult};
 

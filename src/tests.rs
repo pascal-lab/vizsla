@@ -4,27 +4,29 @@ use std::{
 };
 
 use lsp_server::{Connection, Message, Notification, Request};
-use lsp_types::{
-    ClientCapabilities, CodeActionCapabilityResolveSupport, CodeActionClientCapabilities,
-    CodeActionContext, CodeActionKind, CodeActionKindLiteralSupport, CodeActionLiteralSupport,
-    CodeActionOrCommand, CodeActionParams, DiagnosticClientCapabilities,
-    DidChangeTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
-    DocumentDiagnosticParams, DocumentDiagnosticReport, DocumentDiagnosticReportResult,
-    DocumentSymbolParams, DocumentSymbolResponse, FileChangeType, FileEvent, FoldingRange,
-    FoldingRangeParams, GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverParams, Position,
-    ProgressParams, PublishDiagnosticsParams, Range, SemanticTokensParams, SemanticTokensResult,
-    TextDocumentClientCapabilities, TextDocumentContentChangeEvent, TextDocumentIdentifier,
-    TextDocumentItem, TextDocumentPositionParams, Url, VersionedTextDocumentIdentifier,
-    WorkDoneProgressParams, WorkspaceClientCapabilities, WorkspaceDiagnosticParams,
-    WorkspaceDiagnosticReportResult,
+use lspt::{
+    ClientCapabilities, ClientCodeActionKindOptions, ClientCodeActionLiteralOptions,
+    ClientCodeActionResolveOptions, CodeActionClientCapabilities, CodeActionContext,
+    CodeActionKind, CodeActionParams, DiagnosticClientCapabilities, DidChangeTextDocumentParams,
+    DidOpenTextDocumentParams, DidSaveTextDocumentParams, DocumentDiagnosticParams,
+    DocumentSymbolParams, FileChangeType, FileEvent, FoldingRange, FoldingRangeParams, Hover,
+    HoverParams, Position, ProgressParams, PublishDiagnosticsParams, Range, SemanticTokensParams,
+    TextDocumentClientCapabilities, TextDocumentIdentifier, TextDocumentItem, Union2, Union3,
+    Uri as Url, VersionedTextDocumentIdentifier, WorkspaceClientCapabilities,
+    WorkspaceDiagnosticParams,
     notification::{
-        DidChangeTextDocument, DidChangeWatchedFiles, DidOpenTextDocument, DidSaveTextDocument,
-        Exit, Notification as _,
+        DidChangeTextDocumentNotification as DidChangeTextDocument,
+        DidChangeWatchedFilesNotification as DidChangeWatchedFiles,
+        DidOpenTextDocumentNotification as DidOpenTextDocument,
+        DidSaveTextDocumentNotification as DidSaveTextDocument, ExitNotification as Exit,
+        Notification as _,
     },
     request::{
-        CodeActionRequest, CodeLensRequest, CodeLensResolve, DocumentDiagnosticRequest,
-        DocumentSymbolRequest, FoldingRangeRequest, GotoDefinition, HoverRequest, References,
-        Request as _, SemanticTokensFullRequest, Shutdown, WorkspaceDiagnosticRequest,
+        CodeActionRequest, CodeLensRequest, CodeLensResolveRequest as CodeLensResolve,
+        DefinitionRequest as GotoDefinition, DocumentDiagnosticRequest, DocumentSymbolRequest,
+        FoldingRangeRequest, HoverRequest, ReferencesRequest as References, Request as _,
+        SemanticTokensRequest as SemanticTokensFullRequest, ShutdownRequest as Shutdown,
+        WorkspaceDiagnosticRequest,
     },
 };
 use serde::de::DeserializeOwned;
@@ -42,6 +44,14 @@ use crate::{
 };
 
 type TempDir = TestDir;
+type CodeActionOrCommand = Union2<lspt::Command, lspt::CodeAction>;
+type DocumentDiagnosticReportResult = <DocumentDiagnosticRequest as lspt::request::Request>::Result;
+type DocumentSymbolResponse = Union2<Vec<lspt::SymbolInformation>, Vec<lspt::DocumentSymbol>>;
+type GotoDefinitionResponse =
+    Union3<lspt::Definition, Vec<lspt::DefinitionLink>, Vec<lspt::Location>>;
+type SemanticTokensResult = Union2<lspt::SemanticTokens, lspt::SemanticTokensPartialResult>;
+type WorkspaceDiagnosticReportResult =
+    <WorkspaceDiagnosticRequest as lspt::request::Request>::Result;
 
 const LSP_TEST_TIMEOUT: Duration = Duration::from_secs(30);
 const DEFAULT_TEST_CONFIG: &str = "sources = [\"**\"]\ninclude_dirs = [\".\"]\n";
@@ -73,8 +83,8 @@ fn recv_lsp_message_until(
 }
 
 fn handle_test_server_request(client: &Connection, request: Request, context: &str) {
-    if request.method == lsp_types::request::WorkDoneProgressCreate::METHOD
-        || request.method == lsp_types::request::WorkspaceDiagnosticRefresh::METHOD
+    if request.method == lspt::request::WorkDoneProgressCreateRequest::METHOD
+        || request.method == lspt::request::DiagnosticRefreshRequest::METHOD
     {
         client
             .sender
@@ -90,7 +100,7 @@ fn spawn_default_test_server(
     config: config::Config,
     server: Connection,
 ) -> thread::JoinHandle<anyhow::Result<()>> {
-    thread::spawn(move || main_loop::main_loop(config, server, lsp_types::TraceValue::Off))
+    thread::spawn(move || main_loop::main_loop(config, server, lspt::TraceValue::Off))
 }
 
 fn test_server_config(
@@ -142,7 +152,7 @@ fn open_test_document(client: &Connection, uri: Url, text: &str) {
             DidOpenTextDocumentParams {
                 text_document: TextDocumentItem {
                     uri,
-                    language_id: "systemverilog".to_string(),
+                    language_id: lspt::LanguageKind::Custom_("systemverilog".to_string()),
                     version: 1,
                     text: text.to_owned(),
                 },
@@ -255,9 +265,10 @@ fn shutdown_test_server(
         match client.receiver.recv_timeout(LSP_TEST_TIMEOUT).unwrap() {
             Message::Response(response) if response.id == shutdown_id => break,
             Message::Notification(notification)
-                if notification.method == lsp_types::notification::Progress::METHOD => {}
+                if notification.method == lspt::notification::ProgressNotification::METHOD => {}
             Message::Notification(notification)
-                if notification.method == lsp_types::notification::PublishDiagnostics::METHOD => {}
+                if notification.method
+                    == lspt::notification::PublishDiagnosticsNotification::METHOD => {}
             other => panic!("unexpected message while shutting down test server: {other:?}"),
         }
     }
@@ -273,7 +284,7 @@ fn shutdown_test_server(
 fn recv_document_diagnostics(
     client: &Connection,
     request_id: lsp_server::RequestId,
-) -> (Option<String>, Vec<lsp_types::Diagnostic>) {
+) -> (Option<String>, Vec<lspt::Diagnostic>) {
     let deadline = Instant::now() + LSP_TEST_TIMEOUT;
     while let Some(message) = recv_lsp_message_until(client, deadline, "documentDiagnostic") {
         match message {
@@ -284,22 +295,16 @@ fn recv_document_diagnostics(
                 )
                 .unwrap();
                 return match result {
-                    DocumentDiagnosticReportResult::Report(DocumentDiagnosticReport::Full(
-                        report,
-                    )) => (
-                        report.full_document_diagnostic_report.result_id,
-                        report.full_document_diagnostic_report.items,
-                    ),
-                    DocumentDiagnosticReportResult::Report(
-                        DocumentDiagnosticReport::Unchanged(report),
-                    ) => (Some(report.unchanged_document_diagnostic_report.result_id), Vec::new()),
+                    Union2::A(Union2::A(report)) => (report.result_id, report.items),
+                    Union2::A(Union2::B(report)) => (Some(report.result_id), Vec::new()),
                     other => panic!("unexpected diagnostic response: {other:?}"),
                 };
             }
             Message::Notification(notification)
-                if notification.method == lsp_types::notification::Progress::METHOD => {}
+                if notification.method == lspt::notification::ProgressNotification::METHOD => {}
             Message::Notification(notification)
-                if notification.method == lsp_types::notification::PublishDiagnostics::METHOD => {}
+                if notification.method
+                    == lspt::notification::PublishDiagnosticsNotification::METHOD => {}
             Message::Request(request) => {
                 handle_test_server_request(client, request, "documentDiagnostic diagnostics test")
             }
@@ -314,7 +319,7 @@ fn request_document_diagnostics(
     client: &Connection,
     uri: Url,
     request_id: i32,
-) -> (Option<String>, Vec<lsp_types::Diagnostic>) {
+) -> (Option<String>, Vec<lspt::Diagnostic>) {
     let request_id = lsp_server::RequestId::from(request_id);
     client
         .sender
@@ -325,8 +330,8 @@ fn request_document_diagnostics(
                 text_document: TextDocumentIdentifier { uri },
                 identifier: None,
                 previous_result_id: None,
-                work_done_progress_params: WorkDoneProgressParams::default(),
-                partial_result_params: Default::default(),
+                work_done_token: None,
+                partial_result_token: None,
             },
         )))
         .unwrap();
@@ -346,13 +351,11 @@ fn request_goto_definition_uris(
         .send(Message::Request(Request::new(
             request_id.clone(),
             GotoDefinition::METHOD.to_string(),
-            GotoDefinitionParams {
-                text_document_position_params: TextDocumentPositionParams {
-                    text_document: TextDocumentIdentifier { uri },
-                    position: position_of(text, needle),
-                },
-                work_done_progress_params: WorkDoneProgressParams::default(),
-                partial_result_params: Default::default(),
+            lspt::DefinitionParams {
+                text_document: TextDocumentIdentifier { uri },
+                position: position_of(text, needle),
+                work_done_token: None,
+                partial_result_token: None,
             },
         )))
         .unwrap();
@@ -375,28 +378,25 @@ fn request_reference_uris(
         .send(Message::Request(Request::new(
             request_id.clone(),
             References::METHOD.to_string(),
-            lsp_types::ReferenceParams {
-                text_document_position: TextDocumentPositionParams {
-                    text_document: TextDocumentIdentifier { uri },
-                    position: position_of(text, needle),
-                },
-                context: lsp_types::ReferenceContext { include_declaration: true },
-                work_done_progress_params: WorkDoneProgressParams::default(),
-                partial_result_params: Default::default(),
+            lspt::ReferenceParams {
+                text_document: TextDocumentIdentifier { uri },
+                position: position_of(text, needle),
+                context: lspt::ReferenceContext { include_declaration: true },
+                work_done_token: None,
+                partial_result_token: None,
             },
         )))
         .unwrap();
 
-    let references: Option<Vec<lsp_types::Location>> =
-        recv_response(client, request_id, "references");
+    let references: Option<Vec<lspt::Location>> = recv_response(client, request_id, "references");
     references.unwrap_or_default().into_iter().map(|location| location.uri).collect()
 }
 
 fn request_workspace_diagnostic_report(
     client: &Connection,
     request_id: i32,
-    previous_result_ids: Vec<lsp_types::PreviousResultId>,
-) -> lsp_types::WorkspaceDiagnosticReport {
+    previous_result_ids: Vec<lspt::PreviousResultId>,
+) -> lspt::WorkspaceDiagnosticReport {
     let request_id = lsp_server::RequestId::from(request_id);
     client
         .sender
@@ -406,15 +406,15 @@ fn request_workspace_diagnostic_report(
             WorkspaceDiagnosticParams {
                 identifier: None,
                 previous_result_ids,
-                work_done_progress_params: WorkDoneProgressParams::default(),
-                partial_result_params: Default::default(),
+                work_done_token: None,
+                partial_result_token: None,
             },
         )))
         .unwrap();
 
     let result: WorkspaceDiagnosticReportResult =
         recv_response(client, request_id, "workspaceDiagnostic");
-    let WorkspaceDiagnosticReportResult::Report(report) = result else {
+    let Union2::A(report) = result else {
         panic!("unexpected workspaceDiagnostic response: {result:?}");
     };
     report
@@ -425,18 +425,19 @@ fn request_workspace_diagnostic_uris(client: &Connection, request_id: i32) -> Ve
         .items
         .into_iter()
         .map(|item| match item {
-            lsp_types::WorkspaceDocumentDiagnosticReport::Full(full) => full.uri,
-            lsp_types::WorkspaceDocumentDiagnosticReport::Unchanged(unchanged) => unchanged.uri,
+            Union2::A(full) => full.uri,
+            Union2::B(unchanged) => unchanged.uri,
         })
         .collect()
 }
 
-fn recv_publish_diagnostics_for_uri(client: &Connection, uri: &Url) -> Vec<lsp_types::Diagnostic> {
+fn recv_publish_diagnostics_for_uri(client: &Connection, uri: &Url) -> Vec<lspt::Diagnostic> {
     let deadline = Instant::now() + LSP_TEST_TIMEOUT;
     while let Some(message) = recv_lsp_message_until(client, deadline, "publishDiagnostics") {
         match message {
             Message::Notification(notification)
-                if notification.method == lsp_types::notification::PublishDiagnostics::METHOD =>
+                if notification.method
+                    == lspt::notification::PublishDiagnosticsNotification::METHOD =>
             {
                 let params =
                     serde_json::from_value::<PublishDiagnosticsParams>(notification.params)
@@ -446,7 +447,7 @@ fn recv_publish_diagnostics_for_uri(client: &Connection, uri: &Url) -> Vec<lsp_t
                 }
             }
             Message::Notification(notification)
-                if notification.method == lsp_types::notification::Progress::METHOD => {}
+                if notification.method == lspt::notification::ProgressNotification::METHOD => {}
             Message::Request(request) => {
                 handle_test_server_request(client, request, "publishDiagnostics diagnostics test")
             }
@@ -471,9 +472,10 @@ fn recv_response<T: DeserializeOwned>(
                     .unwrap_or_else(|err| panic!("failed to decode {label} response: {err}"));
             }
             Message::Notification(notification)
-                if notification.method == lsp_types::notification::Progress::METHOD => {}
+                if notification.method == lspt::notification::ProgressNotification::METHOD => {}
             Message::Notification(notification)
-                if notification.method == lsp_types::notification::PublishDiagnostics::METHOD => {}
+                if notification.method
+                    == lspt::notification::PublishDiagnosticsNotification::METHOD => {}
             Message::Request(request) => handle_test_server_request(client, request, label),
             _ => {}
         }
@@ -484,13 +486,12 @@ fn recv_response<T: DeserializeOwned>(
 
 fn goto_definition_response_uris(response: GotoDefinitionResponse) -> Vec<Url> {
     match response {
-        GotoDefinitionResponse::Scalar(location) => vec![location.uri],
-        GotoDefinitionResponse::Array(locations) => {
+        Union3::A(Union2::A(location)) => vec![location.uri],
+        Union3::A(Union2::B(locations)) => {
             locations.into_iter().map(|location| location.uri).collect()
         }
-        GotoDefinitionResponse::Link(links) => {
-            links.into_iter().map(|location| location.target_uri).collect()
-        }
+        Union3::B(links) => links.into_iter().map(|location| location.target_uri).collect(),
+        Union3::C(locations) => locations.into_iter().map(|location| location.uri).collect(),
     }
 }
 
@@ -505,20 +506,19 @@ fn code_action_client_caps() -> ClientCapabilities {
     ClientCapabilities {
         text_document: Some(TextDocumentClientCapabilities {
             code_action: Some(CodeActionClientCapabilities {
-                code_action_literal_support: Some(CodeActionLiteralSupport {
-                    code_action_kind: CodeActionKindLiteralSupport {
+                code_action_literal_support: Some(ClientCodeActionLiteralOptions {
+                    code_action_kind: ClientCodeActionKindOptions {
                         value_set: [
-                            CodeActionKind::EMPTY,
-                            CodeActionKind::QUICKFIX,
-                            CodeActionKind::REFACTOR,
-                            CodeActionKind::REFACTOR_REWRITE,
+                            CodeActionKind::Empty,
+                            CodeActionKind::QuickFix,
+                            CodeActionKind::Refactor,
+                            CodeActionKind::RefactorRewrite,
                         ]
                         .into_iter()
-                        .map(|kind| kind.as_str().to_owned())
                         .collect(),
                     },
                 }),
-                resolve_support: Some(CodeActionCapabilityResolveSupport {
+                resolve_support: Some(ClientCodeActionResolveOptions {
                     properties: vec!["edit".to_owned()],
                 }),
                 ..Default::default()
@@ -547,10 +547,10 @@ fn request_code_actions(
             CodeActionRequest::METHOD.to_string(),
             CodeActionParams {
                 text_document: TextDocumentIdentifier { uri },
-                range: Range::new(position, position),
+                range: Range { start: position, end: position },
                 context,
-                work_done_progress_params: WorkDoneProgressParams::default(),
-                partial_result_params: Default::default(),
+                work_done_token: None,
+                partial_result_token: None,
             },
         )))
         .unwrap();
@@ -558,17 +558,17 @@ fn request_code_actions(
     recv_response(client, request_id, "codeAction")
 }
 
-fn request_code_lenses(client: &Connection, uri: Url, request_id: i32) -> Vec<lsp_types::CodeLens> {
+fn request_code_lenses(client: &Connection, uri: Url, request_id: i32) -> Vec<lspt::CodeLens> {
     let request_id = lsp_server::RequestId::from(request_id);
     client
         .sender
         .send(Message::Request(Request::new(
             request_id.clone(),
             CodeLensRequest::METHOD.to_string(),
-            lsp_types::CodeLensParams {
+            lspt::CodeLensParams {
                 text_document: TextDocumentIdentifier { uri },
-                work_done_progress_params: WorkDoneProgressParams::default(),
-                partial_result_params: Default::default(),
+                work_done_token: None,
+                partial_result_token: None,
             },
         )))
         .unwrap();
@@ -576,11 +576,7 @@ fn request_code_lenses(client: &Connection, uri: Url, request_id: i32) -> Vec<ls
     recv_response(client, request_id, "codeLens")
 }
 
-fn resolve_code_lens(
-    client: &Connection,
-    lens: lsp_types::CodeLens,
-    request_id: i32,
-) -> lsp_types::CodeLens {
+fn resolve_code_lens(client: &Connection, lens: lspt::CodeLens, request_id: i32) -> lspt::CodeLens {
     let request_id = lsp_server::RequestId::from(request_id);
     client
         .sender
@@ -598,8 +594,8 @@ fn code_action_titles(actions: &[CodeActionOrCommand]) -> Vec<String> {
     actions
         .iter()
         .map(|action| match action {
-            CodeActionOrCommand::CodeAction(action) => action.title.clone(),
-            CodeActionOrCommand::Command(command) => command.title.clone(),
+            Union2::B(action) => action.title.clone(),
+            Union2::A(command) => command.title.clone(),
         })
         .collect()
 }
@@ -616,11 +612,9 @@ fn clearing_open_document_updates_analysis_state() {
             DidChangeTextDocument::METHOD.to_string(),
             DidChangeTextDocumentParams {
                 text_document: VersionedTextDocumentIdentifier { uri: uri.clone(), version: 2 },
-                content_changes: vec![TextDocumentContentChangeEvent {
-                    range: None,
-                    range_length: None,
+                content_changes: vec![Union2::B(lspt::TextDocumentContentChangeWholeDocument {
                     text: String::new(),
-                }],
+                })],
             },
         )))
         .unwrap();
@@ -633,8 +627,8 @@ fn clearing_open_document_updates_analysis_state() {
             DocumentSymbolRequest::METHOD.to_string(),
             DocumentSymbolParams {
                 text_document: TextDocumentIdentifier { uri },
-                work_done_progress_params: WorkDoneProgressParams::default(),
-                partial_result_params: Default::default(),
+                work_done_token: None,
+                partial_result_token: None,
             },
         )))
         .unwrap();
@@ -642,8 +636,8 @@ fn clearing_open_document_updates_analysis_state() {
     let symbols: Option<DocumentSymbolResponse> =
         recv_response(&client, symbols_id, "documentSymbol");
     let symbol_count = match symbols {
-        Some(DocumentSymbolResponse::Nested(symbols)) => symbols.len(),
-        Some(DocumentSymbolResponse::Flat(symbols)) => symbols.len(),
+        Some(Union2::B(symbols)) => symbols.len(),
+        Some(Union2::A(symbols)) => symbols.len(),
         None => 0,
     };
 
@@ -675,8 +669,8 @@ endmodule
                 text_document: TextDocumentIdentifier { uri: uri.clone() },
                 identifier: None,
                 previous_result_id: None,
-                work_done_progress_params: WorkDoneProgressParams::default(),
-                partial_result_params: Default::default(),
+                work_done_token: None,
+                partial_result_token: None,
             },
         )))
         .unwrap();
@@ -689,7 +683,7 @@ endmodule
         "convert_ports_only (clk",
         CodeActionContext {
             diagnostics: Vec::new(),
-            only: Some(vec![CodeActionKind::REFACTOR_REWRITE]),
+            only: Some(vec![CodeActionKind::RefactorRewrite]),
             trigger_kind: None,
         },
         200,
@@ -728,8 +722,8 @@ endmodule
                 text_document: TextDocumentIdentifier { uri: uri.clone() },
                 identifier: None,
                 previous_result_id: None,
-                work_done_progress_params: WorkDoneProgressParams::default(),
-                partial_result_params: Default::default(),
+                work_done_token: None,
+                partial_result_token: None,
             },
         )))
         .unwrap();
@@ -746,7 +740,7 @@ endmodule
         "clk, .rst_n",
         CodeActionContext {
             diagnostics,
-            only: Some(vec![CodeActionKind::QUICKFIX]),
+            only: Some(vec![CodeActionKind::QuickFix]),
             trigger_kind: None,
         },
         211,
@@ -864,22 +858,16 @@ endconfig
                 text_document: text_document.clone(),
                 identifier: None,
                 previous_result_id: None,
-                work_done_progress_params: WorkDoneProgressParams::default(),
-                partial_result_params: Default::default(),
+                work_done_token: None,
+                partial_result_token: None,
             },
         )))
         .unwrap();
     let diagnostics: DocumentDiagnosticReportResult =
         recv_response(&client, diagnostics_id, "documentDiagnostic");
-    if let DocumentDiagnosticReportResult::Report(DocumentDiagnosticReport::Full(report)) =
-        diagnostics
-    {
+    if let Union2::A(Union2::A(report)) = diagnostics {
         assert!(
-            report
-                .full_document_diagnostic_report
-                .items
-                .iter()
-                .all(|diag| diag.source.as_deref() != Some("vizsla")),
+            report.items.iter().all(|diag| diag.source.as_deref() != Some("vizsla")),
             "document diagnostics should not include removed Vizsla model diagnostics"
         );
     }
@@ -892,8 +880,8 @@ endconfig
             DocumentSymbolRequest::METHOD.to_string(),
             DocumentSymbolParams {
                 text_document: text_document.clone(),
-                work_done_progress_params: WorkDoneProgressParams::default(),
-                partial_result_params: Default::default(),
+                work_done_token: None,
+                partial_result_token: None,
             },
         )))
         .unwrap();
@@ -909,8 +897,8 @@ endconfig
             SemanticTokensFullRequest::METHOD.to_string(),
             SemanticTokensParams {
                 text_document: text_document.clone(),
-                work_done_progress_params: WorkDoneProgressParams::default(),
-                partial_result_params: Default::default(),
+                work_done_token: None,
+                partial_result_token: None,
             },
         )))
         .unwrap();
@@ -926,8 +914,8 @@ endconfig
             FoldingRangeRequest::METHOD.to_string(),
             FoldingRangeParams {
                 text_document: text_document.clone(),
-                work_done_progress_params: WorkDoneProgressParams::default(),
-                partial_result_params: Default::default(),
+                work_done_token: None,
+                partial_result_token: None,
             },
         )))
         .unwrap();
@@ -941,11 +929,9 @@ endconfig
             hover_id.clone(),
             HoverRequest::METHOD.to_string(),
             HoverParams {
-                text_document_position_params: TextDocumentPositionParams {
-                    text_document: text_document.clone(),
-                    position: position_of(file_text, "g_loop"),
-                },
-                work_done_progress_params: WorkDoneProgressParams::default(),
+                text_document: text_document.clone(),
+                position: position_of(file_text, "g_loop"),
+                work_done_token: None,
             },
         )))
         .unwrap();
@@ -958,13 +944,11 @@ endconfig
         .send(Message::Request(Request::new(
             definition_id.clone(),
             GotoDefinition::METHOD.to_string(),
-            GotoDefinitionParams {
-                text_document_position_params: TextDocumentPositionParams {
-                    text_document,
-                    position: position_of(file_text, "sig), .y"),
-                },
-                work_done_progress_params: WorkDoneProgressParams::default(),
-                partial_result_params: Default::default(),
+            lspt::DefinitionParams {
+                text_document,
+                position: position_of(file_text, "sig), .y"),
+                work_done_token: None,
+                partial_result_token: None,
             },
         )))
         .unwrap();
@@ -994,8 +978,8 @@ fn pull_capable_client_does_not_receive_duplicate_publish_diagnostics() {
             text_document: TextDocumentIdentifier { uri: uri.clone() },
             identifier: None,
             previous_result_id: None,
-            work_done_progress_params: WorkDoneProgressParams::default(),
-            partial_result_params: Default::default(),
+            work_done_token: None,
+            partial_result_token: None,
         },
     );
     client.sender.send(Message::Request(request)).unwrap();
@@ -1016,15 +1000,14 @@ fn pull_capable_client_does_not_receive_duplicate_publish_diagnostics() {
                 )
                 .unwrap();
                 let items = match result {
-                    DocumentDiagnosticReportResult::Report(DocumentDiagnosticReport::Full(
-                        report,
-                    )) => report.full_document_diagnostic_report.items,
+                    Union2::A(Union2::A(report)) => report.items,
                     other => panic!("unexpected diagnostic response: {other:?}"),
                 };
                 pull_diagnostics = Some(items);
             }
             Message::Notification(notification)
-                if notification.method == lsp_types::notification::PublishDiagnostics::METHOD =>
+                if notification.method
+                    == lspt::notification::PublishDiagnosticsNotification::METHOD =>
             {
                 let params =
                     serde_json::from_value::<PublishDiagnosticsParams>(notification.params)
@@ -1034,7 +1017,7 @@ fn pull_capable_client_does_not_receive_duplicate_publish_diagnostics() {
                 }
             }
             Message::Notification(notification)
-                if notification.method == lsp_types::notification::Progress::METHOD =>
+                if notification.method == lspt::notification::ProgressNotification::METHOD =>
             {
                 let _ = serde_json::from_value::<ProgressParams>(notification.params).unwrap();
             }
@@ -1058,7 +1041,8 @@ fn pull_capable_client_does_not_receive_duplicate_publish_diagnostics() {
         let timeout = quiet_until.saturating_duration_since(Instant::now());
         match client.receiver.recv_timeout(timeout) {
             Ok(Message::Notification(notification))
-                if notification.method == lsp_types::notification::PublishDiagnostics::METHOD =>
+                if notification.method
+                    == lspt::notification::PublishDiagnosticsNotification::METHOD =>
             {
                 let params =
                     serde_json::from_value::<PublishDiagnosticsParams>(notification.params)
@@ -1069,7 +1053,7 @@ fn pull_capable_client_does_not_receive_duplicate_publish_diagnostics() {
                 );
             }
             Ok(Message::Notification(notification))
-                if notification.method == lsp_types::notification::Progress::METHOD => {}
+                if notification.method == lspt::notification::ProgressNotification::METHOD => {}
             Ok(other) => {
                 panic!("unexpected message after pull diagnostics response: {other:?}");
             }
@@ -1096,7 +1080,8 @@ fn legacy_client_receives_publish_diagnostics() {
         let timeout = deadline.saturating_duration_since(Instant::now());
         match client.receiver.recv_timeout(timeout).unwrap() {
             Message::Notification(notification)
-                if notification.method == lsp_types::notification::PublishDiagnostics::METHOD =>
+                if notification.method
+                    == lspt::notification::PublishDiagnosticsNotification::METHOD =>
             {
                 let params =
                     serde_json::from_value::<PublishDiagnosticsParams>(notification.params)
@@ -1108,7 +1093,7 @@ fn legacy_client_receives_publish_diagnostics() {
                 }
             }
             Message::Notification(notification)
-                if notification.method == lsp_types::notification::Progress::METHOD => {}
+                if notification.method == lspt::notification::ProgressNotification::METHOD => {}
             Message::Request(request) => {
                 panic!("unexpected server request during diagnostics test: {request:?}");
             }
@@ -1155,8 +1140,8 @@ endmodule
             text_document: TextDocumentIdentifier { uri },
             identifier: None,
             previous_result_id: None,
-            work_done_progress_params: WorkDoneProgressParams::default(),
-            partial_result_params: Default::default(),
+            work_done_token: None,
+            partial_result_token: None,
         },
     );
     client.sender.send(Message::Request(request)).unwrap();
@@ -1172,9 +1157,7 @@ endmodule
                 )
                 .unwrap();
                 let items = match result {
-                    DocumentDiagnosticReportResult::Report(DocumentDiagnosticReport::Full(
-                        report,
-                    )) => report.full_document_diagnostic_report.items,
+                    Union2::A(Union2::A(report)) => report.items,
                     other => panic!("unexpected diagnostic response: {other:?}"),
                 };
                 assert!(
@@ -1185,7 +1168,7 @@ endmodule
                 return;
             }
             Message::Notification(notification)
-                if notification.method == lsp_types::notification::Progress::METHOD => {}
+                if notification.method == lspt::notification::ProgressNotification::METHOD => {}
             Message::Request(request) => {
                 panic!("unexpected server request during diagnostics test: {request:?}");
             }
@@ -1227,8 +1210,8 @@ endmodule
                 text_document: TextDocumentIdentifier { uri },
                 identifier: None,
                 previous_result_id: None,
-                work_done_progress_params: WorkDoneProgressParams::default(),
-                partial_result_params: Default::default(),
+                work_done_token: None,
+                partial_result_token: None,
             },
         )))
         .unwrap();
@@ -1282,7 +1265,7 @@ fn unconfigured_workspace_diagnostics_skip_unopened_indexed_files() {
             ..Default::default()
         }),
         workspace: Some(WorkspaceClientCapabilities {
-            diagnostic: Some(lsp_types::DiagnosticWorkspaceClientCapabilities {
+            diagnostics: Some(lspt::DiagnosticWorkspaceClientCapabilities {
                 refresh_support: Some(true),
             }),
             ..Default::default()
@@ -1343,8 +1326,8 @@ endmodule
                 text_document: TextDocumentIdentifier { uri },
                 identifier: None,
                 previous_result_id: None,
-                work_done_progress_params: WorkDoneProgressParams::default(),
-                partial_result_params: Default::default(),
+                work_done_token: None,
+                partial_result_token: None,
             },
         )))
         .unwrap();
@@ -1389,8 +1372,8 @@ endmodule
                 text_document: TextDocumentIdentifier { uri },
                 identifier: None,
                 previous_result_id: None,
-                work_done_progress_params: WorkDoneProgressParams::default(),
-                partial_result_params: Default::default(),
+                work_done_token: None,
+                partial_result_token: None,
             },
         )))
         .unwrap();
@@ -1430,8 +1413,8 @@ endmodule
                 text_document: TextDocumentIdentifier { uri },
                 identifier: None,
                 previous_result_id: None,
-                work_done_progress_params: WorkDoneProgressParams::default(),
-                partial_result_params: Default::default(),
+                work_done_token: None,
+                partial_result_token: None,
             },
         )))
         .unwrap();
@@ -1474,8 +1457,8 @@ fn workspace_diagnostics_use_multi_file_semantic_context() {
         WorkspaceDiagnosticParams {
             identifier: None,
             previous_result_ids: Vec::new(),
-            work_done_progress_params: WorkDoneProgressParams::default(),
-            partial_result_params: Default::default(),
+            work_done_token: None,
+            partial_result_token: None,
         },
     );
     client.sender.send(Message::Request(request)).unwrap();
@@ -1491,20 +1474,20 @@ fn workspace_diagnostics_use_multi_file_semantic_context() {
                 )
                 .unwrap();
                 let report = match result {
-                    WorkspaceDiagnosticReportResult::Report(report) => report,
+                    Union2::A(report) => report,
                     other => panic!("unexpected workspace diagnostic response: {other:?}"),
                 };
                 let mut child_diagnostics = None;
                 let mut unused_diagnostics = None;
                 let mut top_diagnostics = None;
                 for item in report.items {
-                    if let lsp_types::WorkspaceDocumentDiagnosticReport::Full(full) = item {
+                    if let Union2::A(full) = item {
                         if full.uri == child_uri {
-                            child_diagnostics = Some(full.full_document_diagnostic_report.items);
+                            child_diagnostics = Some(full.items);
                         } else if full.uri == unused_uri {
-                            unused_diagnostics = Some(full.full_document_diagnostic_report.items);
+                            unused_diagnostics = Some(full.items);
                         } else if full.uri == top_uri {
-                            top_diagnostics = Some(full.full_document_diagnostic_report.items);
+                            top_diagnostics = Some(full.items);
                         }
                     }
                 }
@@ -1544,7 +1527,7 @@ fn workspace_diagnostics_use_multi_file_semantic_context() {
                 return;
             }
             Message::Notification(notification)
-                if notification.method == lsp_types::notification::Progress::METHOD => {}
+                if notification.method == lspt::notification::ProgressNotification::METHOD => {}
             Message::Request(request) => {
                 panic!("unexpected server request during diagnostics test: {request:?}");
             }
@@ -1605,7 +1588,7 @@ fn configured_include_dirs_suppress_include_defined_macro_diagnostic() {
             DidOpenTextDocumentParams {
                 text_document: TextDocumentItem {
                     uri: top_uri.clone(),
-                    language_id: "systemverilog".to_string(),
+                    language_id: lspt::LanguageKind::Custom_("systemverilog".to_string()),
                     version: 1,
                     text: top_text.to_string(),
                 },
@@ -1623,8 +1606,8 @@ fn configured_include_dirs_suppress_include_defined_macro_diagnostic() {
                 text_document: TextDocumentIdentifier { uri: top_uri },
                 identifier: None,
                 previous_result_id: None,
-                work_done_progress_params: WorkDoneProgressParams::default(),
-                partial_result_params: Default::default(),
+                work_done_token: None,
+                partial_result_token: None,
             },
         )))
         .unwrap();
@@ -1705,8 +1688,8 @@ fn unsaved_library_include_header_changes_are_used_for_dependent_diagnostics() {
                 text_document: TextDocumentIdentifier { uri: top_uri.clone() },
                 identifier: None,
                 previous_result_id: None,
-                work_done_progress_params: WorkDoneProgressParams::default(),
-                partial_result_params: Default::default(),
+                work_done_token: None,
+                partial_result_token: None,
             },
         )))
         .unwrap();
@@ -1723,7 +1706,7 @@ fn unsaved_library_include_header_changes_are_used_for_dependent_diagnostics() {
             DidOpenTextDocumentParams {
                 text_document: TextDocumentItem {
                     uri: header_uri,
-                    language_id: "systemverilog".to_string(),
+                    language_id: lspt::LanguageKind::Custom_("systemverilog".to_string()),
                     version: 1,
                     text: String::new(),
                 },
@@ -1741,8 +1724,8 @@ fn unsaved_library_include_header_changes_are_used_for_dependent_diagnostics() {
                 text_document: TextDocumentIdentifier { uri: top_uri },
                 identifier: None,
                 previous_result_id: None,
-                work_done_progress_params: WorkDoneProgressParams::default(),
-                partial_result_params: Default::default(),
+                work_done_token: None,
+                partial_result_token: None,
             },
         )))
         .unwrap();
@@ -1818,8 +1801,8 @@ fn unsaved_include_header_changes_are_used_for_dependent_diagnostics() {
                 text_document: TextDocumentIdentifier { uri: top_uri.clone() },
                 identifier: None,
                 previous_result_id: None,
-                work_done_progress_params: WorkDoneProgressParams::default(),
-                partial_result_params: Default::default(),
+                work_done_token: None,
+                partial_result_token: None,
             },
         )))
         .unwrap();
@@ -1836,7 +1819,7 @@ fn unsaved_include_header_changes_are_used_for_dependent_diagnostics() {
             DidOpenTextDocumentParams {
                 text_document: TextDocumentItem {
                     uri: header_uri.clone(),
-                    language_id: "systemverilog".to_string(),
+                    language_id: lspt::LanguageKind::Custom_("systemverilog".to_string()),
                     version: 1,
                     text: String::new(),
                 },
@@ -1854,8 +1837,8 @@ fn unsaved_include_header_changes_are_used_for_dependent_diagnostics() {
                 text_document: TextDocumentIdentifier { uri: top_uri },
                 identifier: None,
                 previous_result_id: None,
-                work_done_progress_params: WorkDoneProgressParams::default(),
-                partial_result_params: Default::default(),
+                work_done_token: None,
+                partial_result_token: None,
             },
         )))
         .unwrap();
@@ -1911,7 +1894,7 @@ fn project_manifest_is_not_diagnosed_as_systemverilog() {
             DidOpenTextDocumentParams {
                 text_document: TextDocumentItem {
                     uri: manifest_uri.clone(),
-                    language_id: "toml".to_string(),
+                    language_id: lspt::LanguageKind::Custom_("toml".to_string()),
                     version: 1,
                     text: manifest_text.to_string(),
                 },
@@ -1928,11 +1911,9 @@ fn project_manifest_is_not_diagnosed_as_systemverilog() {
                     uri: manifest_uri.clone(),
                     version: 2,
                 },
-                content_changes: vec![TextDocumentContentChangeEvent {
-                    range: None,
-                    range_length: None,
+                content_changes: vec![Union2::B(lspt::TextDocumentContentChangeWholeDocument {
                     text: String::new(),
-                }],
+                })],
             },
         )))
         .unwrap();
@@ -1946,11 +1927,9 @@ fn project_manifest_is_not_diagnosed_as_systemverilog() {
                     uri: manifest_uri.clone(),
                     version: 3,
                 },
-                content_changes: vec![TextDocumentContentChangeEvent {
-                    range: None,
-                    range_length: None,
+                content_changes: vec![Union2::B(lspt::TextDocumentContentChangeWholeDocument {
                     text: manifest_text.to_string(),
-                }],
+                })],
             },
         )))
         .unwrap();
@@ -1965,8 +1944,8 @@ fn project_manifest_is_not_diagnosed_as_systemverilog() {
                 text_document: TextDocumentIdentifier { uri: manifest_uri },
                 identifier: None,
                 previous_result_id: None,
-                work_done_progress_params: WorkDoneProgressParams::default(),
-                partial_result_params: Default::default(),
+                work_done_token: None,
+                partial_result_token: None,
             },
         )))
         .unwrap();
@@ -2021,14 +2000,11 @@ fn restored_project_manifest_clears_diagnostics_for_excluded_files() {
     let first_report = request_workspace_diagnostic_report(&client, 1, Vec::new());
     let mut saw_ignored_diagnostic = false;
     for item in first_report.items {
-        if let lsp_types::WorkspaceDocumentDiagnosticReport::Full(full) = item
+        if let Union2::A(full) = item
             && full.uri == ignored_uri
         {
-            saw_ignored_diagnostic = full
-                .full_document_diagnostic_report
-                .items
-                .iter()
-                .any(|diag| diag.message.contains("expected"));
+            saw_ignored_diagnostic =
+                full.items.iter().any(|diag| diag.message.contains("expected"));
         }
     }
     assert!(saw_ignored_diagnostic, "root-scanning config should diagnose ignored.sv");
@@ -2058,25 +2034,25 @@ fn restored_project_manifest_clears_diagnostics_for_excluded_files() {
             WorkspaceDiagnosticParams {
                 identifier: None,
                 previous_result_ids: Vec::new(),
-                work_done_progress_params: WorkDoneProgressParams::default(),
-                partial_result_params: Default::default(),
+                work_done_token: None,
+                partial_result_token: None,
             },
         )))
         .unwrap();
     let second: WorkspaceDiagnosticReportResult =
         recv_response(&client, second_id, "workspaceDiagnostic");
     let second_report = match second {
-        WorkspaceDiagnosticReportResult::Report(report) => report,
+        Union2::A(report) => report,
         other => panic!("unexpected workspace diagnostic response: {other:?}"),
     };
     for item in second_report.items {
-        if let lsp_types::WorkspaceDocumentDiagnosticReport::Full(full) = item
+        if let Union2::A(full) = item
             && full.uri == ignored_uri
         {
             assert!(
-                full.full_document_diagnostic_report.items.is_empty(),
+                full.items.is_empty(),
                 "restored config should clear diagnostics for excluded file: {:?}",
-                full.full_document_diagnostic_report.items
+                full.items
             );
             shutdown_test_server(&client, server_thread);
             return;
@@ -2094,7 +2070,7 @@ fn workspace_scan_refreshes_diagnostics_for_unopened_systemverilog_dependency() 
             ..Default::default()
         }),
         workspace: Some(WorkspaceClientCapabilities {
-            diagnostic: Some(lsp_types::DiagnosticWorkspaceClientCapabilities {
+            diagnostics: Some(lspt::DiagnosticWorkspaceClientCapabilities {
                 refresh_support: Some(true),
             }),
             ..Default::default()
@@ -2135,7 +2111,7 @@ fn workspace_scan_refreshes_diagnostics_for_unopened_systemverilog_dependency() 
             DidOpenTextDocumentParams {
                 text_document: TextDocumentItem {
                     uri: top_uri.clone(),
-                    language_id: "verilog".to_string(),
+                    language_id: lspt::LanguageKind::Custom_("verilog".to_string()),
                     version: 1,
                     text: top_text.to_string(),
                 },
@@ -2148,7 +2124,7 @@ fn workspace_scan_refreshes_diagnostics_for_unopened_systemverilog_dependency() 
         let timeout = deadline.saturating_duration_since(Instant::now());
         match client.receiver.recv_timeout(timeout).unwrap() {
             Message::Request(request)
-                if request.method == lsp_types::request::WorkspaceDiagnosticRefresh::METHOD =>
+                if request.method == lspt::request::DiagnosticRefreshRequest::METHOD =>
             {
                 client
                     .sender
@@ -2157,7 +2133,7 @@ fn workspace_scan_refreshes_diagnostics_for_unopened_systemverilog_dependency() 
                 break;
             }
             Message::Request(request)
-                if request.method == lsp_types::request::WorkDoneProgressCreate::METHOD =>
+                if request.method == lspt::request::WorkDoneProgressCreateRequest::METHOD =>
             {
                 client
                     .sender
@@ -2165,7 +2141,7 @@ fn workspace_scan_refreshes_diagnostics_for_unopened_systemverilog_dependency() 
                     .unwrap();
             }
             Message::Notification(notification)
-                if notification.method == lsp_types::notification::Progress::METHOD => {}
+                if notification.method == lspt::notification::ProgressNotification::METHOD => {}
             Message::Request(request) => {
                 panic!(
                     "unexpected server request while waiting for diagnostic refresh: {request:?}"
@@ -2184,8 +2160,8 @@ fn workspace_scan_refreshes_diagnostics_for_unopened_systemverilog_dependency() 
             WorkspaceDiagnosticParams {
                 identifier: None,
                 previous_result_ids: Vec::new(),
-                work_done_progress_params: WorkDoneProgressParams::default(),
-                partial_result_params: Default::default(),
+                work_done_token: None,
+                partial_result_token: None,
             },
         )))
         .unwrap();
@@ -2201,15 +2177,15 @@ fn workspace_scan_refreshes_diagnostics_for_unopened_systemverilog_dependency() 
                 )
                 .unwrap();
                 let report = match result {
-                    WorkspaceDiagnosticReportResult::Report(report) => report,
+                    Union2::A(report) => report,
                     other => panic!("unexpected workspace diagnostic response: {other:?}"),
                 };
                 let mut top_diagnostics = None;
                 for item in report.items {
-                    if let lsp_types::WorkspaceDocumentDiagnosticReport::Full(full) = item
+                    if let Union2::A(full) = item
                         && full.uri == top_uri
                     {
-                        top_diagnostics = Some(full.full_document_diagnostic_report.items);
+                        top_diagnostics = Some(full.items);
                     }
                 }
                 let top_diagnostics = top_diagnostics.expect("missing top diagnostics");
@@ -2229,9 +2205,9 @@ fn workspace_scan_refreshes_diagnostics_for_unopened_systemverilog_dependency() 
                 return;
             }
             Message::Notification(notification)
-                if notification.method == lsp_types::notification::Progress::METHOD => {}
+                if notification.method == lspt::notification::ProgressNotification::METHOD => {}
             Message::Request(request)
-                if request.method == lsp_types::request::WorkspaceDiagnosticRefresh::METHOD =>
+                if request.method == lspt::request::DiagnosticRefreshRequest::METHOD =>
             {
                 client
                     .sender
@@ -2256,7 +2232,7 @@ fn deleted_workspace_file_requests_diagnostic_refresh() {
             ..Default::default()
         }),
         workspace: Some(WorkspaceClientCapabilities {
-            diagnostic: Some(lsp_types::DiagnosticWorkspaceClientCapabilities {
+            diagnostics: Some(lspt::DiagnosticWorkspaceClientCapabilities {
                 refresh_support: Some(true),
             }),
             ..Default::default()
@@ -2292,15 +2268,11 @@ fn deleted_workspace_file_requests_diagnostic_refresh() {
     let mut saw_broken_diagnostic = false;
     let mut broken_result_id = None;
     for item in first_report.items {
-        if let lsp_types::WorkspaceDocumentDiagnosticReport::Full(full) = item
+        if let Union2::A(full) = item
             && full.uri == broken_uri
         {
-            broken_result_id = full.full_document_diagnostic_report.result_id.clone();
-            saw_broken_diagnostic = full
-                .full_document_diagnostic_report
-                .items
-                .iter()
-                .any(|diag| diag.message.contains("expected"));
+            broken_result_id = full.result_id.clone();
+            saw_broken_diagnostic = full.items.iter().any(|diag| diag.message.contains("expected"));
         }
     }
     assert!(saw_broken_diagnostic, "expected broken.sv diagnostics before deletion");
@@ -2312,8 +2284,8 @@ fn deleted_workspace_file_requests_diagnostic_refresh() {
         .sender
         .send(Message::Notification(Notification::new(
             DidChangeWatchedFiles::METHOD.to_string(),
-            lsp_types::DidChangeWatchedFilesParams {
-                changes: vec![FileEvent::new(broken_uri.clone(), FileChangeType::DELETED)],
+            lspt::DidChangeWatchedFilesParams {
+                changes: vec![FileEvent { uri: broken_uri.clone(), ty: FileChangeType::Deleted }],
             },
         )))
         .unwrap();
@@ -2325,7 +2297,7 @@ fn deleted_workspace_file_requests_diagnostic_refresh() {
     {
         match message {
             Message::Request(request)
-                if request.method == lsp_types::request::WorkspaceDiagnosticRefresh::METHOD =>
+                if request.method == lspt::request::DiagnosticRefreshRequest::METHOD =>
             {
                 client
                     .sender
@@ -2335,7 +2307,7 @@ fn deleted_workspace_file_requests_diagnostic_refresh() {
                 break;
             }
             Message::Request(request)
-                if request.method == lsp_types::request::WorkDoneProgressCreate::METHOD =>
+                if request.method == lspt::request::WorkDoneProgressCreateRequest::METHOD =>
             {
                 client
                     .sender
@@ -2343,7 +2315,7 @@ fn deleted_workspace_file_requests_diagnostic_refresh() {
                     .unwrap();
             }
             Message::Notification(notification)
-                if notification.method == lsp_types::notification::Progress::METHOD => {}
+                if notification.method == lspt::notification::ProgressNotification::METHOD => {}
             other => panic!("unexpected message while waiting for diagnostic refresh: {other:?}"),
         }
     }
@@ -2352,16 +2324,16 @@ fn deleted_workspace_file_requests_diagnostic_refresh() {
     let second_report = request_workspace_diagnostic_report(
         &client,
         2,
-        vec![lsp_types::PreviousResultId { uri: broken_uri.clone(), value: broken_result_id }],
+        vec![lspt::PreviousResultId { uri: broken_uri.clone(), value: broken_result_id }],
     );
     for item in second_report.items {
-        if let lsp_types::WorkspaceDocumentDiagnosticReport::Full(full) = item
+        if let Union2::A(full) = item
             && full.uri == broken_uri
         {
             assert!(
-                full.full_document_diagnostic_report.items.is_empty(),
+                full.items.is_empty(),
                 "deleted file diagnostics should be cleared: {:?}",
-                full.full_document_diagnostic_report.items
+                full.items
             );
             shutdown_test_server(&client, server_thread);
             return;
@@ -2401,8 +2373,8 @@ fn document_diagnostic_result_id_changes_when_dependency_changes() {
                 text_document: TextDocumentIdentifier { uri: top_uri.clone() },
                 identifier: None,
                 previous_result_id: None,
-                work_done_progress_params: WorkDoneProgressParams::default(),
-                partial_result_params: Default::default(),
+                work_done_token: None,
+                partial_result_token: None,
             },
         )))
         .unwrap();
@@ -2420,11 +2392,9 @@ fn document_diagnostic_result_id_changes_when_dependency_changes() {
             DidChangeTextDocument::METHOD.to_string(),
             DidChangeTextDocumentParams {
                 text_document: VersionedTextDocumentIdentifier { uri: child_uri, version: 2 },
-                content_changes: vec![TextDocumentContentChangeEvent {
-                    range: None,
-                    range_length: None,
+                content_changes: vec![Union2::B(lspt::TextDocumentContentChangeWholeDocument {
                     text: "module child(input logic a);\nendmodule\n".to_string(),
-                }],
+                })],
             },
         )))
         .unwrap();
@@ -2439,8 +2409,8 @@ fn document_diagnostic_result_id_changes_when_dependency_changes() {
                 text_document: TextDocumentIdentifier { uri: top_uri },
                 identifier: None,
                 previous_result_id: Some(first_result_id.clone()),
-                work_done_progress_params: WorkDoneProgressParams::default(),
-                partial_result_params: Default::default(),
+                work_done_token: None,
+                partial_result_token: None,
             },
         )))
         .unwrap();
@@ -2486,11 +2456,9 @@ fn legacy_publish_diagnostics_refreshes_dependent_open_files() {
             DidChangeTextDocument::METHOD.to_string(),
             DidChangeTextDocumentParams {
                 text_document: VersionedTextDocumentIdentifier { uri: child_uri, version: 2 },
-                content_changes: vec![TextDocumentContentChangeEvent {
-                    range: None,
-                    range_length: None,
+                content_changes: vec![Union2::B(lspt::TextDocumentContentChangeWholeDocument {
                     text: "module child(input logic a);\nendmodule\n".to_string(),
-                }],
+                })],
             },
         )))
         .unwrap();

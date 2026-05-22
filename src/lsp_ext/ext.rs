@@ -1,6 +1,4 @@
-use std::ops;
-
-use lsp_types::notification::Notification;
+use lspt::notification::Notification;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -14,72 +12,84 @@ pub struct CodeLensData {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum CodeLensDataKind {
-    Instantiation(lsp_types::TextDocumentPositionParams),
+    Instantiation(TextDocumentPositionParams),
 }
 
-macro_rules! define_semantic_token_kind {
-    (   ($name:ident: [$ty:ty] @ $mod:ident) =>
-        standard {
-            $($standard:ident),*$(,)?
-        }
-        custom {
-            $(($custom:ident, $string:literal) $(=> $fallback:ident)?),*$(,)?
-        }
-    ) => {
-        pub(crate) mod $mod {
-            $(pub(crate) const $standard: $ty = <$ty>::$standard;)*
-            $(pub(crate) const $custom: $ty = <$ty>::new($string);)*
-
-            pub(crate) fn fallback(token: $ty) -> Option<$ty> {
-                $(
-                    if token == $custom {
-                        None $(.or(Some($fallback)))?
-                    } else
-                )*
-                { Some(token)}
-            }
-        }
-
-        pub(crate) const $name: &[$ty] = &[
-            $(self::$mod::$standard,)*
-            $(self::$mod::$custom),*
-        ];
-    };
+#[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TextDocumentPositionParams {
+    pub text_document: lspt::TextDocumentIdentifier,
+    pub position: lspt::Position,
 }
 
-define_semantic_token_kind! {
-    (SEMA_TOKENS_TYPES: [lsp_types::SemanticTokenType] @ sema_token_types) =>
-    standard {
-        COMMENT,
-        DECORATOR,
-        ENUM_MEMBER,
-        ENUM,
-        FUNCTION,
-        INTERFACE,
-        KEYWORD,
-        MACRO,
-        METHOD,
-        NAMESPACE,
-        NUMBER,
-        OPERATOR,
-        PARAMETER,
-        PROPERTY,
-        STRING,
-        STRUCT,
-        TYPE_PARAMETER,
-        VARIABLE,
-        TYPE,
-    }
+pub(crate) mod sema_token_types {
+    pub(crate) const COMMENT: &str = "comment";
+    pub(crate) const DECORATOR: &str = "decorator";
+    pub(crate) const ENUM_MEMBER: &str = "enumMember";
+    pub(crate) const ENUM: &str = "enum";
+    pub(crate) const FUNCTION: &str = "function";
+    pub(crate) const INTERFACE: &str = "interface";
+    pub(crate) const KEYWORD: &str = "keyword";
+    pub(crate) const MACRO: &str = "macro";
+    pub(crate) const METHOD: &str = "method";
+    pub(crate) const NAMESPACE: &str = "namespace";
+    pub(crate) const NUMBER: &str = "number";
+    pub(crate) const OPERATOR: &str = "operator";
+    pub(crate) const PARAMETER: &str = "parameter";
+    pub(crate) const PROPERTY: &str = "property";
+    pub(crate) const STRING: &str = "string";
+    pub(crate) const STRUCT: &str = "struct";
+    pub(crate) const TYPE_PARAMETER: &str = "typeParameter";
+    pub(crate) const VARIABLE: &str = "variable";
+    pub(crate) const TYPE: &str = "type";
 
-    custom {
-        (CLK_PORT, "port_clock") => KEYWORD,
-        (RST_PORT, "port_reset") => PROPERTY,
-        (OTHERS_PORT, "port_generic") => PARAMETER,
-        (INSTANCE, "instance") => VARIABLE,
-        (TYPE_ALIAS, "type_alias") => TYPE,
-        (GENERIC, "generic") => TYPE_PARAMETER,
+    pub(crate) const CLK_PORT: &str = "port_clock";
+    pub(crate) const RST_PORT: &str = "port_reset";
+    pub(crate) const OTHERS_PORT: &str = "port_generic";
+    pub(crate) const INSTANCE: &str = "instance";
+    pub(crate) const TYPE_ALIAS: &str = "type_alias";
+    pub(crate) const GENERIC: &str = "generic";
+
+    pub(crate) fn fallback(token: &'static str) -> Option<&'static str> {
+        match token {
+            CLK_PORT => Some(KEYWORD),
+            RST_PORT => Some(PROPERTY),
+            OTHERS_PORT => Some(PARAMETER),
+            INSTANCE => Some(VARIABLE),
+            TYPE_ALIAS => Some(TYPE),
+            GENERIC => Some(TYPE_PARAMETER),
+            _ => Some(token),
+        }
     }
 }
+
+pub(crate) const SEMA_TOKENS_TYPES: &[&str] = &[
+    sema_token_types::COMMENT,
+    sema_token_types::DECORATOR,
+    sema_token_types::ENUM_MEMBER,
+    sema_token_types::ENUM,
+    sema_token_types::FUNCTION,
+    sema_token_types::INTERFACE,
+    sema_token_types::KEYWORD,
+    sema_token_types::MACRO,
+    sema_token_types::METHOD,
+    sema_token_types::NAMESPACE,
+    sema_token_types::NUMBER,
+    sema_token_types::OPERATOR,
+    sema_token_types::PARAMETER,
+    sema_token_types::PROPERTY,
+    sema_token_types::STRING,
+    sema_token_types::STRUCT,
+    sema_token_types::TYPE_PARAMETER,
+    sema_token_types::VARIABLE,
+    sema_token_types::TYPE,
+    sema_token_types::CLK_PORT,
+    sema_token_types::RST_PORT,
+    sema_token_types::OTHERS_PORT,
+    sema_token_types::INSTANCE,
+    sema_token_types::TYPE_ALIAS,
+    sema_token_types::GENERIC,
+];
 #[derive(Default)]
 pub(crate) struct SemaTokenModifierSet(pub(crate) u32);
 
@@ -89,30 +99,50 @@ impl SemaTokenModifierSet {
     }
 }
 
-define_semantic_token_kind! {
-    (SEMA_TOKENS_MODIFIERS: [lsp_types::SemanticTokenModifier] @ sema_token_modifiers) =>
-    standard {
-        DECLARATION,
-        DEFINITION,
-        READONLY,
-        STATIC,
-        DEPRECATED,
-        ABSTRACT,
-        ASYNC,
-        MODIFICATION,
-        DOCUMENTATION,
-        DEFAULT_LIBRARY,
-    }
-    custom {
-        (READ, "read"),
-        (WRITE, "write"),
-        (REF, "ref") => MODIFICATION,
-        (DEF, "definition"),
+pub(crate) mod sema_token_modifiers {
+    pub(crate) const DECLARATION: &str = "declaration";
+    pub(crate) const DEFINITION: &str = "definition";
+    pub(crate) const READONLY: &str = "readonly";
+    pub(crate) const STATIC: &str = "static";
+    pub(crate) const DEPRECATED: &str = "deprecated";
+    pub(crate) const ABSTRACT: &str = "abstract";
+    pub(crate) const ASYNC: &str = "async";
+    pub(crate) const MODIFICATION: &str = "modification";
+    pub(crate) const DOCUMENTATION: &str = "documentation";
+    pub(crate) const DEFAULT_LIBRARY: &str = "defaultLibrary";
+
+    pub(crate) const READ: &str = "read";
+    pub(crate) const WRITE: &str = "write";
+    pub(crate) const REF: &str = "ref";
+    pub(crate) const DEF: &str = "definition";
+
+    pub(crate) fn fallback(token: &'static str) -> Option<&'static str> {
+        match token {
+            REF => Some(MODIFICATION),
+            _ => Some(token),
+        }
     }
 }
 
-impl ops::BitOrAssign<lsp_types::SemanticTokenModifier> for SemaTokenModifierSet {
-    fn bitor_assign(&mut self, rhs: lsp_types::SemanticTokenModifier) {
+pub(crate) const SEMA_TOKENS_MODIFIERS: &[&str] = &[
+    sema_token_modifiers::DECLARATION,
+    sema_token_modifiers::DEFINITION,
+    sema_token_modifiers::READONLY,
+    sema_token_modifiers::STATIC,
+    sema_token_modifiers::DEPRECATED,
+    sema_token_modifiers::ABSTRACT,
+    sema_token_modifiers::ASYNC,
+    sema_token_modifiers::MODIFICATION,
+    sema_token_modifiers::DOCUMENTATION,
+    sema_token_modifiers::DEFAULT_LIBRARY,
+    sema_token_modifiers::READ,
+    sema_token_modifiers::WRITE,
+    sema_token_modifiers::REF,
+    sema_token_modifiers::DEF,
+];
+
+impl std::ops::BitOrAssign<&'static str> for SemaTokenModifierSet {
+    fn bitor_assign(&mut self, rhs: &'static str) {
         let Some(idx) = SEMA_TOKENS_MODIFIERS.iter().position(|it| it == &rhs) else {
             tracing::debug!(?rhs, "unknown semantic token modifier");
             return;
@@ -124,7 +154,7 @@ impl ops::BitOrAssign<lsp_types::SemanticTokenModifier> for SemaTokenModifierSet
 #[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CodeActionData {
-    pub code_action_params: lsp_types::CodeActionParams,
+    pub code_action_params: lspt::CodeActionParams,
     pub id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub version: Option<i32>,
@@ -146,7 +176,7 @@ pub const RELOAD_WORKSPACE_COMMAND: &str = "vizsla.server.reloadWorkspace";
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RunQiheAnalysisParams {
-    pub uri: lsp_types::Url,
+    pub uri: lspt::Uri,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cwd: Option<std::path::PathBuf>,
 }
@@ -197,8 +227,8 @@ pub enum ProjectStatusState {
 #[serde(rename_all = "camelCase")]
 pub struct ProjectStatusParams {
     pub state: ProjectStatusState,
-    pub manifest_uris: Vec<lsp_types::Url>,
-    pub unconfigured_root_uris: Vec<lsp_types::Url>,
+    pub manifest_uris: Vec<lspt::Uri>,
+    pub unconfigured_root_uris: Vec<lspt::Uri>,
     pub workspace_count: usize,
     pub errors: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
