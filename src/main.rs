@@ -7,7 +7,7 @@ use config::Config;
 use const_format::formatcp;
 use itertools::Itertools;
 use lsp_server::Connection;
-use lsp_types::{MessageType, ShowMessageParams};
+use lspt::{MessageType, ShowMessageParams, TraceValue};
 use slang as _;
 use tracing_subscriber::{
     Registry, filter::Targets, fmt::writer::BoxMakeWriter, layer::SubscriberExt,
@@ -97,29 +97,18 @@ fn run_server(opt: Opt) -> anyhow::Result<()> {
 
     tracing::info!("Server initialized. InitializeParams: {}", &initialize_params);
 
-    let lsp_types::InitializeParams {
-        root_uri,
+    let lspt::InitializeParams {
         capabilities: client_caps,
         workspace_folders,
         initialization_options,
         trace,
         locale,
         ..
-    } = from_json::<lsp_types::InitializeParams>("InitializeParams", &initialize_params)?;
+    } = from_json::<lspt::InitializeParams>("InitializeParams", &initialize_params)?;
 
-    let root_path = match root_uri
-        .and_then(|uri| uri.to_file_path().ok())
-        .map(patch_path_prefix)
-        .and_then(|path| AbsPathBuf::try_from(path).ok())
-    {
-        Some(path) => path,
-        None => AbsPathBuf::try_from(env::current_dir()?).map_err(|path| {
-            anyhow::format_err!(
-                "current directory is not an absolute UTF-8 path: {}",
-                path.display()
-            )
-        })?,
-    };
+    let root_path = AbsPathBuf::try_from(env::current_dir()?).map_err(|path| {
+        anyhow::format_err!("current directory is not an absolute UTF-8 path: {}", path.display())
+    })?;
 
     let workspace_roots = workspace_folders
         .map(|workspace| {
@@ -138,10 +127,10 @@ fn run_server(opt: Opt) -> anyhow::Result<()> {
     let (user_config, snippets) = if let Some(options) = initialization_options {
         let (user_config, snippets, errors) = Config::parse_initialization_options(options);
         if !errors.is_empty() {
-            use lsp_types::notification::{Notification, ShowMessage};
+            use lspt::notification::{Notification, ShowMessageNotification};
             let noti = lsp_server::Notification::new(
-                ShowMessage::METHOD.to_string(),
-                ShowMessageParams { typ: MessageType::WARNING, message: errors.message(i18n) },
+                ShowMessageNotification::METHOD.to_string(),
+                ShowMessageParams { ty: MessageType::Warning, message: errors.message(i18n) },
             );
             if connection.sender.send(lsp_server::Message::Notification(noti)).is_err() {
                 tracing::debug!(
@@ -157,9 +146,9 @@ fn run_server(opt: Opt) -> anyhow::Result<()> {
     let config =
         Config::new(opt, root_path, client_caps, workspace_roots, i18n, user_config, snippets);
 
-    let initialize_result = lsp_types::InitializeResult {
+    let initialize_result = lspt::InitializeResult {
         capabilities: config.server_caps(),
-        server_info: Some(lsp_types::ServerInfo {
+        server_info: Some(lspt::ServerInfo {
             name: config.opt.process_name.clone(),
             version: Some(VERSION.to_string()),
         }),
@@ -174,7 +163,7 @@ fn run_server(opt: Opt) -> anyhow::Result<()> {
         return Err(e.into());
     }
 
-    main_loop::main_loop(config, connection, trace.unwrap_or_default())?;
+    main_loop::main_loop(config, connection, trace.unwrap_or(TraceValue::Off))?;
 
     io_threads.join()?;
     tracing::info!("Server shut down. BYE!");

@@ -11,9 +11,9 @@ use std::{
 
 use anyhow::{Context, Result, anyhow, bail};
 use base_db::compilation_plan::CompilationPlan;
-use lsp_types::{
-    Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity, MessageType, NumberOrString,
-    ShowMessageParams,
+use lspt::{
+    Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity, MessageType, ShowMessageParams,
+    request::DiagnosticRefreshRequest,
 };
 use project_model::project_manifest::MANIFEST_FILE_NAME;
 use regex::Regex;
@@ -35,7 +35,7 @@ use super::{
 };
 use crate::{
     config::user_config::QiheConfig,
-    global_state::main_loop::Task,
+    global_state::{DEFAULT_REQ_HANDLER, main_loop::Task},
     i18n::{I18n, keys},
     lsp_ext::{
         ext::{
@@ -124,7 +124,7 @@ impl GlobalState {
             QiheTask::Finished { update, progress_token } => {
                 let summary = update.summary.clone();
                 let changed_files = self.replace_qihe_diagnostics(update.by_file);
-                self.publish_qihe_diagnostics(changed_files);
+                self.refresh_qihe_diagnostics(changed_files);
                 self.end_qihe_progress(progress_token, "end", summary.clone(), summary);
             }
             QiheTask::Failed { message, progress_token } => {
@@ -134,10 +134,9 @@ impl GlobalState {
                     message.clone(),
                     self.config.i18n.text(keys::QIHE_FAILED).to_owned(),
                 );
-                self.send_notification::<lsp_types::notification::ShowMessage>(ShowMessageParams {
-                    typ: MessageType::ERROR,
-                    message,
-                });
+                self.send_notification::<lspt::notification::ShowMessageNotification>(
+                    ShowMessageParams { ty: MessageType::Error, message },
+                );
             }
         }
     }
@@ -163,8 +162,15 @@ impl GlobalState {
         changed_files
     }
 
-    fn publish_qihe_diagnostics(&mut self, changed_files: FxHashSet<FileId>) {
+    fn refresh_qihe_diagnostics(&mut self, changed_files: FxHashSet<FileId>) {
         if changed_files.is_empty() {
+            return;
+        }
+
+        if self.config.cli_pull_diagnostics_support() {
+            if self.config.cli_workspace_diagnostic_refresh_support() {
+                self.send_request::<DiagnosticRefreshRequest>((), DEFAULT_REQ_HANDLER);
+            }
             return;
         }
 
@@ -189,7 +195,7 @@ impl GlobalState {
                 diagnostics: snapshot.lsp_diagnostics(file_id),
             });
         }
-        self.publish_diagnostics_tasks(publish_tasks, true);
+        self.publish_diagnostics_tasks(publish_tasks, false);
     }
 
     fn begin_qihe_progress(&mut self, progress_token: &str, label: String) {
@@ -639,15 +645,17 @@ impl<'a> DiagnosticConverter<'a> {
 
         Ok((
             file_id,
-            Diagnostic::new(
+            Diagnostic {
                 range,
-                Some(map_severity(&severity)),
-                Some(NumberOrString::String(analysis_code(&analysis_class))),
-                Some(QIHE.to_owned()),
+                severity: Some(map_severity(&severity)),
+                code: Some(lspt::Union2::B(analysis_code(&analysis_class))),
+                code_description: None,
+                source: Some(QIHE.to_owned()),
                 message,
-                related_info,
-                None,
-            ),
+                related_information: related_info,
+                tags: None,
+                data: None,
+            },
         ))
     }
 
@@ -719,11 +727,11 @@ fn resolve_file_name(base_dir: &Path, file_name: &str) -> Option<PathBuf> {
 
 fn map_severity(severity: &str) -> DiagnosticSeverity {
     match severity.trim().to_ascii_uppercase().as_str() {
-        "ERROR" => DiagnosticSeverity::ERROR,
-        "WARNING" | "WARN" => DiagnosticSeverity::WARNING,
-        "INFO" | "INFORMATION" => DiagnosticSeverity::INFORMATION,
-        "HINT" => DiagnosticSeverity::HINT,
-        _ => DiagnosticSeverity::WARNING,
+        "ERROR" => DiagnosticSeverity::Error,
+        "WARNING" | "WARN" => DiagnosticSeverity::Warning,
+        "INFO" | "INFORMATION" => DiagnosticSeverity::Information,
+        "HINT" => DiagnosticSeverity::Hint,
+        _ => DiagnosticSeverity::Warning,
     }
 }
 
@@ -779,7 +787,15 @@ mod tests {
 
     use base_db::compilation_plan::CompilationPlan;
     use crossbeam_channel::unbounded;
+    use lsp_server::{Connection, Message};
+    use lspt::{
+        ClientCapabilities, DiagnosticClientCapabilities, DiagnosticWorkspaceClientCapabilities,
+        TextDocumentClientCapabilities, WorkspaceClientCapabilities,
+        request::{DiagnosticRefreshRequest, Request as _},
+    };
+    use rustc_hash::FxHashSet;
     use utils::paths::AbsPathBuf;
+    use vfs::FileId;
 
     use super::{
         QiheCompileInput, QiheLogSink, command_line, has_compile_mode, join_command_output,
@@ -787,9 +803,53 @@ mod tests {
         qihe_working_directory, split_compile_args, stream_command_output, strip_ansi,
     };
     use crate::{
-        config::user_config::QiheConfig,
-        global_state::main_loop::{QiheTask, Task},
+        Opt,
+        config::{
+            Config,
+            user_config::{QiheConfig, UserConfig},
+        },
+        global_state::{
+            GlobalState,
+            main_loop::{QiheTask, Task},
+        },
+        i18n::I18n,
     };
+
+    fn test_state(client_caps: ClientCapabilities) -> (GlobalState, Connection) {
+        let root_path = AbsPathBuf::assert_utf8(std::env::current_dir().unwrap());
+        let config = Config::new(
+            Opt {
+                process_name: "vizsla-test".to_string(),
+                log: "error".to_string(),
+                log_filename: None,
+            },
+            root_path.clone(),
+            client_caps,
+            vec![root_path],
+            I18n::default(),
+            UserConfig::default(),
+            Vec::new(),
+        );
+
+        let (server, client) = Connection::memory();
+        (GlobalState::new(server.sender, config, lspt::TraceValue::Off), client)
+    }
+
+    fn pull_diagnostic_caps() -> ClientCapabilities {
+        ClientCapabilities {
+            text_document: Some(TextDocumentClientCapabilities {
+                diagnostic: Some(DiagnosticClientCapabilities::default()),
+                ..Default::default()
+            }),
+            workspace: Some(WorkspaceClientCapabilities {
+                diagnostics: Some(DiagnosticWorkspaceClientCapabilities {
+                    refresh_support: Some(true),
+                }),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }
+    }
 
     #[test]
     fn parses_line_col_only_locations() {
@@ -841,6 +901,23 @@ mod tests {
             let rendered = resolved.to_string_lossy().replace('\\', "/");
             assert!(!rendered.starts_with("//?/"), "{rendered}");
         }
+    }
+
+    #[test]
+    fn qihe_refresh_requests_pull_diagnostics_refresh_without_publishing() {
+        let (mut state, client) = test_state(pull_diagnostic_caps());
+
+        state.refresh_qihe_diagnostics(FxHashSet::from_iter([FileId(0)]));
+
+        let message = client.receiver.try_recv().expect("workspace diagnostic refresh request");
+        match message {
+            Message::Request(request) => {
+                assert_eq!(request.method, DiagnosticRefreshRequest::METHOD);
+            }
+            other => panic!("expected workspace diagnostic refresh request, got {other:?}"),
+        }
+
+        assert!(client.receiver.try_recv().is_err(), "pull diagnostics should not be published");
     }
 
     #[test]

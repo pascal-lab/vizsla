@@ -20,7 +20,7 @@ use base_db::{
 use crossbeam_channel::{Receiver, Sender, unbounded};
 use ide::analysis_host::AnalysisHost;
 use lsp_server::{Message, ReqQueue, Request};
-use lsp_types::{TraceValue, Url};
+use lspt::{TraceValue, Uri as Url};
 use nohash_hasher::IntMap;
 use parking_lot::{Mutex, RwLock};
 use project_model::Workspace;
@@ -112,8 +112,8 @@ pub(crate) struct GlobalState {
 
     pub(crate) shutdown_requested: bool,
 
-    pub(crate) semantic_tokens_cache: Arc<Mutex<FxHashMap<Url, lsp_types::SemanticTokens>>>,
-    pub(crate) diagnostics: FxHashMap<FileId, Vec<lsp_types::Diagnostic>>,
+    pub(crate) semantic_tokens_cache: Arc<Mutex<FxHashMap<Url, lspt::SemanticTokens>>>,
+    pub(crate) diagnostics: FxHashMap<FileId, Vec<lspt::Diagnostic>>,
     pub(crate) diagnostics_revision: u64,
     pub(crate) qihe_diagnostics: Arc<Mutex<FxHashMap<FileId, QiheDiagnosticState>>>,
 
@@ -200,7 +200,7 @@ impl GlobalState {
 #[derive(Debug, Clone, Default)]
 pub(crate) struct QiheDiagnosticState {
     pub(crate) generation: u64,
-    pub(crate) diagnostics: Vec<lsp_types::Diagnostic>,
+    pub(crate) diagnostics: Vec<lspt::Diagnostic>,
 }
 
 // handle request

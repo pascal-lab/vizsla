@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use lsp_types::{
+use lspt::{
     DidChangeConfigurationParams, DidChangeTextDocumentParams, DidChangeWatchedFilesParams,
     DidChangeWorkspaceFoldersParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
     DidSaveTextDocumentParams,
@@ -22,11 +22,11 @@ use crate::{
 
 pub(crate) fn handle_cancel(
     state: &mut GlobalState,
-    params: lsp_types::CancelParams,
+    params: lspt::CancelParams,
 ) -> anyhow::Result<()> {
     let id: lsp_server::RequestId = match params.id {
-        lsp_types::NumberOrString::Number(id) => id.into(),
-        lsp_types::NumberOrString::String(id) => id.into(),
+        lspt::Union2::A(id) => id.into(),
+        lspt::Union2::B(id) => id.into(),
     };
     state.cancel(id);
     Ok(())
@@ -124,9 +124,9 @@ pub(crate) fn handle_did_change_configuration(
     // this notification's parameters should be ignored and the actual config queried separately.
     _params: DidChangeConfigurationParams,
 ) -> anyhow::Result<()> {
-    state.send_request::<lsp_types::request::WorkspaceConfiguration>(
-        lsp_types::ConfigurationParams {
-            items: vec![lsp_types::ConfigurationItem {
+    state.send_request::<lspt::request::ConfigurationRequest>(
+        lspt::ConfigurationParams {
+            items: vec![lspt::ConfigurationItem {
                 scope_uri: None,
                 section: Some(DEFAULT_PROCESS_NAME.into()),
             }],
@@ -188,10 +188,8 @@ pub(crate) fn handle_did_change_watched_files(
 
     for change in params.changes {
         if let Ok(path) = from_proto::abs_path(&change.uri) {
-            if reload::should_refresh_for_change(
-                &path,
-                change.typ != lsp_types::FileChangeType::CHANGED,
-            ) {
+            if reload::should_refresh_for_change(&path, change.ty != lspt::FileChangeType::Changed)
+            {
                 workspace_structure_change.get_or_insert(path);
                 continue;
             }
@@ -212,7 +210,7 @@ pub(crate) fn handle_did_change_watched_files(
 
 pub(crate) fn handle_set_trace(
     state: &mut GlobalState,
-    params: lsp_types::SetTraceParams,
+    params: lspt::SetTraceParams,
 ) -> anyhow::Result<()> {
     state.set_lsp_trace(params.value);
     Ok(())
@@ -232,7 +230,7 @@ fn set_vfs_file_contents(
 fn update_document_text(
     encoding: PositionEncoding,
     data: &mut String,
-    content_changes: Vec<lsp_types::TextDocumentContentChangeEvent>,
+    content_changes: Vec<lspt::TextDocumentContentChangeEvent>,
 ) -> Option<String> {
     let text = apply_document_changes(encoding, data, content_changes);
 
@@ -247,16 +245,19 @@ fn update_document_text(
 fn apply_document_changes(
     encoding: PositionEncoding,
     file_contents: &str,
-    content_changes: Vec<lsp_types::TextDocumentContentChangeEvent>,
+    content_changes: Vec<lspt::TextDocumentContentChangeEvent>,
 ) -> String {
     // Skip to the last full document change and peek at the first content change
     let (mut text, content_changes) = {
-        match content_changes.iter().rposition(|change| change.range.is_none()) {
+        match content_changes.iter().rposition(|change| matches!(change, lspt::Union2::B(_))) {
             Some(idx) => {
                 let (full_doc_changes, rest) = content_changes.split_at(idx + 1);
                 match full_doc_changes.last() {
-                    Some(full_doc_change) => (full_doc_change.text.clone(), rest),
+                    Some(lspt::Union2::B(full_doc_change)) => (full_doc_change.text.clone(), rest),
                     None => (file_contents.to_owned(), rest),
+                    Some(lspt::Union2::A(_)) => {
+                        unreachable!("rposition selected a whole document change")
+                    }
                 }
             }
             None => (file_contents.to_owned(), &content_changes[..]),
@@ -281,18 +282,21 @@ fn apply_document_changes(
     // set to infinity at first, to avoid rebuilding the index on the first change
     let mut index_valid_until = !0u32;
     for change in content_changes {
-        let Some(range) = change.range else {
-            text = change.text.clone();
-            *Arc::make_mut(&mut line_info.index) = LineIndex::new(&text);
-            index_valid_until = !0u32;
-            continue;
+        let (range, change_text) = match change {
+            lspt::Union2::A(change) => (change.range, &change.text),
+            lspt::Union2::B(change) => {
+                text = change.text.clone();
+                *Arc::make_mut(&mut line_info.index) = LineIndex::new(&text);
+                index_valid_until = !0u32;
+                continue;
+            }
         };
         if index_valid_until <= range.end.line {
             *Arc::make_mut(&mut line_info.index) = LineIndex::new(&text);
         }
         index_valid_until = range.start.line;
         if let Ok(range) = from_proto::text_range(&line_info, range) {
-            text.replace_range(Range::<usize>::from(range), &change.text);
+            text.replace_range(Range::<usize>::from(range), change_text);
         }
     }
     text
@@ -303,9 +307,9 @@ mod tests {
     use std::time::Duration;
 
     use lsp_server::Connection;
-    use lsp_types::{
-        DidChangeWatchedFilesParams, FileChangeType, FileEvent, SetTraceParams,
-        TextDocumentContentChangeEvent, TraceValue, Url,
+    use lspt::{
+        DidChangeWatchedFilesParams, FileChangeType, FileEvent, SetTraceParams, TraceValue,
+        Uri as Url,
     };
     use project_model::project_manifest;
     use utils::{lines::PositionEncoding, paths::AbsPathBuf, test_support::TestDir};
@@ -331,7 +335,7 @@ mod tests {
                 log_filename: None,
             },
             root_path.clone(),
-            lsp_types::ClientCapabilities::default(),
+            lspt::ClientCapabilities::default(),
             vec![root_path],
             I18n::default(),
             UserConfig::default(),
@@ -348,11 +352,9 @@ mod tests {
         let vfs_text = update_document_text(
             PositionEncoding::Utf8,
             &mut text,
-            vec![TextDocumentContentChangeEvent {
-                range: None,
-                range_length: None,
+            vec![lspt::Union2::B(lspt::TextDocumentContentChangeWholeDocument {
                 text: String::new(),
-            }],
+            })],
         );
 
         assert_eq!(text, "");
@@ -365,11 +367,9 @@ mod tests {
         let vfs_text = update_document_text(
             PositionEncoding::Utf8,
             &mut text,
-            vec![TextDocumentContentChangeEvent {
-                range: None,
-                range_length: None,
+            vec![lspt::Union2::B(lspt::TextDocumentContentChangeWholeDocument {
                 text: "module top;\nendmodule\n".to_owned(),
-            }],
+            })],
         );
 
         assert_eq!(text, "module top;\nendmodule\n");
@@ -396,7 +396,7 @@ mod tests {
         handle_did_change_watched_files(
             &mut state,
             DidChangeWatchedFilesParams {
-                changes: vec![FileEvent::new(manifest_uri, FileChangeType::DELETED)],
+                changes: vec![FileEvent { uri: manifest_uri, ty: FileChangeType::Deleted }],
             },
         )
         .unwrap();

@@ -1,4 +1,4 @@
-use lsp_types::Url;
+use lspt::Uri as Url;
 use project_model::project_manifest::ProjectManifest;
 use utils::paths::AbsPath;
 
@@ -75,7 +75,7 @@ fn url_from_path(path: &AbsPath) -> Option<Url> {
 #[cfg(test)]
 mod tests {
     use lsp_server::{Connection, Message, Notification as LspNotification};
-    use lsp_types::notification::Notification as _;
+    use lspt::notification::Notification as _;
     use project_model::project_manifest::MANIFEST_FILE_NAME;
     use utils::{paths::AbsPathBuf, test_support::TestDir};
 
@@ -95,7 +95,7 @@ mod tests {
                 log_filename: None,
             },
             root_path.clone(),
-            lsp_types::ClientCapabilities::default(),
+            lspt::ClientCapabilities::default(),
             vec![root_path],
             I18n::default(),
             UserConfig::default(),
@@ -103,7 +103,7 @@ mod tests {
         );
 
         let (server, client) = Connection::memory();
-        (GlobalState::new(server.sender, config, lsp_types::TraceValue::Off), client)
+        (GlobalState::new(server.sender, config, lspt::TraceValue::Off), client)
     }
 
     fn drain_client_notifications(client: &Connection) -> Vec<LspNotification> {

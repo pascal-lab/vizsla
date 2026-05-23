@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 use always_assert::always;
 use crossbeam_channel::{Receiver, select};
 use lsp_server::{Connection, Message, Notification, Request, Response};
-use lsp_types::{TraceValue, notification::Notification as _};
+use lspt::{TraceValue, notification::Notification as _};
 use project_model::project_manifest;
 use triomphe::Arc;
 use utils::thread::ThreadIntent;
@@ -29,9 +29,9 @@ enum Event {
 #[derive(Debug)]
 pub(crate) struct PublishDiagnosticsTask {
     pub(crate) file_id: FileId,
-    pub(crate) uri: lsp_types::Url,
+    pub(crate) uri: lspt::Uri,
     pub(crate) version: Option<i32>,
-    pub(crate) diagnostics: Vec<lsp_types::Diagnostic>,
+    pub(crate) diagnostics: Vec<lspt::Diagnostic>,
 }
 
 #[derive(Debug)]
@@ -69,6 +69,14 @@ pub fn main_loop(
     GlobalState::new(connection.sender, config, initial_trace).run(connection.receiver)
 }
 
+fn document_filter(pattern: impl Into<String>) -> lspt::DocumentFilter {
+    lspt::Union2::A(lspt::Union3::C(lspt::TextDocumentFilterPattern {
+        language: None,
+        scheme: None,
+        pattern: lspt::Union2::A(pattern.into()),
+    }))
+}
+
 impl GlobalState {
     pub(crate) fn run(&mut self, client_receiver: Receiver<Message>) -> anyhow::Result<()> {
         // TODO: check for status
@@ -84,7 +92,7 @@ impl GlobalState {
 
         while let Some(event) = self.next_event(&client_receiver) {
             if let Event::Lsp(Message::Notification(Notification { method, .. })) = &event
-                && method == lsp_types::notification::Exit::METHOD
+                && method == lspt::notification::ExitNotification::METHOD
             {
                 return Ok(());
             }
@@ -94,27 +102,19 @@ impl GlobalState {
     }
 
     fn register_did_save_cap(&mut self) {
-        let mut document_selector = vec![lsp_types::DocumentFilter {
-            language: None,
-            scheme: None,
-            pattern: Some("**/*.{v,sv,vh,svh,svi}".into()),
-        }];
-        document_selector.extend(project_manifest::MANIFEST_FILE_NAMES.iter().map(|file_name| {
-            lsp_types::DocumentFilter {
-                language: None,
-                scheme: None,
-                pattern: Some(format!("**/{file_name}")),
-            }
-        }));
+        let mut document_selector = vec![document_filter("**/*.{v,sv,vh,svh,svi}")];
+        document_selector.extend(
+            project_manifest::MANIFEST_FILE_NAMES
+                .iter()
+                .map(|file_name| document_filter(format!("**/{file_name}"))),
+        );
 
-        let save_registration_options = lsp_types::TextDocumentSaveRegistrationOptions {
-            include_text: false.into(),
-            text_document_registration_options: lsp_types::TextDocumentRegistrationOptions {
-                document_selector: document_selector.into(),
-            },
+        let save_registration_options = lspt::TextDocumentSaveRegistrationOptions {
+            document_selector: Some(document_selector),
+            include_text: Some(false),
         };
 
-        let registration = lsp_types::Registration {
+        let registration = lspt::Registration {
             id: "textDocument/didSave".into(),
             method: "textDocument/didSave".into(),
             register_options: match serde_json::to_value(save_registration_options) {
@@ -125,8 +125,8 @@ impl GlobalState {
                 }
             },
         };
-        self.send_request::<lsp_types::request::RegisterCapability>(
-            lsp_types::RegistrationParams { registrations: vec![registration] },
+        self.send_request::<lspt::request::RegistrationRequest>(
+            lspt::RegistrationParams { registrations: vec![registration] },
             DEFAULT_REQ_HANDLER,
         );
     }
@@ -168,11 +168,11 @@ impl GlobalState {
             let client_refresh = !was_stuck || state_changed;
 
             if client_refresh && self.config.cli_code_lens_refresh_support() {
-                self.send_request::<lsp_types::request::CodeLensRefresh>((), DEFAULT_REQ_HANDLER);
+                self.send_request::<lspt::request::CodeLensRefreshRequest>((), DEFAULT_REQ_HANDLER);
             }
 
             if client_refresh && self.config.cli_inlay_hint_refresh_support() {
-                self.send_request::<lsp_types::request::InlayHintRefreshRequest>(
+                self.send_request::<lspt::request::InlayHintRefreshRequest>(
                     (),
                     DEFAULT_REQ_HANDLER,
                 );
@@ -200,8 +200,8 @@ impl GlobalState {
     fn handle_request(&mut self, req: Request) {
         if matches!(
             req.method.as_str(),
-            lsp_types::request::DocumentDiagnosticRequest::METHOD
-                | lsp_types::request::WorkspaceDiagnosticRequest::METHOD
+            lspt::request::DocumentDiagnosticRequest::METHOD
+                | lspt::request::WorkspaceDiagnosticRequest::METHOD
         ) && !self.is_stuck()
         {
             self.task_pool.handle.spawn_and_send(ThreadIntent::Worker, move || Task::Retry(req));
@@ -211,7 +211,7 @@ impl GlobalState {
         let mut dispatcher = ReqDispatcher { req: Some(req), global_state: self };
 
         // Handle shutdown req first
-        dispatcher.on_sync_mut::<lsp_types::request::Shutdown>(|this, ()| {
+        dispatcher.on_sync_mut::<lspt::request::ShutdownRequest>(|this, ()| {
             this.shutdown_requested = true;
             Ok(())
         });
@@ -229,13 +229,11 @@ impl GlobalState {
         }
 
         use handlers::request::*;
-        use lsp_types::request::*;
+        use lspt::request::*;
         dispatcher
-            .on_no_retry::<Completion>(handle_completion)
-            .on_latency_sensitive::<SemanticTokensFullRequest>(handle_semantic_tokens_full)
-            .on_latency_sensitive::<SemanticTokensFullDeltaRequest>(
-                handle_semantic_tokens_full_delta,
-            )
+            .on_no_retry::<CompletionRequest>(handle_completion)
+            .on_latency_sensitive::<SemanticTokensRequest>(handle_semantic_tokens_full)
+            .on_latency_sensitive::<SemanticTokensDeltaRequest>(handle_semantic_tokens_full_delta)
             .on_latency_sensitive::<SemanticTokensRangeRequest>(handle_semantic_tokens_range)
             .on::<DocumentSymbolRequest>(handle_document_symbol)
             .on::<FoldingRangeRequest>(handle_folding_ranges)
@@ -244,39 +242,41 @@ impl GlobalState {
             .on_no_retry::<SignatureHelpRequest>(handle_signature_help)
             .on_no_retry::<InlayHintRequest>(handle_inlay_hint)
             .on_no_retry::<CodeLensRequest>(handle_code_lens)
-            .on_no_retry::<CodeLensResolve>(handle_code_lens_resolve)
+            .on_no_retry::<CodeLensResolveRequest>(handle_code_lens_resolve)
             .on_no_retry::<HoverRequest>(handle_hover)
-            .on_no_retry::<GotoDefinition>(handle_goto_definition)
-            .on_no_retry::<GotoDeclaration>(handle_goto_declaration)
+            .on_no_retry::<DefinitionRequest>(handle_goto_definition)
+            .on_no_retry::<DeclarationRequest>(handle_goto_declaration)
             .on_no_retry::<DocumentHighlightRequest>(handle_document_highlight)
-            .on_no_retry::<References>(handle_references)
+            .on_no_retry::<ReferencesRequest>(handle_references)
             .on_no_retry::<PrepareRenameRequest>(handle_prepare_rename)
-            .on_no_retry::<Rename>(handle_rename)
-            .on_fmt_thread::<Formatting>(handle_formatting)
-            .on_fmt_thread::<RangeFormatting>(handle_range_formatting)
-            .on_sync::<OnTypeFormatting>(handle_on_type_formatting)
+            .on_no_retry::<RenameRequest>(handle_rename)
+            .on_fmt_thread::<DocumentFormattingRequest>(handle_formatting)
+            .on_fmt_thread::<DocumentRangeFormattingRequest>(handle_range_formatting)
+            .on_sync::<DocumentOnTypeFormattingRequest>(handle_on_type_formatting)
             .on_no_retry::<CodeActionRequest>(handle_code_action)
             .on_no_retry::<CodeActionResolveRequest>(handle_code_action_resolve)
-            .on_sync_mut::<ExecuteCommand>(handle_execute_command)
+            .on_sync_mut::<ExecuteCommandRequest>(handle_execute_command)
             .on::<SelectionRangeRequest>(handle_selection_range)
             .finish();
     }
 
     fn handle_notification(&mut self, notif: Notification) {
         use handlers::notification::*;
-        use lsp_types::notification::*;
+        use lspt::notification::*;
 
         let mut dispatcher = NotifDispatcher { notif: Some(notif), global_state: self };
         dispatcher
-            .on_sync_mut::<Cancel>(handle_cancel)
-            .on_sync_mut::<DidOpenTextDocument>(handle_did_open_text_document)
-            .on_sync_mut::<DidChangeTextDocument>(handle_did_change_text_document)
-            .on_sync_mut::<DidCloseTextDocument>(handle_did_close_text_document)
-            .on_sync_mut::<DidSaveTextDocument>(handle_did_save_text_document)
-            .on_sync_mut::<DidChangeConfiguration>(handle_did_change_configuration)
-            .on_sync_mut::<DidChangeWorkspaceFolders>(handle_did_change_workspace_folders)
-            .on_sync_mut::<DidChangeWatchedFiles>(handle_did_change_watched_files)
-            .on_sync_mut::<SetTrace>(handle_set_trace)
+            .on_sync_mut::<CancelNotification>(handle_cancel)
+            .on_sync_mut::<DidOpenTextDocumentNotification>(handle_did_open_text_document)
+            .on_sync_mut::<DidChangeTextDocumentNotification>(handle_did_change_text_document)
+            .on_sync_mut::<DidCloseTextDocumentNotification>(handle_did_close_text_document)
+            .on_sync_mut::<DidSaveTextDocumentNotification>(handle_did_save_text_document)
+            .on_sync_mut::<DidChangeConfigurationNotification>(handle_did_change_configuration)
+            .on_sync_mut::<DidChangeWorkspaceFoldersNotification>(
+                handle_did_change_workspace_folders,
+            )
+            .on_sync_mut::<DidChangeWatchedFilesNotification>(handle_did_change_watched_files)
+            .on_sync_mut::<SetTraceNotification>(handle_set_trace)
             .finish();
     }
 
@@ -415,8 +415,8 @@ impl GlobalState {
                 self.diagnostics.insert(diag.file_id, diag.diagnostics.clone());
             }
 
-            self.send_notification::<lsp_types::notification::PublishDiagnostics>(
-                lsp_types::PublishDiagnosticsParams {
+            self.send_notification::<lspt::notification::PublishDiagnosticsNotification>(
+                lspt::PublishDiagnosticsParams {
                     uri: diag.uri,
                     diagnostics: diag.diagnostics,
                     version: diag.version,

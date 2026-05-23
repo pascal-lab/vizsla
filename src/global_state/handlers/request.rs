@@ -20,26 +20,24 @@ pub(crate) use code_action::{handle_code_action, handle_code_action_resolve};
 
 pub(crate) fn handle_goto_definition(
     snap: GlobalStateSnapshot,
-    params: lsp_types::GotoDefinitionParams,
-) -> anyhow::Result<Option<lsp_types::GotoDefinitionResponse>> {
-    let position = from_proto::file_position(&snap, params.text_document_position_params)?;
+    params: lspt::DefinitionParams,
+) -> anyhow::Result<<lspt::request::DefinitionRequest as lspt::request::Request>::Result> {
+    let position = from_proto::file_position(&snap, params.text_document, params.position)?;
     let Some(nav_info) = snap.analysis.goto_definition(position)? else {
         return Ok(None);
     };
 
     let src = FileRange { file_id: position.file_id, range: nav_info.range };
-    let res = to_proto::goto_definition_response(&snap, Some(src), nav_info.info)?;
-    Ok(Some(res))
+    to_proto::goto_definition_response(&snap, Some(src), nav_info.info)
 }
 
 pub(crate) fn handle_completion(
     snap: GlobalStateSnapshot,
-    params: lsp_types::CompletionParams,
-) -> anyhow::Result<Option<lsp_types::CompletionResponse>> {
+    params: lspt::CompletionParams,
+) -> anyhow::Result<<lspt::request::CompletionRequest as lspt::request::Request>::Result> {
     use ide::completion::{CompletionItemKind as IdeCompletionItemKind, context::TriggerChar};
-    use lsp_types::CompletionTextEdit;
 
-    let position = from_proto::file_position(&snap, params.text_document_position)?;
+    let position = from_proto::file_position(&snap, params.text_document, params.position)?;
     let line_info = snap.line_info(position.file_id)?;
 
     let trigger = params
@@ -68,7 +66,7 @@ pub(crate) fn handle_completion(
             let sort_text = item.sort_text();
             let (edit, insert_text_format) = if snippet_support {
                 match (item.snippet_edit, item.edit) {
-                    (Some(edit), _) => Some((edit, Some(lsp_types::InsertTextFormat::SNIPPET))),
+                    (Some(edit), _) => Some((edit, Some(lspt::InsertTextFormat::Snippet))),
                     (None, Some(edit)) => Some((edit, None)),
                     (None, None) => None,
                 }
@@ -77,52 +75,55 @@ pub(crate) fn handle_completion(
             }?;
 
             let kind = match item.kind {
-                IdeCompletionItemKind::Text => lsp_types::CompletionItemKind::TEXT,
-                IdeCompletionItemKind::Keyword => lsp_types::CompletionItemKind::KEYWORD,
-                IdeCompletionItemKind::Snippet => lsp_types::CompletionItemKind::SNIPPET,
+                IdeCompletionItemKind::Text => lspt::CompletionItemKind::Text,
+                IdeCompletionItemKind::Keyword => lspt::CompletionItemKind::Keyword,
+                IdeCompletionItemKind::Snippet => lspt::CompletionItemKind::Snippet,
             };
 
-            Some(lsp_types::CompletionItem {
+            Some(lspt::CompletionItem {
                 label: item.label,
                 kind: Some(kind),
                 sort_text: Some(sort_text),
                 insert_text_format,
-                text_edit: Some(CompletionTextEdit::Edit(to_proto::text_edit(&line_info, edit))),
+                text_edit: Some(lspt::Union2::A(to_proto::text_edit(&line_info, edit))),
                 ..Default::default()
             })
         })
         .collect();
 
-    Ok(Some(lsp_types::CompletionResponse::Array(items)))
+    Ok(Some(lspt::Union2::A(items)))
 }
 
 pub(crate) fn handle_goto_declaration(
     snap: GlobalStateSnapshot,
-    params: lsp_types::request::GotoDeclarationParams,
-) -> anyhow::Result<Option<lsp_types::request::GotoDeclarationResponse>> {
-    let position = from_proto::file_position(&snap, params.text_document_position_params.clone())?;
+    params: lspt::DeclarationParams,
+) -> anyhow::Result<<lspt::request::DeclarationRequest as lspt::request::Request>::Result> {
+    let position = from_proto::file_position(&snap, params.text_document, params.position)?;
     let Some(nav_info) = snap.analysis.goto_declaration(position)? else {
-        return handle_goto_definition(snap, params);
+        return Ok(None);
     };
     let src = FileRange { file_id: position.file_id, range: nav_info.range };
-    let res = to_proto::goto_definition_response(&snap, Some(src), nav_info.info)?;
-    Ok(Some(res))
+    to_proto::goto_definition_response(&snap, Some(src), nav_info.info)
 }
 
 pub(crate) fn handle_document_diagnostic(
     snap: GlobalStateSnapshot,
-    params: lsp_types::DocumentDiagnosticParams,
-) -> anyhow::Result<lsp_types::DocumentDiagnosticReportResult> {
+    params: lspt::DocumentDiagnosticParams,
+) -> anyhow::Result<<lspt::request::DocumentDiagnosticRequest as lspt::request::Request>::Result> {
     let file_id = from_proto::file_id(&snap, &params.text_document.uri)?;
     let result_id = snap.diagnostic_result_id(file_id);
     let items = snap.lsp_diagnostics(file_id);
-    Ok(document_diagnostic_report(result_id, items, params.previous_result_id.as_deref()).into())
+    Ok(lspt::Union2::A(document_diagnostic_report(
+        result_id,
+        items,
+        params.previous_result_id.as_deref(),
+    )))
 }
 
 pub(crate) fn handle_workspace_diagnostic(
     snap: GlobalStateSnapshot,
-    params: lsp_types::WorkspaceDiagnosticParams,
-) -> anyhow::Result<lsp_types::WorkspaceDiagnosticReportResult> {
+    params: lspt::WorkspaceDiagnosticParams,
+) -> anyhow::Result<<lspt::request::WorkspaceDiagnosticRequest as lspt::request::Request>::Result> {
     let previous_result_ids = params
         .previous_result_ids
         .into_iter()
@@ -182,7 +183,7 @@ pub(crate) fn handle_workspace_diagnostic(
         diag_items.extend(snap.qihe_diagnostics(file_id));
 
         let result_id = snap.diagnostic_result_id(file_id);
-        let version = snap.file_version(file_id).map(|version| version as i64);
+        let version = snap.file_version(file_id);
         let previous_result_id = previous_result_ids.get(&uri).map(String::as_str);
 
         items.push(workspace_diagnostic_report(
@@ -202,44 +203,43 @@ pub(crate) fn handle_workspace_diagnostic(
         items.push(workspace_diagnostic_report(uri, None, None, Vec::new(), None));
     }
 
-    Ok(lsp_types::WorkspaceDiagnosticReportResult::Report(lsp_types::WorkspaceDiagnosticReport {
-        items,
-    }))
+    Ok(lspt::Union2::A(lspt::WorkspaceDiagnosticReport { items }))
 }
 
 fn document_diagnostic_report(
     result_id: Option<String>,
-    items: Vec<lsp_types::Diagnostic>,
+    items: Vec<lspt::Diagnostic>,
     previous_result_id: Option<&str>,
-) -> lsp_types::DocumentDiagnosticReport {
+) -> lspt::DocumentDiagnosticReport {
     if let Some(result_id) = result_id.as_ref()
         && Some(result_id.as_str()) == previous_result_id
     {
-        return lsp_types::DocumentDiagnosticReport::Unchanged(
-            lsp_types::RelatedUnchangedDocumentDiagnosticReport {
-                related_documents: None,
-                unchanged_document_diagnostic_report:
-                    lsp_types::UnchangedDocumentDiagnosticReport { result_id: result_id.clone() },
-            },
-        );
+        return lspt::Union2::B(lspt::RelatedUnchangedDocumentDiagnosticReport {
+            kind: "unchanged".to_owned(),
+            result_id: result_id.clone(),
+            related_documents: None,
+        });
     }
 
-    lsp_types::DocumentDiagnosticReport::Full(lsp_types::RelatedFullDocumentDiagnosticReport {
+    lspt::Union2::A(lspt::RelatedFullDocumentDiagnosticReport {
+        kind: "full".to_owned(),
+        result_id: result_id.clone(),
+        items,
         related_documents: None,
-        full_document_diagnostic_report: lsp_types::FullDocumentDiagnosticReport {
-            result_id: result_id.clone(),
-            items,
-        },
     })
 }
 
 fn handle_qihe_analysis_command(
     state: &mut crate::global_state::GlobalState,
-    params: lsp_types::ExecuteCommandParams,
+    params: lspt::ExecuteCommandParams,
 ) -> anyhow::Result<Option<serde_json::Value>> {
-    let args = params.arguments.first().cloned().ok_or_else(|| {
-        anyhow::format_err!("{}", state.config.i18n.text(keys::EXECUTE_COMMAND_MISSING_ARGUMENTS))
-    })?;
+    let args =
+        params.arguments.as_ref().and_then(|args| args.first()).cloned().ok_or_else(|| {
+            anyhow::format_err!(
+                "{}",
+                state.config.i18n.text(keys::EXECUTE_COMMAND_MISSING_ARGUMENTS)
+            )
+        })?;
     let params = serde_json::from_value::<RunQiheAnalysisParams>(args)?;
     state.spawn_qihe_analysis(params);
     Ok(None)
@@ -256,7 +256,7 @@ fn handle_reload_workspace_command(
 
 pub(crate) fn handle_execute_command(
     state: &mut crate::global_state::GlobalState,
-    params: lsp_types::ExecuteCommandParams,
+    params: lspt::ExecuteCommandParams,
 ) -> anyhow::Result<Option<serde_json::Value>> {
     match params.command.as_str() {
         RUN_QIHE_ANALYSIS_COMMAND => handle_qihe_analysis_command(state, params),
@@ -272,58 +272,53 @@ pub(crate) fn handle_execute_command(
 }
 
 fn workspace_diagnostic_report(
-    uri: lsp_types::Url,
-    version: Option<i64>,
+    uri: lspt::Uri,
+    version: Option<i32>,
     result_id: Option<String>,
-    items: Vec<lsp_types::Diagnostic>,
+    items: Vec<lspt::Diagnostic>,
     previous_result_id: Option<&str>,
-) -> lsp_types::WorkspaceDocumentDiagnosticReport {
+) -> lspt::WorkspaceDocumentDiagnosticReport {
     if let Some(result_id) = result_id.as_ref()
         && Some(result_id.as_str()) == previous_result_id
     {
-        return lsp_types::WorkspaceDocumentDiagnosticReport::Unchanged(
-            lsp_types::WorkspaceUnchangedDocumentDiagnosticReport {
-                uri,
-                version,
-                unchanged_document_diagnostic_report:
-                    lsp_types::UnchangedDocumentDiagnosticReport { result_id: result_id.clone() },
-            },
-        );
-    }
-
-    lsp_types::WorkspaceDocumentDiagnosticReport::Full(
-        lsp_types::WorkspaceFullDocumentDiagnosticReport {
+        return lspt::Union2::B(lspt::WorkspaceUnchangedDocumentDiagnosticReport {
+            kind: "unchanged".to_owned(),
+            result_id: result_id.clone(),
             uri,
             version,
-            full_document_diagnostic_report: lsp_types::FullDocumentDiagnosticReport {
-                result_id: result_id.clone(),
-                items,
-            },
-        },
-    )
+        });
+    }
+
+    lspt::Union2::A(lspt::WorkspaceFullDocumentDiagnosticReport {
+        kind: "full".to_owned(),
+        result_id: result_id.clone(),
+        items,
+        uri,
+        version,
+    })
 }
 
 pub(crate) fn handle_document_symbol(
     snap: GlobalStateSnapshot,
-    params: lsp_types::DocumentSymbolParams,
-) -> anyhow::Result<Option<lsp_types::DocumentSymbolResponse>> {
+    params: lspt::DocumentSymbolParams,
+) -> anyhow::Result<<lspt::request::DocumentSymbolRequest as lspt::request::Request>::Result> {
     let file_id = from_proto::file_id(&snap, &params.text_document.uri)?;
     let line_info = snap.line_info(file_id)?;
     let symbols = snap.analysis.document_symbol(file_id)?;
 
     let res = if snap.config.hierarchical_symbols() {
-        symbols
+        let res = symbols
             .into_iter()
             .map(|symbol| to_proto::document_symbol(&line_info, symbol))
-            .collect_vec()
-            .into()
+            .collect_vec();
+        lspt::Union2::B(res)
     } else {
         let mut res = Vec::new();
         let url = to_proto::url(&snap, file_id)?;
         symbols.into_iter().for_each(|symbol| {
             to_proto::document_symbol_information(symbol, url.clone(), &line_info, &mut res);
         });
-        res.into()
+        lspt::Union2::A(res)
     };
 
     Ok(Some(res))
@@ -331,9 +326,9 @@ pub(crate) fn handle_document_symbol(
 
 pub(crate) fn handle_document_highlight(
     snap: GlobalStateSnapshot,
-    params: lsp_types::DocumentHighlightParams,
-) -> anyhow::Result<Option<Vec<lsp_types::DocumentHighlight>>> {
-    let position = from_proto::file_position(&snap, params.text_document_position_params)?;
+    params: lspt::DocumentHighlightParams,
+) -> anyhow::Result<Option<Vec<lspt::DocumentHighlight>>> {
+    let position = from_proto::file_position(&snap, params.text_document, params.position)?;
     let line_info = snap.line_info(position.file_id)?;
     let config = snap.config.document_highlight();
     let Some(highlights) = snap.analysis.document_highlight(position, config)? else {
@@ -349,9 +344,9 @@ pub(crate) fn handle_document_highlight(
 
 pub(crate) fn handle_references(
     snap: GlobalStateSnapshot,
-    params: lsp_types::ReferenceParams,
-) -> anyhow::Result<Option<Vec<lsp_types::Location>>> {
-    let position = from_proto::file_position(&snap, params.text_document_position)?;
+    params: lspt::ReferenceParams,
+) -> anyhow::Result<Option<Vec<lspt::Location>>> {
+    let position = from_proto::file_position(&snap, params.text_document, params.position)?;
     let config = snap.config.references();
     let Some(refs) = snap.analysis.references(position, config)? else {
         return Ok(None);
@@ -380,9 +375,9 @@ pub(crate) fn handle_references(
 
 pub(crate) fn handle_prepare_rename(
     snap: GlobalStateSnapshot,
-    params: lsp_types::TextDocumentPositionParams,
-) -> anyhow::Result<Option<lsp_types::PrepareRenameResponse>> {
-    let position = from_proto::file_position(&snap, params)?;
+    params: lspt::PrepareRenameParams,
+) -> anyhow::Result<Option<lspt::PrepareRenameResult>> {
+    let position = from_proto::file_position(&snap, params.text_document, params.position)?;
     if !snap.file_allows_workspace_edits(position.file_id) {
         return Ok(None);
     }
@@ -393,14 +388,14 @@ pub(crate) fn handle_prepare_rename(
         .prepare_rename(position)?
         .map_err(|err| to_proto::rename_error(snap.config.i18n, err))?;
     let range = to_proto::range(&line_index, text_range);
-    Ok(Some(lsp_types::PrepareRenameResponse::Range(range)))
+    Ok(Some(lspt::Union3::A(range)))
 }
 
 pub(crate) fn handle_rename(
     snap: GlobalStateSnapshot,
-    params: lsp_types::RenameParams,
-) -> anyhow::Result<Option<lsp_types::WorkspaceEdit>> {
-    let position = from_proto::file_position(&snap, params.text_document_position)?;
+    params: lspt::RenameParams,
+) -> anyhow::Result<Option<lspt::WorkspaceEdit>> {
+    let position = from_proto::file_position(&snap, params.text_document, params.position)?;
     if !snap.file_allows_workspace_edits(position.file_id) {
         return Ok(None);
     }
@@ -416,8 +411,8 @@ pub(crate) fn handle_rename(
 
 pub(crate) fn handle_formatting(
     snap: GlobalStateSnapshot,
-    params: lsp_types::DocumentFormattingParams,
-) -> anyhow::Result<Option<Vec<lsp_types::TextEdit>>> {
+    params: lspt::DocumentFormattingParams,
+) -> anyhow::Result<Option<Vec<lspt::TextEdit>>> {
     let file_id = from_proto::file_id(&snap, &params.text_document.uri)?;
     let line_info = snap.line_info(file_id)?;
 
@@ -431,8 +426,8 @@ pub(crate) fn handle_formatting(
 
 pub(crate) fn handle_range_formatting(
     snap: GlobalStateSnapshot,
-    params: lsp_types::DocumentRangeFormattingParams,
-) -> anyhow::Result<Option<Vec<lsp_types::TextEdit>>> {
+    params: lspt::DocumentRangeFormattingParams,
+) -> anyhow::Result<Option<Vec<lspt::TextEdit>>> {
     let file_id = from_proto::file_id(&snap, &params.text_document.uri)?;
     let line_info = snap.line_info(file_id)?;
     let line_ranges =
@@ -450,9 +445,9 @@ pub(crate) fn handle_range_formatting(
 
 pub(crate) fn handle_on_type_formatting(
     snap: GlobalStateSnapshot,
-    params: lsp_types::DocumentOnTypeFormattingParams,
-) -> anyhow::Result<Option<Vec<lsp_types::TextEdit>>> {
-    let position = from_proto::file_position(&snap, params.text_document_position)?;
+    params: lspt::DocumentOnTypeFormattingParams,
+) -> anyhow::Result<Option<Vec<lspt::TextEdit>>> {
+    let position = from_proto::file_position(&snap, params.text_document, params.position)?;
     let line_info = snap.line_info(position.file_id)?;
 
     let config = formatting_config(&snap, &params.options);
@@ -467,7 +462,7 @@ pub(crate) fn handle_on_type_formatting(
 
 fn formatting_config(
     snap: &GlobalStateSnapshot,
-    options: &lsp_types::FormattingOptions,
+    options: &lspt::FormattingOptions,
 ) -> ide::formatting::FmtConfig {
     let mut config = snap.config.fmt();
     config.apply_editor_options(options.tab_size, options.insert_spaces);
@@ -476,8 +471,8 @@ fn formatting_config(
 
 pub(crate) fn handle_selection_range(
     snap: GlobalStateSnapshot,
-    params: lsp_types::SelectionRangeParams,
-) -> anyhow::Result<Option<Vec<lsp_types::SelectionRange>>> {
+    params: lspt::SelectionRangeParams,
+) -> anyhow::Result<Option<Vec<lspt::SelectionRange>>> {
     let file_id = from_proto::file_id(&snap, &params.text_document.uri)?;
     let line_info = snap.line_info(file_id)?;
 
@@ -488,7 +483,7 @@ pub(crate) fn handle_selection_range(
             let offset = from_proto::offset(&line_info, pos)?;
             let ranges = snap.analysis.selection_ranges(FilePosition { file_id, offset })?;
             Ok(to_proto::selection_ranges(&line_info, ranges).unwrap_or_else(|| {
-                lsp_types::SelectionRange {
+                lspt::SelectionRange {
                     range: to_proto::range(&line_info, TextRange::empty(offset)),
                     parent: None,
                 }
@@ -501,8 +496,8 @@ pub(crate) fn handle_selection_range(
 
 pub(crate) fn handle_folding_ranges(
     snap: GlobalStateSnapshot,
-    params: lsp_types::FoldingRangeParams,
-) -> anyhow::Result<Option<Vec<lsp_types::FoldingRange>>> {
+    params: lspt::FoldingRangeParams,
+) -> anyhow::Result<Option<Vec<lspt::FoldingRange>>> {
     let file_id = from_proto::file_id(&snap, &params.text_document.uri)?;
     let config = FoldingConfig { line_fold_only: snap.config.cli_line_folding_only() };
     let text = snap.file_text(file_id)?;
@@ -520,9 +515,9 @@ pub(crate) fn handle_folding_ranges(
 
 pub(crate) fn handle_hover(
     snap: GlobalStateSnapshot,
-    params: lsp_types::HoverParams,
-) -> anyhow::Result<Option<lsp_types::Hover>> {
-    let position = from_proto::file_position(&snap, params.text_document_position_params)?;
+    params: lspt::HoverParams,
+) -> anyhow::Result<Option<lspt::Hover>> {
+    let position = from_proto::file_position(&snap, params.text_document, params.position)?;
 
     let config = snap.config.hover();
     let hover_format = config.format;
@@ -533,7 +528,7 @@ pub(crate) fn handle_hover(
     let line_info = snap.line_info(position.file_id)?;
     let range = to_proto::range(&line_info, hover_info.range);
 
-    let res = lsp_types::Hover {
+    let res = lspt::Hover {
         contents: to_proto::hover_contents(hover_info.info, hover_format),
         range: Some(range),
     };
@@ -543,8 +538,8 @@ pub(crate) fn handle_hover(
 
 pub(crate) fn handle_inlay_hint(
     snap: GlobalStateSnapshot,
-    params: lsp_types::InlayHintParams,
-) -> anyhow::Result<Option<Vec<lsp_types::InlayHint>>> {
+    params: lspt::InlayHintParams,
+) -> anyhow::Result<Option<Vec<lspt::InlayHint>>> {
     let FileRange { file_id, range } =
         from_proto::file_range(&snap, &params.text_document.uri, params.range)?;
 
@@ -567,8 +562,8 @@ pub(crate) fn handle_inlay_hint(
 
 pub(crate) fn handle_code_lens(
     snap: GlobalStateSnapshot,
-    params: lsp_types::CodeLensParams,
-) -> anyhow::Result<Option<Vec<lsp_types::CodeLens>>> {
+    params: lspt::CodeLensParams,
+) -> anyhow::Result<Option<Vec<lspt::CodeLens>>> {
     let file_id = from_proto::file_id(&snap, &params.text_document.uri)?;
     let line_info = snap.line_info(file_id)?;
     let config = snap.config.code_lens();
@@ -585,8 +580,8 @@ pub(crate) fn handle_code_lens(
 
 pub(crate) fn handle_code_lens_resolve(
     snap: GlobalStateSnapshot,
-    mut code_lens: lsp_types::CodeLens,
-) -> anyhow::Result<lsp_types::CodeLens> {
+    mut code_lens: lspt::CodeLens,
+) -> anyhow::Result<lspt::CodeLens> {
     let Some(data) = code_lens.data.take() else {
         return Ok(code_lens);
     };
@@ -596,59 +591,58 @@ pub(crate) fn handle_code_lens_resolve(
 
     let line_info = snap.line_info(file_id)?;
     let (command, data) = to_proto::code_lens_kind(&snap, file_id, &line_info, code_lens_kind)?;
-    let res = lsp_types::CodeLens { range: code_lens.range, command, data };
+    let res = lspt::CodeLens { range: code_lens.range, command, data };
 
     Ok(res)
 }
 
 pub(crate) fn handle_semantic_tokens_full(
     snap: GlobalStateSnapshot,
-    params: lsp_types::SemanticTokensParams,
-) -> anyhow::Result<Option<lsp_types::SemanticTokensResult>> {
+    params: lspt::SemanticTokensParams,
+) -> anyhow::Result<<lspt::request::SemanticTokensRequest as lspt::request::Request>::Result> {
     let file_id = from_proto::file_id(&snap, &params.text_document.uri)?;
     let res = compute_sema_tokens_helper(&snap, file_id, None)?;
     snap.sema_tokens_cache.lock().insert(params.text_document.uri, res.clone());
-    Ok(Some(res.into()))
+    Ok(Some(lspt::Union2::A(res)))
 }
 
 pub(crate) fn handle_semantic_tokens_full_delta(
     snap: GlobalStateSnapshot,
-    params: lsp_types::SemanticTokensDeltaParams,
-) -> anyhow::Result<Option<lsp_types::SemanticTokensFullDeltaResult>> {
+    params: lspt::SemanticTokensDeltaParams,
+) -> anyhow::Result<<lspt::request::SemanticTokensDeltaRequest as lspt::request::Request>::Result> {
     let file_id = from_proto::file_id(&snap, &params.text_document.uri)?;
     let res = compute_sema_tokens_helper(&snap, file_id, None)?;
 
     let old_tokens = snap.sema_tokens_cache.lock().remove(&params.text_document.uri);
-    if let Some(old_tokens @ lsp_types::SemanticTokens { result_id: Some(prev_id), .. }) =
-        &old_tokens
+    if let Some(old_tokens @ lspt::SemanticTokens { result_id: Some(prev_id), .. }) = &old_tokens
         && *prev_id == params.previous_result_id
     {
         let delta = to_proto::semantic_token_delta(old_tokens, &res);
         snap.sema_tokens_cache.lock().insert(params.text_document.uri, res);
-        Ok(Some(delta.into()))
+        Ok(Some(lspt::Union4::B(delta)))
     } else {
         // Clone first to keep the lock short
         let semantic_tokens_clone = res.clone();
         snap.sema_tokens_cache.lock().insert(params.text_document.uri, semantic_tokens_clone);
-        Ok(Some(res.into()))
+        Ok(Some(lspt::Union4::A(res)))
     }
 }
 
 pub(crate) fn handle_semantic_tokens_range(
     snap: GlobalStateSnapshot,
-    params: lsp_types::SemanticTokensRangeParams,
-) -> anyhow::Result<Option<lsp_types::SemanticTokensRangeResult>> {
+    params: lspt::SemanticTokensRangeParams,
+) -> anyhow::Result<<lspt::request::SemanticTokensRangeRequest as lspt::request::Request>::Result> {
     let FileRange { file_id, range } =
         from_proto::file_range(&snap, &params.text_document.uri, params.range)?;
     let res = compute_sema_tokens_helper(&snap, file_id, Some(range))?;
-    Ok(Some(res.into()))
+    Ok(Some(lspt::Union2::A(res)))
 }
 
 fn compute_sema_tokens_helper(
     snap: &GlobalStateSnapshot,
     file_id: FileId,
     range: Option<TextRange>,
-) -> anyhow::Result<lsp_types::SemanticTokens> {
+) -> anyhow::Result<lspt::SemanticTokens> {
     let text = snap.analysis.file_text(file_id)?;
     let line_info = snap.line_info(file_id)?;
     let config = snap.config.semantic_tokens();
@@ -660,9 +654,9 @@ fn compute_sema_tokens_helper(
 
 pub(crate) fn handle_signature_help(
     snap: GlobalStateSnapshot,
-    params: lsp_types::SignatureHelpParams,
-) -> anyhow::Result<Option<lsp_types::SignatureHelp>> {
-    let position = from_proto::file_position(&snap, params.text_document_position_params)?;
+    params: lspt::SignatureHelpParams,
+) -> anyhow::Result<Option<lspt::SignatureHelp>> {
+    let position = from_proto::file_position(&snap, params.text_document, params.position)?;
     let config = snap.config.signature_help();
     let Some(res) = snap.analysis.signature_help(position, config)? else {
         return Ok(None);
@@ -675,10 +669,7 @@ pub(crate) fn handle_signature_help(
 
 #[cfg(test)]
 mod tests {
-    use lsp_types::{
-        DocumentDiagnosticReport, UnchangedDocumentDiagnosticReport, Url,
-        WorkspaceDocumentDiagnosticReport,
-    };
+    use lspt::{DocumentDiagnosticReport, Uri as Url, WorkspaceDocumentDiagnosticReport};
 
     use super::{document_diagnostic_report, workspace_diagnostic_report};
 
@@ -694,11 +685,11 @@ mod tests {
         );
 
         match report {
-            WorkspaceDocumentDiagnosticReport::Full(report) => {
+            WorkspaceDocumentDiagnosticReport::A(report) => {
                 assert_eq!(report.uri, uri);
                 assert_eq!(report.version, Some(3));
-                assert_eq!(report.full_document_diagnostic_report.result_id.as_deref(), Some("4"));
-                assert!(report.full_document_diagnostic_report.items.is_empty());
+                assert_eq!(report.result_id.as_deref(), Some("4"));
+                assert!(report.items.is_empty());
             }
             other => panic!("expected full report, got {other:?}"),
         }
@@ -716,10 +707,10 @@ mod tests {
         );
 
         match report {
-            WorkspaceDocumentDiagnosticReport::Unchanged(report) => {
+            WorkspaceDocumentDiagnosticReport::B(report) => {
                 assert_eq!(report.uri, uri);
                 assert_eq!(report.version, Some(5));
-                assert_eq!(report.unchanged_document_diagnostic_report.result_id, "5");
+                assert_eq!(report.result_id, "5");
             }
             other => panic!("expected unchanged report, got {other:?}"),
         }
@@ -729,10 +720,10 @@ mod tests {
         let report = document_diagnostic_report(Some("7".to_string()), Vec::new(), Some("7"));
 
         match report {
-            DocumentDiagnosticReport::Unchanged(report) => assert_eq!(
-                report.unchanged_document_diagnostic_report,
-                UnchangedDocumentDiagnosticReport { result_id: "7".to_string() }
-            ),
+            DocumentDiagnosticReport::B(report) => {
+                assert_eq!(report.kind, "unchanged");
+                assert_eq!(report.result_id, "7");
+            }
             other => panic!("expected unchanged report, got {other:?}"),
         }
     }

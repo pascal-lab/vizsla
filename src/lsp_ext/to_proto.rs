@@ -49,7 +49,7 @@ pub(crate) fn goto_definition_response(
     snap: &GlobalStateSnapshot,
     src: Option<FileRange>,
     targets: Vec<NavTarget>,
-) -> anyhow::Result<lsp_types::GotoDefinitionResponse> {
+) -> anyhow::Result<<lspt::request::DefinitionRequest as lspt::request::Request>::Result> {
     let res = if snap.config.location_link() {
         let links = targets
             .into_iter()
@@ -58,7 +58,7 @@ pub(crate) fn goto_definition_response(
             })
             .map(|nav| location_link(snap, src, nav))
             .collect::<anyhow::Result<Vec<_>>>()?;
-        links.into()
+        lspt::Union3::B(links)
     } else {
         let locations = targets
             .into_iter()
@@ -66,25 +66,24 @@ pub(crate) fn goto_definition_response(
             .unique()
             .map(|file_range| location(snap, file_range))
             .collect::<anyhow::Result<Vec<_>>>()?;
-        locations.into()
+        lspt::Union3::A(lspt::Union2::B(locations))
     };
-    Ok(res)
+    Ok(Some(res))
 }
 
 #[allow(deprecated)]
 pub(crate) fn document_symbol(
     line_info: &LineInfo,
     symbol: ide::document_symbols::DocumentSymbol,
-) -> lsp_types::DocumentSymbol {
+) -> lspt::DocumentSymbol {
     let children =
         symbol.children.into_iter().map(|child| document_symbol(line_info, child)).collect_vec();
 
-    lsp_types::DocumentSymbol {
+    lspt::DocumentSymbol {
         name: symbol.name,
         detail: symbol.detail,
         kind: symbol_kind(symbol.kind),
         tags: None,
-        deprecated: None,
         range: self::range(line_info, symbol.full_range),
         selection_range: self::range(line_info, symbol.focus_range),
         children: if children.is_empty() { None } else { Some(children) },
@@ -94,16 +93,18 @@ pub(crate) fn document_symbol(
 #[allow(deprecated)]
 pub(crate) fn document_symbol_information(
     symbol: ide::document_symbols::DocumentSymbol,
-    url: lsp_types::Url,
+    url: lspt::Uri,
     line_info: &LineInfo,
-    res: &mut Vec<lsp_types::SymbolInformation>,
+    res: &mut Vec<lspt::SymbolInformation>,
 ) {
-    res.push(lsp_types::SymbolInformation {
+    res.push(lspt::SymbolInformation {
         name: symbol.name,
         kind: symbol_kind(symbol.kind),
         tags: None,
-        deprecated: None,
-        location: lsp_types::Location::new(url.clone(), self::range(line_info, symbol.focus_range)),
+        location: lspt::Location {
+            uri: url.clone(),
+            range: self::range(line_info, symbol.focus_range),
+        },
         container_name: symbol.container_name,
     });
 
@@ -115,16 +116,16 @@ pub(crate) fn document_symbol_information(
 pub(crate) fn document_highlight(
     line_info: &LineInfo,
     DocumentHighlight { range, category }: DocumentHighlight,
-) -> lsp_types::DocumentHighlight {
+) -> lspt::DocumentHighlight {
     let kind = if category.contains(ReferenceCategory::READ) {
-        Some(lsp_types::DocumentHighlightKind::READ)
+        Some(lspt::DocumentHighlightKind::Read)
     } else if category.contains(ReferenceCategory::WRITE) {
-        Some(lsp_types::DocumentHighlightKind::WRITE)
+        Some(lspt::DocumentHighlightKind::Write)
     } else {
         None
     };
 
-    lsp_types::DocumentHighlight { range: self::range(line_info, range), kind }
+    lspt::DocumentHighlight { range: self::range(line_info, range), kind }
 }
 
 const SLANG_DIAGNOSTIC_SOURCE: &str = "slang";
@@ -133,13 +134,13 @@ pub(crate) fn diagnostic(
     i18n: I18n,
     line_info: &LineInfo,
     diag: ide_diagnostics::Diagnostic,
-) -> lsp_types::Diagnostic {
+) -> lspt::Diagnostic {
     let data = diagnostic_data(&diag);
     let message = diagnostic_message(i18n, &diag);
-    lsp_types::Diagnostic {
+    lspt::Diagnostic {
         range: self::range(line_info, diag.range),
         severity: diagnostic_severity(diag.severity),
-        code: Some(lsp_types::NumberOrString::String(format!("{}:{}", diag.subsystem, diag.code))),
+        code: Some(lspt::Union2::B(format!("{}:{}", diag.subsystem, diag.code))),
         code_description: None,
         source: Some(
             match diag.source {
@@ -202,40 +203,40 @@ fn diagnostic_selector_hints(diag: &ide_diagnostics::Diagnostic) -> Vec<String> 
     selectors
 }
 
-fn diagnostic_severity(severity: SlangDiagnosticSeverity) -> Option<lsp_types::DiagnosticSeverity> {
-    use lsp_types::DiagnosticSeverity as LspSeverity;
+fn diagnostic_severity(severity: SlangDiagnosticSeverity) -> Option<lspt::DiagnosticSeverity> {
+    use lspt::DiagnosticSeverity as LspSeverity;
     match severity {
         SlangDiagnosticSeverity::Ignored => None,
-        SlangDiagnosticSeverity::Note => Some(LspSeverity::INFORMATION),
-        SlangDiagnosticSeverity::Warning => Some(LspSeverity::WARNING),
-        SlangDiagnosticSeverity::Error | SlangDiagnosticSeverity::Fatal => Some(LspSeverity::ERROR),
+        SlangDiagnosticSeverity::Note => Some(LspSeverity::Information),
+        SlangDiagnosticSeverity::Warning => Some(LspSeverity::Warning),
+        SlangDiagnosticSeverity::Error | SlangDiagnosticSeverity::Fatal => Some(LspSeverity::Error),
     }
 }
 
-fn symbol_kind(symbol_kind: SymbolKind) -> lsp_types::SymbolKind {
-    use lsp_types::SymbolKind as LspSymbolKind;
+fn symbol_kind(symbol_kind: SymbolKind) -> lspt::SymbolKind {
+    use lspt::SymbolKind as LspSymbolKind;
     match symbol_kind {
-        SymbolKind::Module => LspSymbolKind::MODULE,
-        SymbolKind::Config => LspSymbolKind::NAMESPACE,
-        SymbolKind::Primitive => LspSymbolKind::OBJECT,
-        SymbolKind::NonAnsiPortLabel => LspSymbolKind::FIELD,
-        SymbolKind::PortDecl => LspSymbolKind::FIELD,
-        SymbolKind::ParamDecl => LspSymbolKind::TYPE_PARAMETER,
-        SymbolKind::NetDecl => LspSymbolKind::PROPERTY,
-        SymbolKind::DataDecl => LspSymbolKind::VARIABLE,
-        SymbolKind::Genvar => LspSymbolKind::VARIABLE,
-        SymbolKind::Specparam => LspSymbolKind::TYPE_PARAMETER,
-        SymbolKind::Typedef => LspSymbolKind::TYPE_PARAMETER,
-        SymbolKind::Instance => LspSymbolKind::OBJECT,
-        SymbolKind::Block => LspSymbolKind::NAMESPACE,
-        SymbolKind::Stmt => LspSymbolKind::NAMESPACE,
-        SymbolKind::Fn => LspSymbolKind::FUNCTION,
-        SymbolKind::Generate => LspSymbolKind::NAMESPACE,
-        SymbolKind::Specify => LspSymbolKind::NAMESPACE,
-        SymbolKind::Interface => LspSymbolKind::INTERFACE,
-        SymbolKind::Library => LspSymbolKind::NAMESPACE,
-        SymbolKind::Region => LspSymbolKind::NAMESPACE,
-        SymbolKind::Unknown => LspSymbolKind::NAMESPACE,
+        SymbolKind::Module => LspSymbolKind::Module,
+        SymbolKind::Config => LspSymbolKind::Namespace,
+        SymbolKind::Primitive => LspSymbolKind::Object,
+        SymbolKind::NonAnsiPortLabel => LspSymbolKind::Field,
+        SymbolKind::PortDecl => LspSymbolKind::Field,
+        SymbolKind::ParamDecl => LspSymbolKind::TypeParameter,
+        SymbolKind::NetDecl => LspSymbolKind::Property,
+        SymbolKind::DataDecl => LspSymbolKind::Variable,
+        SymbolKind::Genvar => LspSymbolKind::Variable,
+        SymbolKind::Specparam => LspSymbolKind::TypeParameter,
+        SymbolKind::Typedef => LspSymbolKind::TypeParameter,
+        SymbolKind::Instance => LspSymbolKind::Object,
+        SymbolKind::Block => LspSymbolKind::Namespace,
+        SymbolKind::Stmt => LspSymbolKind::Namespace,
+        SymbolKind::Fn => LspSymbolKind::Function,
+        SymbolKind::Generate => LspSymbolKind::Namespace,
+        SymbolKind::Specify => LspSymbolKind::Namespace,
+        SymbolKind::Interface => LspSymbolKind::Interface,
+        SymbolKind::Library => LspSymbolKind::Namespace,
+        SymbolKind::Region => LspSymbolKind::Namespace,
+        SymbolKind::Unknown => LspSymbolKind::Namespace,
     }
 }
 
@@ -243,7 +244,7 @@ fn location_link(
     snap: &GlobalStateSnapshot,
     src: Option<FileRange>,
     target: NavTarget,
-) -> anyhow::Result<lsp_types::LocationLink> {
+) -> anyhow::Result<lspt::LocationLink> {
     let origin_selection_range = try {
         let FileRange { file_id, range } = src?;
         let line_info = snap.line_info(file_id).ok()?;
@@ -251,7 +252,7 @@ fn location_link(
     };
 
     let (target_uri, target_range, target_selection_range) = location_info(snap, target)?;
-    let res = lsp_types::LocationLink {
+    let res = lspt::LocationLink {
         origin_selection_range,
         target_uri,
         target_range,
@@ -263,7 +264,7 @@ fn location_link(
 fn location_info(
     snap: &GlobalStateSnapshot,
     NavTarget { file_id, full_range, focus_range, .. }: NavTarget,
-) -> anyhow::Result<(lsp_types::Url, lsp_types::Range, lsp_types::Range)> {
+) -> anyhow::Result<(lspt::Uri, lspt::Range, lspt::Range)> {
     let line_info = snap.line_info(file_id)?;
 
     let target_uri = url(snap, file_id)?;
@@ -273,12 +274,12 @@ fn location_info(
     Ok((target_uri, target_range, target_selection_range))
 }
 
-pub(crate) fn url(snap: &GlobalStateSnapshot, file_id: FileId) -> anyhow::Result<lsp_types::Url> {
+pub(crate) fn url(snap: &GlobalStateSnapshot, file_id: FileId) -> anyhow::Result<lspt::Uri> {
     snap.url(file_id)
 }
 
-pub(crate) fn url_from_abs_path(path: &AbsPath) -> anyhow::Result<lsp_types::Url> {
-    let url = lsp_types::Url::from_file_path(path)
+pub(crate) fn url_from_abs_path(path: &AbsPath) -> anyhow::Result<lspt::Uri> {
+    let url = lspt::Uri::from_file_path(path)
         .map_err(|()| anyhow::format_err!("failed to convert file path to URL: {path}"))?;
 
     let Some(Utf8Component::Prefix(prefix)) = path.components().next() else {
@@ -300,37 +301,37 @@ pub(crate) fn url_from_abs_path(path: &AbsPath) -> anyhow::Result<lsp_types::Url
     // also canonicalizes the drive letter.
     let mut url: String = url.into();
     url[driver_letter_range].make_ascii_lowercase();
-    lsp_types::Url::parse(&url).with_context(|| format!("failed to parse file URL: {url}"))
+    lspt::Uri::parse(&url).with_context(|| format!("failed to parse file URL: {url}"))
 }
 
-pub(crate) fn range(line_info: &LineInfo, range: TextRange) -> lsp_types::Range {
+pub(crate) fn range(line_info: &LineInfo, range: TextRange) -> lspt::Range {
     let start = position(line_info, range.start());
     let end = position(line_info, range.end());
-    lsp_types::Range::new(start, end)
+    lspt::Range { start, end }
 }
 
 pub(crate) fn location(
     snap: &GlobalStateSnapshot,
     FileRange { file_id, range }: FileRange,
-) -> anyhow::Result<lsp_types::Location> {
+) -> anyhow::Result<lspt::Location> {
     let url = url(snap, file_id)?;
     let line_info = snap.line_info(file_id)?;
     let range = self::range(&line_info, range);
-    Ok(lsp_types::Location::new(url, range))
+    Ok(lspt::Location { uri: url, range })
 }
 
 pub(crate) fn position(
     LineInfo { index, encoding, .. }: &LineInfo,
     offset: TextSize,
-) -> lsp_types::Position {
+) -> lspt::Position {
     let line_col = line_col_for_position(index, offset);
     match *encoding {
-        PositionEncoding::Utf8 => lsp_types::Position::new(line_col.line, line_col.col),
+        PositionEncoding::Utf8 => lspt::Position { line: line_col.line, character: line_col.col },
         PositionEncoding::Wide(enc) => match index.to_wide(enc, line_col) {
-            Some(line_col) => lsp_types::Position::new(line_col.line, line_col.col),
+            Some(line_col) => lspt::Position { line: line_col.line, character: line_col.col },
             None => {
                 tracing::debug!(?line_col, "failed to convert UTF-8 position to wide encoding");
-                lsp_types::Position::new(line_col.line, line_col.col)
+                lspt::Position { line: line_col.line, character: line_col.col }
             }
         },
     }
@@ -379,20 +380,19 @@ pub(crate) fn code_action_resolve_error(i18n: I18n, err: CodeActionResolveError)
 pub(crate) fn workspace_edit(
     snap: &GlobalStateSnapshot,
     source_change: SourceChange,
-) -> anyhow::Result<lsp_types::WorkspaceEdit> {
+) -> anyhow::Result<lspt::WorkspaceEdit> {
     let mut document_changes = Vec::with_capacity(source_change.text_edits.len());
 
     for (file_id, edit) in source_change.text_edits {
         let text_document = optional_versioned_text_document_identifier(snap, file_id)?;
         let line_info = snap.line_info(file_id)?;
-        let edits =
-            edit.into_iter().map(|it| lsp_types::OneOf::Left(text_edit(&line_info, it))).collect();
-        document_changes.push(lsp_types::TextDocumentEdit { text_document, edits });
+        let edits = edit.into_iter().map(|it| lspt::Union2::A(text_edit(&line_info, it))).collect();
+        document_changes.push(lspt::TextDocumentEdit { text_document, edits });
     }
 
-    let workspace_edit = lsp_types::WorkspaceEdit {
+    let workspace_edit = lspt::WorkspaceEdit {
         changes: None,
-        document_changes: Some(lsp_types::DocumentChanges::Edits(document_changes)),
+        document_changes: Some(document_changes.into_iter().map(lspt::Union4::A).collect()),
         change_annotations: None,
     };
 
@@ -402,31 +402,31 @@ pub(crate) fn workspace_edit(
 pub(crate) fn optional_versioned_text_document_identifier(
     snap: &GlobalStateSnapshot,
     file_id: FileId,
-) -> anyhow::Result<lsp_types::OptionalVersionedTextDocumentIdentifier> {
+) -> anyhow::Result<lspt::OptionalVersionedTextDocumentIdentifier> {
     let url = url(snap, file_id)?;
     let version = snap.url_file_version(&url);
-    Ok(lsp_types::OptionalVersionedTextDocumentIdentifier { uri: url, version })
+    Ok(lspt::OptionalVersionedTextDocumentIdentifier { uri: url, version })
 }
 
-pub(crate) fn text_edit(line_info: &LineInfo, item: TextEditItem) -> lsp_types::TextEdit {
+pub(crate) fn text_edit(line_info: &LineInfo, item: TextEditItem) -> lspt::TextEdit {
     let range = self::range(line_info, item.del);
     let new_text = match line_info.ending {
         LineEnding::Unix => item.ins,
         LineEnding::Dos => item.ins.replace('\n', "\r\n"),
     };
-    lsp_types::TextEdit { range, new_text }
+    lspt::TextEdit { range, new_text }
 }
 
-pub(crate) fn text_edits(line_info: &LineInfo, edit: TextEdit) -> Vec<lsp_types::TextEdit> {
+pub(crate) fn text_edits(line_info: &LineInfo, edit: TextEdit) -> Vec<lspt::TextEdit> {
     edit.into_iter().map(|it| self::text_edit(line_info, it)).collect()
 }
 
 pub(crate) fn selection_ranges(
     line_info: &LineInfo,
     ranges: Vec<TextRange>,
-) -> Option<lsp_types::SelectionRange> {
+) -> Option<lspt::SelectionRange> {
     ranges.into_iter().rfold(None, |parent, range| {
-        Some(lsp_types::SelectionRange {
+        Some(lspt::SelectionRange {
             range: self::range(line_info, range),
             parent: parent.map(Box::new),
         })
@@ -438,16 +438,16 @@ pub(crate) fn folding_range(
     line_info: &LineInfo,
     FoldingConfig { line_fold_only }: &FoldingConfig,
     Fold { range, kind, collapsed_text }: Fold,
-) -> lsp_types::FoldingRange {
+) -> lspt::FoldingRange {
     use ide::folding_ranges::FoldKind;
     let kind = match kind {
-        FoldKind::Comment => Some(lsp_types::FoldingRangeKind::Comment),
-        FoldKind::Imports => Some(lsp_types::FoldingRangeKind::Imports),
-        FoldKind::Region => Some(lsp_types::FoldingRangeKind::Region),
+        FoldKind::Comment => Some(lspt::FoldingRangeKind::Comment),
+        FoldKind::Imports => Some(lspt::FoldingRangeKind::Imports),
+        FoldKind::Region => Some(lspt::FoldingRangeKind::Region),
         _ => None,
     };
 
-    let lsp_types::Range { start, end } = self::range(line_info, range);
+    let lspt::Range { start, end } = self::range(line_info, range);
 
     if *line_fold_only {
         // Clients with `line_folding_only` will fold the whole end line even if
@@ -460,7 +460,7 @@ pub(crate) fn folding_range(
             end.line.saturating_sub(1)
         };
 
-        lsp_types::FoldingRange {
+        lspt::FoldingRange {
             start_line: start.line,
             start_character: None,
             end_line,
@@ -469,7 +469,7 @@ pub(crate) fn folding_range(
             collapsed_text,
         }
     } else {
-        lsp_types::FoldingRange {
+        lspt::FoldingRange {
             start_line: start.line,
             start_character: Some(start.character),
             end_line: end.line,
@@ -512,21 +512,24 @@ fn has_more_text_in_line(text: &str) -> bool {
     true
 }
 
-pub(crate) fn hover_contents(markup: Markup, format: HoverFormat) -> lsp_types::HoverContents {
+pub(crate) fn hover_contents(
+    markup: Markup,
+    format: HoverFormat,
+) -> lspt::Union3<lspt::MarkupContent, lspt::MarkedString, Vec<lspt::MarkedString>> {
     let kind = match format {
-        HoverFormat::Markdown => lsp_types::MarkupKind::Markdown,
-        HoverFormat::PlainText => lsp_types::MarkupKind::PlainText,
+        HoverFormat::Markdown => lspt::MarkupKind::Markdown,
+        HoverFormat::PlainText => lspt::MarkupKind::PlainText,
     };
 
     let value = markup.into();
-    lsp_types::HoverContents::Markup(lsp_types::MarkupContent { kind, value })
+    lspt::Union3::A(lspt::MarkupContent { kind, value })
 }
 
 pub(crate) fn inlay_hint(
     snap: &GlobalStateSnapshot,
     line_info: &LineInfo,
     hint: InlayHint,
-) -> lsp_types::InlayHint {
+) -> lspt::InlayHint {
     let InlayHint {
         label,
         tooltip,
@@ -538,11 +541,11 @@ pub(crate) fn inlay_hint(
         padding_right,
     } = hint;
 
-    let label = lsp_types::InlayHintLabelPart {
+    let label = lspt::InlayHintLabelPart {
         value: label,
         tooltip: tooltip.map(|tooltip| {
-            lsp_types::InlayHintLabelPartTooltip::MarkupContent(lsp_types::MarkupContent {
-                kind: lsp_types::MarkupKind::Markdown,
+            lspt::Union2::B(lspt::MarkupContent {
+                kind: lspt::MarkupKind::Markdown,
                 value: tooltip.into(),
             })
         }),
@@ -555,15 +558,15 @@ pub(crate) fn inlay_hint(
 
     let position = self::position(line_info, position);
     let kind = match kind {
-        InlayKind::ParamAssign | InlayKind::Port => Some(lsp_types::InlayHintKind::PARAMETER),
+        InlayKind::ParamAssign | InlayKind::Port => Some(lspt::InlayHintKind::Parameter),
         InlayKind::EndStructure => None,
     };
 
     let text_edits = text_edit.map(|it| self::text_edits(line_info, it));
 
-    lsp_types::InlayHint {
+    lspt::InlayHint {
         position,
-        label: lsp_types::InlayHintLabel::LabelParts(vec![label]),
+        label: lspt::Union2::B(vec![label]),
         kind,
         text_edits,
         tooltip: None,
@@ -578,10 +581,10 @@ pub(crate) fn code_lens(
     line_info: &LineInfo,
     file_id: FileId,
     CodeLens { range, kind }: CodeLens,
-) -> Option<lsp_types::CodeLens> {
+) -> Option<lspt::CodeLens> {
     let range = self::range(line_info, range);
     let (command, data) = self::code_lens_kind(snap, file_id, line_info, kind).ok()?;
-    Some(lsp_types::CodeLens { range, command, data })
+    Some(lspt::CodeLens { range, command, data })
 }
 
 pub(crate) fn code_lens_kind(
@@ -589,7 +592,7 @@ pub(crate) fn code_lens_kind(
     file_id: FileId,
     line_info: &LineInfo,
     kind: CodeLensKind,
-) -> anyhow::Result<(Option<lsp_types::Command>, Option<serde_json::Value>)> {
+) -> anyhow::Result<(Option<lspt::Command>, Option<serde_json::Value>)> {
     let url = self::url(snap, file_id)?;
 
     let command = match kind {
@@ -600,7 +603,7 @@ pub(crate) fn code_lens_kind(
             } else {
                 keys::CODE_LENS_INSTANCES_MANY
             };
-            lsp_types::Command {
+            lspt::Command {
                 title: snap.config.i18n.format(key, [("count", count.to_string())]),
                 command: String::new(),
                 arguments: None,
@@ -611,8 +614,8 @@ pub(crate) fn code_lens_kind(
     let data = match kind {
         CodeLensKind::ModuleInstance { pos: FilePosition { offset, .. }, .. } => {
             snap.url_file_version(&url).and_then(|version| {
-                let file_pos = lsp_types::TextDocumentPositionParams {
-                    text_document: lsp_types::TextDocumentIdentifier { uri: url.clone() },
+                let file_pos = ext::TextDocumentPositionParams {
+                    text_document: lspt::TextDocumentIdentifier { uri: url.clone() },
                     position: self::position(line_info, offset),
                 };
                 let data =
@@ -629,7 +632,7 @@ pub(crate) struct SemanticTokensBuilder {
     id: String,
     prev_line: u32,
     prev_char: u32,
-    data: Vec<lsp_types::SemanticToken>,
+    data: Vec<u32>,
 }
 
 impl SemanticTokensBuilder {
@@ -640,11 +643,11 @@ impl SemanticTokensBuilder {
     /// Push a new token onto the builder
     pub(crate) fn push(
         &mut self,
-        range: lsp_types::Range,
+        range: lspt::Range,
         token_type: u32,
         token_modifiers_bitset: u32,
     ) {
-        let lsp_types::Position { line: mut push_line, character: mut push_char } = range.start;
+        let lspt::Position { line: mut push_line, character: mut push_char } = range.start;
 
         if !self.data.is_empty() {
             if push_line < self.prev_line
@@ -664,22 +667,20 @@ impl SemanticTokensBuilder {
             }
         }
 
-        let token = lsp_types::SemanticToken {
-            delta_line: push_line,
-            delta_start: push_char,
-            length: range.end.character.saturating_sub(range.start.character),
+        self.data.extend([
+            push_line,
+            push_char,
+            range.end.character.saturating_sub(range.start.character),
             token_type,
             token_modifiers_bitset,
-        };
-
-        self.data.push(token);
+        ]);
 
         self.prev_line = range.start.line;
         self.prev_char = range.start.character;
     }
 
-    pub(crate) fn build(self) -> lsp_types::SemanticTokens {
-        lsp_types::SemanticTokens { result_id: Some(self.id), data: self.data }
+    pub(crate) fn build(self) -> lspt::SemanticTokens {
+        lspt::SemanticTokens { result_id: Some(self.id), data: self.data }
     }
 }
 
@@ -687,7 +688,7 @@ pub(crate) fn semantic_tokens(
     text: &str,
     line_info: &LineInfo,
     sema_tokens: Vec<SemaToken>,
-) -> lsp_types::SemanticTokens {
+) -> lspt::SemanticTokens {
     static TOKEN_RESULT_COUNTER: AtomicU32 = AtomicU32::new(1);
 
     let id = TOKEN_RESULT_COUNTER.fetch_add(1, Ordering::SeqCst).to_string();
@@ -704,7 +705,7 @@ pub(crate) fn semantic_tokens(
         };
         // Prefer standard tokens where we have an explicit fallback, otherwise
         // keep the token from the advertised legend.
-        let legend_ty = sema_token_types::fallback(ty.clone()).unwrap_or(ty);
+        let legend_ty = sema_token_types::fallback(ty).unwrap_or(ty);
         let Some(ty) =
             SEMA_TOKENS_TYPES.iter().position(|it| it == &legend_ty).map(|idx| idx as u32)
         else {
@@ -727,7 +728,7 @@ pub(crate) fn semantic_tokens(
             };
             // Prefer standard modifiers where we have an explicit fallback,
             // otherwise keep the modifier from the advertised legend.
-            mods_set |= sema_token_modifiers::fallback(modifier.clone()).unwrap_or(modifier);
+            mods_set |= sema_token_modifiers::fallback(modifier).unwrap_or(modifier);
         }
         let mods = mods_set.finish();
 
@@ -744,9 +745,9 @@ pub(crate) fn semantic_tokens(
 }
 
 pub(crate) fn semantic_token_delta(
-    lsp_types::SemanticTokens { data: old, .. }: &lsp_types::SemanticTokens,
-    lsp_types::SemanticTokens { data: new, result_id }: &lsp_types::SemanticTokens,
-) -> lsp_types::SemanticTokensDelta {
+    lspt::SemanticTokens { data: old, .. }: &lspt::SemanticTokens,
+    lspt::SemanticTokens { data: new, result_id }: &lspt::SemanticTokens,
+) -> lspt::SemanticTokensDelta {
     let old = old.as_slice();
     let new = new.as_slice();
 
@@ -763,21 +764,20 @@ pub(crate) fn semantic_token_delta(
     let edits = if old.is_empty() && new.is_empty() {
         vec![]
     } else {
-        const TOKEN_SIZE: u32 = 5;
-        vec![lsp_types::SemanticTokensEdit {
-            start: TOKEN_SIZE * (offset as u32),
-            delete_count: TOKEN_SIZE * (old.len() as u32),
-            data: Some(new.into()),
+        vec![lspt::SemanticTokensEdit {
+            start: offset as u32,
+            delete_count: old.len() as u32,
+            data: Some(new.to_vec()),
         }]
     };
 
-    lsp_types::SemanticTokensDelta { result_id: result_id.clone().clone(), edits }
+    lspt::SemanticTokensDelta { result_id: result_id.clone().clone(), edits }
 }
 
 pub(crate) fn signature_help(
     sig_help: SignatureHelp,
     support_label_offsets: bool,
-) -> lsp_types::SignatureHelp {
+) -> lspt::SignatureHelp {
     let parameters = if support_label_offsets {
         sig_help
             .param_ranges
@@ -787,8 +787,8 @@ pub(crate) fn signature_help(
                 let end = sig_help.label[..it.end().into()].chars().count() as u32;
                 [start, end]
             })
-            .map(|range| lsp_types::ParameterInformation {
-                label: lsp_types::ParameterLabel::LabelOffsets(range),
+            .map(|range| lspt::ParameterInformation {
+                label: lspt::Union2::B((range[0], range[1])),
                 documentation: None,
             })
             .collect()
@@ -796,8 +796,8 @@ pub(crate) fn signature_help(
         sig_help
             .param_ranges
             .iter()
-            .map(|range| lsp_types::ParameterInformation {
-                label: lsp_types::ParameterLabel::Simple(sig_help.label[*range].to_owned()),
+            .map(|range| lspt::ParameterInformation {
+                label: lspt::Union2::A(sig_help.label[*range].to_owned()),
                 documentation: None,
             })
             .collect()
@@ -805,39 +805,35 @@ pub(crate) fn signature_help(
 
     let active_parameter = sig_help.active_parameter.map(|it| it as u32);
 
-    let signature = lsp_types::SignatureInformation {
+    let signature = lspt::SignatureInformation {
         label: sig_help.label,
         documentation: None,
         parameters: Some(parameters),
         active_parameter,
     };
 
-    lsp_types::SignatureHelp {
-        signatures: vec![signature],
-        active_signature: Some(0),
-        active_parameter,
-    }
+    lspt::SignatureHelp { signatures: vec![signature], active_signature: Some(0), active_parameter }
 }
 
-pub(crate) fn code_action_kind(kind: CodeActionKind) -> lsp_types::CodeActionKind {
+pub(crate) fn code_action_kind(kind: CodeActionKind) -> lspt::CodeActionKind {
     match kind {
-        CodeActionKind::Generate => lsp_types::CodeActionKind::EMPTY,
-        CodeActionKind::QuickFix => lsp_types::CodeActionKind::QUICKFIX,
-        CodeActionKind::Refactor => lsp_types::CodeActionKind::REFACTOR,
-        CodeActionKind::RefactorExtract => lsp_types::CodeActionKind::REFACTOR_EXTRACT,
-        CodeActionKind::RefactorInline => lsp_types::CodeActionKind::REFACTOR_INLINE,
-        CodeActionKind::RefactorRewrite => lsp_types::CodeActionKind::REFACTOR_REWRITE,
+        CodeActionKind::Generate => lspt::CodeActionKind::Empty,
+        CodeActionKind::QuickFix => lspt::CodeActionKind::QuickFix,
+        CodeActionKind::Refactor => lspt::CodeActionKind::Refactor,
+        CodeActionKind::RefactorExtract => lspt::CodeActionKind::RefactorExtract,
+        CodeActionKind::RefactorInline => lspt::CodeActionKind::RefactorInline,
+        CodeActionKind::RefactorRewrite => lspt::CodeActionKind::RefactorRewrite,
     }
 }
 
 pub(crate) fn code_action(
     snap: &GlobalStateSnapshot,
     CodeAction { id, label, source_change, .. }: CodeAction,
-    resolve_data: Option<(usize, lsp_types::CodeActionParams, Option<i32>)>,
-    diagnostics: Option<Vec<lsp_types::Diagnostic>>,
-) -> anyhow::Result<lsp_types::CodeAction> {
+    resolve_data: Option<(usize, lspt::CodeActionParams, Option<i32>)>,
+    diagnostics: Option<Vec<lspt::Diagnostic>>,
+) -> anyhow::Result<lspt::CodeAction> {
     let title = code_action_title(snap.config.i18n, id.name, &label);
-    let mut res = lsp_types::CodeAction {
+    let mut res = lspt::CodeAction {
         title,
         kind: Some(self::code_action_kind(id.kind)),
         edit: None,
@@ -846,6 +842,7 @@ pub(crate) fn code_action(
         diagnostics,
         disabled: None,
         data: None,
+        tags: None,
     };
 
     match (source_change, resolve_data) {

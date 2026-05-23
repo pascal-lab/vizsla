@@ -37,7 +37,7 @@ dunce.workspace = true
 itertools.workspace = true
 la-arena.workspace = true
 lsp-server = "0.7.6"
-lsp-types = "0.95.0"
+lspt = { version = "0.3.0", features = ["url"] }
 nohash-hasher.workspace = true
 num_cpus = "1.16.0"
 parking_lot = "0.12.1"

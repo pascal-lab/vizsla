@@ -1,4 +1,4 @@
-use lsp_types::TraceValue;
+use lspt::TraceValue;
 
 use crate::global_state::GlobalState;
 
@@ -21,7 +21,7 @@ impl LspTrace {
 
     #[cfg(test)]
     pub(crate) fn level(&self) -> TraceValue {
-        self.level
+        self.level.clone()
     }
 }
 
@@ -33,7 +33,7 @@ impl GlobalState {
 
 #[cfg(test)]
 mod tests {
-    use lsp_types::TraceValue;
+    use lspt::TraceValue;
 
     use super::LspTrace;
 

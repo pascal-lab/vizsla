@@ -1,14 +1,12 @@
 use ide::hover::HoverFormat;
-use lsp_types::{
-    CodeActionKind, CodeActionOptions, CodeActionProviderCapability, CodeLensOptions,
-    DeclarationCapability, DiagnosticOptions, DiagnosticServerCapabilities,
-    DocumentOnTypeFormattingOptions, FileOperationFilter, FileOperationPattern,
-    FileOperationPatternKind, FileOperationRegistrationOptions, InlayHintOptions,
-    InlayHintServerCapabilities, OneOf, PositionEncodingKind, RenameOptions, SaveOptions,
-    SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions, ServerCapabilities,
-    SignatureHelpOptions, TextDocumentSyncKind, TextDocumentSyncOptions,
-    WorkspaceFileOperationsServerCapabilities, WorkspaceFoldersServerCapabilities,
-    WorkspaceServerCapabilities,
+use lspt::{
+    CodeActionKind, CodeActionOptions, CodeLensOptions, DiagnosticOptions,
+    DocumentOnTypeFormattingOptions, FileOperationFilter, FileOperationOptions,
+    FileOperationPattern, FileOperationPatternKind, FileOperationRegistrationOptions,
+    InlayHintOptions, PositionEncodingKind, RenameOptions, SaveOptions, SemanticTokensFullDelta,
+    SemanticTokensLegend, SemanticTokensOptions, ServerCapabilities, SignatureHelpOptions,
+    TextDocumentSyncKind, TextDocumentSyncOptions, Union2, Union3,
+    WorkspaceFoldersServerCapabilities, WorkspaceOptions,
 };
 use utils::{line_index::WideEncoding, lines::PositionEncoding, try_, try_or_default};
 
@@ -78,7 +76,7 @@ impl Config {
     }
 
     pub fn location_link(&self) -> bool {
-        try_or_default!(self.client_caps.text_document.as_ref()?.definition?.link_support?)
+        try_or_default!(self.client_caps.text_document.as_ref()?.definition.as_ref()?.link_support?)
     }
 
     pub fn cli_did_save_dyn_reg(&self) -> bool {
@@ -117,7 +115,7 @@ impl Config {
             .text_document.as_ref()?
             .hover.as_ref()?
             .content_format.as_ref()?
-            .contains(&lsp_types::MarkupKind::Markdown)
+            .contains(&lspt::MarkupKind::Markdown)
         };
 
         if support_markdown { HoverFormat::Markdown } else { HoverFormat::PlainText }
@@ -145,7 +143,7 @@ impl Config {
         try_or_default! {
             self.client_caps
             .workspace.as_ref()?
-            .diagnostic.as_ref()?
+            .diagnostics.as_ref()?
             .refresh_support?
         }
     }
@@ -204,9 +202,9 @@ impl Config {
         };
 
         for enc in client_encodings {
-            if enc == &PositionEncodingKind::UTF8 {
+            if enc == &PositionEncodingKind::Utf8 {
                 return PositionEncoding::Utf8;
-            } else if enc == &PositionEncodingKind::UTF32 {
+            } else if enc == &PositionEncodingKind::Utf32 {
                 return PositionEncoding::Wide(WideEncoding::Utf32);
             }
             // NB: intentionally prefer just about anything else to utf-16.
@@ -220,26 +218,24 @@ impl Config {
     pub fn server_caps(&self) -> ServerCapabilities {
         ServerCapabilities {
             position_encoding: match self.negotiated_encoding() {
-                PositionEncoding::Utf8 => Some(PositionEncodingKind::UTF8),
+                PositionEncoding::Utf8 => Some(PositionEncodingKind::Utf8),
                 PositionEncoding::Wide(wide) => match wide {
-                    WideEncoding::Utf16 => Some(PositionEncodingKind::UTF16),
-                    WideEncoding::Utf32 => Some(PositionEncodingKind::UTF32),
+                    WideEncoding::Utf16 => Some(PositionEncodingKind::Utf16),
+                    WideEncoding::Utf32 => Some(PositionEncodingKind::Utf32),
                     _ => None,
                 },
             },
-            text_document_sync: Some(
-                TextDocumentSyncOptions {
-                    open_close: true.into(),
-                    change: TextDocumentSyncKind::INCREMENTAL.into(),
-                    will_save: None,
-                    will_save_wait_until: None,
-                    save: Some(SaveOptions::default().into()),
-                }
-                .into(),
-            ),
-            selection_range_provider: Some(true.into()),
-            hover_provider: Some(true.into()),
-            completion_provider: Some(lsp_types::CompletionOptions {
+            text_document_sync: Some(Union2::A(TextDocumentSyncOptions {
+                open_close: Some(true),
+                change: Some(TextDocumentSyncKind::Incremental),
+                will_save: None,
+                will_save_wait_until: None,
+                save: Some(Union2::B(SaveOptions::default())),
+            })),
+            notebook_document_sync: None,
+            selection_range_provider: Some(Union3::A(true)),
+            hover_provider: Some(Union2::A(true)),
+            completion_provider: Some(lspt::CompletionOptions {
                 resolve_provider: Some(false),
                 trigger_characters: Some(vec![
                     ".".into(),
@@ -254,121 +250,115 @@ impl Config {
                 ]),
                 ..Default::default()
             }),
-            signature_help_provider: SignatureHelpOptions {
+            signature_help_provider: Some(SignatureHelpOptions {
                 trigger_characters: Some(["(", ",", "."].map(String::from).into()),
                 retrigger_characters: None,
-                work_done_progress_options: Default::default(),
-            }
-            .into(),
-            declaration_provider: Some(DeclarationCapability::Simple(true)),
-            definition_provider: OneOf::Left(true).into(),
-            type_definition_provider: Some(true.into()),
-            implementation_provider: Some(false.into()),
-            references_provider: OneOf::Left(true).into(),
-            document_highlight_provider: OneOf::Left(true).into(),
-            document_symbol_provider: OneOf::Left(true).into(),
-            workspace_symbol_provider: OneOf::Left(true).into(),
-            code_action_provider: Some(CodeActionProviderCapability::Options(CodeActionOptions {
+                work_done_progress: Default::default(),
+            }),
+            declaration_provider: Some(Union3::A(true)),
+            definition_provider: Some(Union2::A(true)),
+            type_definition_provider: Some(Union3::A(true)),
+            implementation_provider: Some(Union3::A(false)),
+            references_provider: Some(Union2::A(true)),
+            document_highlight_provider: Some(Union2::A(true)),
+            document_symbol_provider: Some(Union2::A(true)),
+            workspace_symbol_provider: Some(Union2::A(true)),
+            code_action_provider: Some(Union2::B(CodeActionOptions {
                 code_action_kinds: Some(vec![
-                    CodeActionKind::EMPTY,
-                    CodeActionKind::QUICKFIX,
-                    CodeActionKind::REFACTOR,
-                    CodeActionKind::REFACTOR_EXTRACT,
-                    CodeActionKind::REFACTOR_INLINE,
-                    CodeActionKind::REFACTOR_REWRITE,
+                    CodeActionKind::Empty,
+                    CodeActionKind::QuickFix,
+                    CodeActionKind::Refactor,
+                    CodeActionKind::RefactorExtract,
+                    CodeActionKind::RefactorInline,
+                    CodeActionKind::RefactorRewrite,
                 ]),
-                work_done_progress_options: Default::default(),
+                work_done_progress: Default::default(),
                 resolve_provider: Some(true),
             })),
-            code_lens_provider: CodeLensOptions { resolve_provider: true.into() }.into(),
-            document_formatting_provider: OneOf::Left(true).into(),
-            document_range_formatting_provider: OneOf::Left(true).into(),
-            document_on_type_formatting_provider: DocumentOnTypeFormattingOptions {
+            code_lens_provider: Some(CodeLensOptions {
+                resolve_provider: Some(true),
+                work_done_progress: None,
+            }),
+            document_formatting_provider: Some(Union2::A(true)),
+            document_range_formatting_provider: Some(Union2::A(true)),
+            document_on_type_formatting_provider: Some(DocumentOnTypeFormattingOptions {
                 first_trigger_character: "\n".to_owned(),
                 more_trigger_character: None,
-            }
-            .into(),
-            rename_provider: OneOf::Right(RenameOptions {
-                prepare_provider: true.into(),
-                work_done_progress_options: Default::default(),
-            })
-            .into(),
+            }),
+            rename_provider: Some(Union2::B(RenameOptions {
+                prepare_provider: Some(true),
+                work_done_progress: Default::default(),
+            })),
             document_link_provider: None,
             color_provider: None,
-            folding_range_provider: Some(true.into()),
-            execute_command_provider: Some(lsp_types::ExecuteCommandOptions {
+            folding_range_provider: Some(Union3::A(true)),
+            execute_command_provider: Some(lspt::ExecuteCommandOptions {
                 commands: vec![
                     RUN_QIHE_ANALYSIS_COMMAND.to_string(),
                     RELOAD_WORKSPACE_COMMAND.to_string(),
                 ],
-                work_done_progress_options: Default::default(),
+                work_done_progress: Default::default(),
             }),
-            workspace: WorkspaceServerCapabilities {
-                workspace_folders: WorkspaceFoldersServerCapabilities {
-                    supported: true.into(),
-                    change_notifications: OneOf::Left(true).into(),
-                }
-                .into(),
-                file_operations: WorkspaceFileOperationsServerCapabilities {
+            workspace: Some(WorkspaceOptions {
+                workspace_folders: Some(WorkspaceFoldersServerCapabilities {
+                    supported: Some(true),
+                    change_notifications: Some(Union2::B(true)),
+                }),
+                file_operations: Some(FileOperationOptions {
                     did_create: None,
                     will_create: None,
                     did_rename: None,
-                    will_rename: FileOperationRegistrationOptions {
+                    will_rename: Some(FileOperationRegistrationOptions {
                         filters: vec![
                             FileOperationFilter {
-                                scheme: String::from("file").into(),
+                                scheme: Some(String::from("file")),
                                 pattern: FileOperationPattern {
                                     glob: String::from("**/*.{v,sv}"),
-                                    matches: FileOperationPatternKind::File.into(),
+                                    matches: Some(FileOperationPatternKind::File),
                                     options: None,
                                 },
                             },
                             FileOperationFilter {
-                                scheme: String::from("file").into(),
+                                scheme: Some(String::from("file")),
                                 pattern: FileOperationPattern {
                                     glob: String::from("**"),
-                                    matches: FileOperationPatternKind::Folder.into(),
+                                    matches: Some(FileOperationPatternKind::Folder),
                                     options: None,
                                 },
                             },
                         ],
-                    }
-                    .into(),
+                    }),
                     did_delete: None,
                     will_delete: None,
-                }
-                .into(),
-            }
-            .into(),
-            call_hierarchy_provider: Some(true.into()),
-            semantic_tokens_provider: Some(
-                SemanticTokensOptions {
-                    legend: SemanticTokensLegend {
-                        token_types: ext::SEMA_TOKENS_TYPES.to_vec(),
-                        token_modifiers: ext::SEMA_TOKENS_MODIFIERS.to_vec(),
-                    },
+                }),
+            }),
+            call_hierarchy_provider: Some(Union3::A(true)),
+            semantic_tokens_provider: Some(Union2::A(SemanticTokensOptions {
+                legend: SemanticTokensLegend {
+                    token_types: ext::SEMA_TOKENS_TYPES.iter().map(|it| it.to_string()).collect(),
+                    token_modifiers: ext::SEMA_TOKENS_MODIFIERS
+                        .iter()
+                        .map(|it| it.to_string())
+                        .collect(),
+                },
 
-                    full: Some(SemanticTokensFullOptions::Delta { delta: Some(true) }),
-                    range: Some(true),
-                    work_done_progress_options: Default::default(),
-                }
-                .into(),
-            ),
+                full: Some(Union2::B(SemanticTokensFullDelta { delta: Some(true) })),
+                range: Some(Union2::A(true)),
+                work_done_progress: Default::default(),
+            })),
             moniker_provider: None,
             linked_editing_range_provider: None,
+            type_hierarchy_provider: None,
             inline_value_provider: None,
-            inlay_hint_provider: OneOf::Right(InlayHintServerCapabilities::Options(
-                InlayHintOptions {
-                    work_done_progress_options: Default::default(),
-                    resolve_provider: false.into(),
-                },
-            ))
-            .into(),
-            diagnostic_provider: Some(DiagnosticServerCapabilities::Options(DiagnosticOptions {
+            inlay_hint_provider: Some(Union3::B(InlayHintOptions {
+                work_done_progress: Default::default(),
+                resolve_provider: Some(false),
+            })),
+            diagnostic_provider: Some(Union2::A(DiagnosticOptions {
                 identifier: None,
                 inter_file_dependencies: true,
                 workspace_diagnostics: true,
-                work_done_progress_options: Default::default(),
+                work_done_progress: Default::default(),
             })),
             experimental: None,
         }
