@@ -181,13 +181,14 @@ pub(crate) fn handle_workspace_diagnostic(
         diag_items.extend(snap.qihe_diagnostics(file_id));
 
         for target in targets {
-            seen.insert(target.uri.clone());
-            let result_id = snap.diagnostic_result_id(file_id, &target.uri);
-            let version = target.version.map(|version| version as i64);
-            let previous_result_id = previous_result_ids.get(&target.uri).map(String::as_str);
+            let uri = target.uri().clone();
+            seen.insert(uri.clone());
+            let result_id = snap.diagnostic_result_id(file_id, &uri);
+            let version = target.version().map(|version| version as i64);
+            let previous_result_id = previous_result_ids.get(&uri).map(String::as_str);
 
             items.push(workspace_diagnostic_report(
-                target.uri,
+                uri,
                 version,
                 result_id,
                 diag_items.clone(),

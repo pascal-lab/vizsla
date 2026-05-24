@@ -197,12 +197,7 @@ impl GlobalState {
                         return None;
                     }
                 };
-                Some(PublishDiagnosticsTask {
-                    file_id: *file_id,
-                    uri,
-                    version: None,
-                    diagnostics: Vec::new(),
-                })
+                Some(PublishDiagnosticsTask::clear_stale_uri(*file_id, uri))
             })
             .collect();
 
@@ -327,14 +322,11 @@ impl GlobalState {
                     }
                 };
                 let diagnostics = snapshot.lsp_diagnostics(file_id);
-                results.extend(targets.into_iter().map(|target| PublishDiagnosticsTask {
-                    file_id: target.file_id,
-                    uri: target.uri,
-                    version: target.version,
-                    diagnostics: diagnostics.clone(),
+                results.extend(targets.into_iter().map(|target| {
+                    PublishDiagnosticsTask::from_target(target, diagnostics.clone())
                 }));
             }
-            Task::Diagnostics(PublishDiagnosticsBatch { touched_file_ids, tasks: results })
+            Task::Diagnostics(PublishDiagnosticsBatch::for_touched_files(touched_file_ids, results))
         });
     }
 }
@@ -447,7 +439,7 @@ mod tests {
         let alias_uri = to_proto::url_from_abs_path(alias.as_path()).unwrap();
 
         state.published_diagnostics.insert(
-            DiagnosticPublishKey { file_id: alias_file_id, uri: alias_uri.clone() },
+            DiagnosticPublishKey::for_test(alias_file_id, alias_uri.clone()),
             vec![Diagnostic {
                 range: Range::new(Position::new(0, 0), Position::new(0, 1)),
                 severity: Some(DiagnosticSeverity::ERROR),
@@ -548,10 +540,10 @@ mod tests {
         else {
             panic!("expected diagnostics task");
         };
-        let tasks = batch.tasks;
+        let tasks = batch.into_tasks();
         assert_eq!(tasks.len(), 1);
-        assert_eq!(tasks[0].uri, source_uri);
-        assert_eq!(tasks[0].version, Some(3));
+        assert_eq!(tasks[0].uri(), &source_uri);
+        assert_eq!(tasks[0].version(), Some(3));
 
         handle_did_open_text_document(
             &mut state,
@@ -571,20 +563,20 @@ mod tests {
         let Task::Diagnostics(batch) = task else {
             panic!("expected diagnostics task");
         };
-        let mut tasks = batch.tasks;
-        tasks.sort_unstable_by(|lhs, rhs| lhs.uri.cmp(&rhs.uri));
+        let mut tasks = batch.into_tasks();
+        tasks.sort_unstable_by(|lhs, rhs| lhs.uri().cmp(rhs.uri()));
         let targets = tasks
             .into_iter()
             .map(|task| {
-                assert_eq!(task.file_id, file_id);
-                (task.uri, task.version)
+                assert_eq!(task.file_id(), file_id);
+                (task.uri().clone(), task.version())
             })
             .collect::<Vec<_>>();
         let mut expected = vec![(source_uri.clone(), Some(3)), (alias_uri.clone(), Some(12))];
         expected.sort_unstable_by(|lhs, rhs| lhs.0.cmp(&rhs.0));
         assert_eq!(targets, expected);
         state.published_diagnostics.insert(
-            DiagnosticPublishKey { file_id, uri: alias_uri.clone() },
+            DiagnosticPublishKey::for_test(file_id, alias_uri.clone()),
             vec![Diagnostic {
                 range: Range::new(Position::new(0, 0), Position::new(0, 1)),
                 severity: Some(DiagnosticSeverity::ERROR),
@@ -607,11 +599,11 @@ mod tests {
         let Task::Diagnostics(batch) = task else {
             panic!("expected diagnostics task");
         };
-        assert_eq!(batch.touched_file_ids, FxHashSet::from_iter([file_id]));
-        assert_eq!(batch.tasks.len(), 1);
-        assert_eq!(batch.tasks[0].file_id, file_id);
-        assert_eq!(batch.tasks[0].uri, source_uri);
-        assert_eq!(batch.tasks[0].version, Some(3));
+        assert_eq!(batch.touched_file_ids(), &FxHashSet::from_iter([file_id]));
+        assert_eq!(batch.tasks().len(), 1);
+        assert_eq!(batch.tasks()[0].file_id(), file_id);
+        assert_eq!(batch.tasks()[0].uri(), &source_uri);
+        assert_eq!(batch.tasks()[0].version(), Some(3));
         state.publish_diagnostics_tasks(batch, false);
         let message = client.receiver.recv_timeout(Duration::from_secs(1)).unwrap();
         let lsp_server::Message::Notification(notification) = message else {

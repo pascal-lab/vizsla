@@ -381,7 +381,9 @@ impl fmt::Debug for Vfs {
 mod tests {
     use std::fs;
 
-    use utils::{lines::LineEnding, paths::AbsPathBuf};
+    use utils::lines::LineEnding;
+    #[cfg(windows)]
+    use utils::paths::AbsPathBuf;
 
     use super::*;
     use crate::test_support::TestDir;

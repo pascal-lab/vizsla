@@ -176,15 +176,14 @@ impl GlobalState {
             };
             let diagnostics = snapshot.lsp_diagnostics(file_id);
 
-            publish_tasks.extend(targets.into_iter().map(|target| PublishDiagnosticsTask {
-                file_id: target.file_id,
-                uri: target.uri,
-                version: target.version,
-                diagnostics: diagnostics.clone(),
-            }));
+            publish_tasks.extend(
+                targets
+                    .into_iter()
+                    .map(|target| PublishDiagnosticsTask::from_target(target, diagnostics.clone())),
+            );
         }
         self.publish_diagnostics_tasks(
-            PublishDiagnosticsBatch { touched_file_ids: changed_files, tasks: publish_tasks },
+            PublishDiagnosticsBatch::for_touched_files(changed_files, publish_tasks),
             true,
         );
     }

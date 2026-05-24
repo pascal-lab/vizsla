@@ -17,6 +17,7 @@ use super::{
     qihe::QiheUpdate,
     reload::FetchWorkspaceProgress,
     respond::Progress,
+    snapshot::DiagnosticPublishTarget,
 };
 use crate::{config::Config, global_state::DEFAULT_REQ_HANDLER, i18n::keys};
 
@@ -143,12 +144,12 @@ mod tests {
         };
 
         state.publish_diagnostics_tasks(
-            publish_batch(vec![PublishDiagnosticsTask {
+            publish_batch(vec![PublishDiagnosticsTask::for_test(
                 file_id,
-                uri: primary_uri.clone(),
-                version: None,
-                diagnostics: vec![diagnostic.clone()],
-            }]),
+                primary_uri.clone(),
+                None,
+                vec![diagnostic.clone()],
+            )]),
             false,
         );
         let first = recv_publish(&client);
@@ -156,12 +157,12 @@ mod tests {
         assert_eq!(first.diagnostics, vec![diagnostic.clone()]);
 
         state.publish_diagnostics_tasks(
-            publish_batch(vec![PublishDiagnosticsTask {
+            publish_batch(vec![PublishDiagnosticsTask::for_test(
                 file_id,
-                uri: alias_uri.clone(),
-                version: Some(7),
-                diagnostics: vec![diagnostic.clone()],
-            }]),
+                alias_uri.clone(),
+                Some(7),
+                vec![diagnostic.clone()],
+            )]),
             false,
         );
 
@@ -175,7 +176,7 @@ mod tests {
         assert!(
             state
                 .published_diagnostics
-                .contains_key(&DiagnosticPublishKey { file_id, uri: alias_uri })
+                .contains_key(&DiagnosticPublishKey::for_test(file_id, alias_uri))
         );
     }
 
@@ -211,12 +212,12 @@ mod tests {
         };
 
         state.publish_diagnostics_tasks(
-            publish_batch(vec![PublishDiagnosticsTask {
+            publish_batch(vec![PublishDiagnosticsTask::for_test(
                 file_id,
-                uri: alias_uri.clone(),
-                version: Some(9),
-                diagnostics: vec![diagnostic],
-            }]),
+                alias_uri.clone(),
+                Some(9),
+                vec![diagnostic],
+            )]),
             false,
         );
         let published = recv_publish(&client);
@@ -224,10 +225,7 @@ mod tests {
         assert!(!published.diagnostics.is_empty());
 
         state.publish_diagnostics_tasks(
-            PublishDiagnosticsBatch {
-                touched_file_ids: FxHashSet::from_iter([file_id]),
-                tasks: Vec::new(),
-            },
+            PublishDiagnosticsBatch::for_touched_files(FxHashSet::from_iter([file_id]), Vec::new()),
             false,
         );
 
@@ -237,7 +235,7 @@ mod tests {
         assert!(
             !state
                 .published_diagnostics
-                .contains_key(&DiagnosticPublishKey { file_id, uri: alias_uri })
+                .contains_key(&DiagnosticPublishKey::for_test(file_id, alias_uri))
         );
     }
 
@@ -266,22 +264,49 @@ mod tests {
 
 #[derive(Debug)]
 pub(crate) struct PublishDiagnosticsTask {
-    pub(crate) file_id: FileId,
-    pub(crate) uri: lsp_types::Url,
-    pub(crate) version: Option<i32>,
-    pub(crate) diagnostics: Vec<lsp_types::Diagnostic>,
+    file_id: FileId,
+    uri: lsp_types::Url,
+    version: Option<i32>,
+    diagnostics: Vec<lsp_types::Diagnostic>,
 }
 
 #[derive(Debug)]
 pub(crate) struct PublishDiagnosticsBatch {
-    pub(crate) touched_file_ids: FxHashSet<FileId>,
-    pub(crate) tasks: Vec<PublishDiagnosticsTask>,
+    touched_file_ids: FxHashSet<FileId>,
+    tasks: Vec<PublishDiagnosticsTask>,
 }
 
 impl PublishDiagnosticsBatch {
     pub(crate) fn from_tasks(tasks: Vec<PublishDiagnosticsTask>) -> Self {
         let touched_file_ids = tasks.iter().map(|task| task.file_id).collect();
         Self { touched_file_ids, tasks }
+    }
+
+    /// Builds a diagnostics batch for files whose publish target set may have
+    /// changed independently from diagnostics contents.
+    ///
+    /// This is what lets didClose clear stale URI diagnostics even when the
+    /// remaining target set is empty.
+    pub(crate) fn for_touched_files(
+        touched_file_ids: FxHashSet<FileId>,
+        tasks: Vec<PublishDiagnosticsTask>,
+    ) -> Self {
+        Self { touched_file_ids, tasks }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn touched_file_ids(&self) -> &FxHashSet<FileId> {
+        &self.touched_file_ids
+    }
+
+    #[cfg(test)]
+    pub(crate) fn tasks(&self) -> &[PublishDiagnosticsTask] {
+        &self.tasks
+    }
+
+    #[cfg(test)]
+    pub(crate) fn into_tasks(self) -> Vec<PublishDiagnosticsTask> {
+        self.tasks
     }
 }
 
@@ -290,13 +315,66 @@ pub(crate) struct DiagnosticPublishKey {
     /// Diagnostics are computed per analysis file but delivered per LSP URI.
     /// Keeping both parts in the cache key prevents an alias URI from being
     /// skipped just because the same diagnostic list was sent to another URI.
-    pub(crate) file_id: FileId,
-    pub(crate) uri: lsp_types::Url,
+    file_id: FileId,
+    uri: lsp_types::Url,
+}
+
+impl DiagnosticPublishKey {
+    fn new(file_id: FileId, uri: lsp_types::Url) -> Self {
+        Self { file_id, uri }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn for_test(file_id: FileId, uri: lsp_types::Url) -> Self {
+        Self::new(file_id, uri)
+    }
 }
 
 impl PublishDiagnosticsTask {
+    pub(crate) fn from_target(
+        target: DiagnosticPublishTarget,
+        diagnostics: Vec<lsp_types::Diagnostic>,
+    ) -> Self {
+        let (file_id, uri, version) = target.into_parts();
+        Self { file_id, uri, version, diagnostics }
+    }
+
+    /// Clears diagnostics previously published to a concrete URI that is no
+    /// longer a live target, such as a deleted duplicate identity spelling.
+    ///
+    /// Normal diagnostics publishing should use [`Self::from_target`] so URI
+    /// and version always come from the same document target.
+    pub(crate) fn clear_stale_uri(file_id: FileId, uri: lsp_types::Url) -> Self {
+        Self { file_id, uri, version: None, diagnostics: Vec::new() }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn file_id(&self) -> FileId {
+        self.file_id
+    }
+
+    #[cfg(test)]
+    pub(crate) fn uri(&self) -> &lsp_types::Url {
+        &self.uri
+    }
+
+    #[cfg(test)]
+    pub(crate) fn version(&self) -> Option<i32> {
+        self.version
+    }
+
     fn cache_key(&self) -> DiagnosticPublishKey {
-        DiagnosticPublishKey { file_id: self.file_id, uri: self.uri.clone() }
+        DiagnosticPublishKey::new(self.file_id, self.uri.clone())
+    }
+
+    #[cfg(test)]
+    pub(crate) fn for_test(
+        file_id: FileId,
+        uri: lsp_types::Url,
+        version: Option<i32>,
+        diagnostics: Vec<lsp_types::Diagnostic>,
+    ) -> Self {
+        Self { file_id, uri, version, diagnostics }
     }
 }
 

@@ -25,15 +25,33 @@ use crate::{
 #[derive(Debug, Clone)]
 pub(crate) struct DiagnosticPublishTarget {
     /// The analysis identity diagnostics are computed from.
-    pub(crate) file_id: FileId,
+    file_id: FileId,
     /// The URI diagnostics will be published for.
     ///
     /// Diagnostic code should obtain URI/version pairs from
     /// [`GlobalStateSnapshot::diagnostic_publish_targets`] instead of pairing
     /// [`GlobalStateSnapshot::url`] with a file-id-wide document version.
-    pub(crate) uri: Url,
+    uri: Url,
     /// The document version for `uri`, when that URI is currently open.
-    pub(crate) version: Option<i32>,
+    version: Option<i32>,
+}
+
+impl DiagnosticPublishTarget {
+    fn new(file_id: FileId, uri: Url, version: Option<i32>) -> Self {
+        Self { file_id, uri, version }
+    }
+
+    pub(crate) fn uri(&self) -> &Url {
+        &self.uri
+    }
+
+    pub(crate) fn version(&self) -> Option<i32> {
+        self.version
+    }
+
+    pub(crate) fn into_parts(self) -> (FileId, Url, Option<i32>) {
+        (self.file_id, self.uri, self.version)
+    }
 }
 
 // immutable
@@ -216,6 +234,11 @@ impl GlobalStateSnapshot {
         vfs.0.iter().map(|(file_id, _)| file_id).collect()
     }
 
+    /// Returns the VFS primary URI for a file.
+    ///
+    /// This is suitable for protocol features that need a stable file location.
+    /// Push diagnostics must use [`Self::diagnostic_publish_targets`] so the
+    /// URI and document version come from the same open document spelling.
     pub(crate) fn url(&self, id: FileId) -> anyhow::Result<Url> {
         let vfs = &self.vfs_read();
         let path =
@@ -247,7 +270,7 @@ impl GlobalStateSnapshot {
             return Ok(open_targets);
         }
 
-        Ok(vec![DiagnosticPublishTarget { file_id, uri: self.url(file_id)?, version: None }])
+        Ok(vec![DiagnosticPublishTarget::new(file_id, self.url(file_id)?, None)])
     }
 
     fn open_diagnostic_targets(
@@ -262,7 +285,7 @@ impl GlobalStateSnapshot {
                     anyhow::format_err!("open file {file_id:?} has no file URI: {}", document.path)
                 })?;
                 let uri = to_proto::url_from_abs_path(path)?;
-                Ok(DiagnosticPublishTarget { file_id, uri, version: Some(document.version) })
+                Ok(DiagnosticPublishTarget::new(file_id, uri, Some(document.version)))
             })
             .collect()
     }
