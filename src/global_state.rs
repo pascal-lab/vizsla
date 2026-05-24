@@ -34,7 +34,7 @@ use utils::{
 use vfs::{self, FileId, Vfs};
 
 use self::{
-    main_loop::{DiagnosticPublishKey, Task},
+    main_loop::{DiagnosticPublishFreshness, DiagnosticPublishKey, Task},
     mem_docs::MemDocs,
     snapshot::GlobalStateSnapshot,
     trace::LspTrace,
@@ -124,6 +124,7 @@ pub(crate) struct GlobalState {
     // the normal change-processing boundary.
     pub(crate) pending_document_diagnostic_targets: FxHashSet<FileId>,
     pub(crate) diagnostics_revision: u64,
+    pub(crate) diagnostic_target_revision: u64,
     pub(crate) qihe_diagnostics: Arc<Mutex<FxHashMap<FileId, QiheDiagnosticState>>>,
     // Only the latest Qihe run is allowed to commit diagnostics or logs.
     pub(crate) qihe_run_generation: qihe::QiheRunId,
@@ -183,6 +184,7 @@ impl GlobalState {
             published_diagnostics: FxHashMap::default(),
             pending_document_diagnostic_targets: FxHashSet::default(),
             diagnostics_revision: 0,
+            diagnostic_target_revision: 0,
             qihe_diagnostics: Arc::new(Mutex::new(FxHashMap::default())),
             qihe_run_generation: qihe::QiheRunId::default(),
             qihe_active_progress_token: None,
@@ -208,7 +210,12 @@ impl GlobalState {
             sema_tokens_cache: Arc::clone(&self.semantic_tokens_cache),
             qihe_diagnostics: Arc::clone(&self.qihe_diagnostics),
             diagnostics_revision: self.diagnostics_revision,
+            diagnostic_publish_freshness: self.diagnostic_publish_freshness(),
         }
+    }
+
+    pub(crate) fn diagnostic_publish_freshness(&self) -> DiagnosticPublishFreshness {
+        DiagnosticPublishFreshness::new(self.diagnostics_revision, self.diagnostic_target_revision)
     }
 }
 

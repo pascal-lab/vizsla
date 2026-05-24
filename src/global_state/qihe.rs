@@ -238,7 +238,6 @@ impl GlobalState {
             return;
         }
 
-        let diagnostics_revision = self.diagnostics_revision;
         let snapshot = self.make_snapshot();
         let mut publish_tasks = Vec::with_capacity(changed_files.len());
         let mut touched_file_ids = FxHashSet::default();
@@ -266,7 +265,7 @@ impl GlobalState {
             PublishDiagnosticsBatch::for_touched_files(
                 touched_file_ids,
                 publish_tasks,
-                diagnostics_revision,
+                snapshot.diagnostic_publish_freshness,
             ),
             true,
         );

@@ -35,6 +35,10 @@ struct OpenDocumentAlias {
 // URI-local. An alias opened with divergent text is tracked for close/version
 // bookkeeping but is detached from the canonical analysis buffer; supporting
 // multiple unsaved alias buffers is a separate design.
+//
+// TODO: Allow detached aliases to reattach on a full-document change that
+// matches the canonical analysis buffer, or expose an explicit unsupported
+// multi-alias-unsaved-buffer status to the client.
 #[derive(Default, Clone)]
 pub(crate) struct MemDocs {
     buffers: FxHashMap<FileId, OpenBuffer>,

@@ -27,6 +27,7 @@ impl GlobalState {
     pub(crate) fn process_changes(&mut self) -> bool {
         let pending_diagnostic_targets =
             std::mem::take(&mut self.pending_document_diagnostic_targets);
+        let mut diagnostic_targets_changed = !pending_diagnostic_targets.is_empty();
         let mut write_guard = self.vfs.write();
         let changed_files = write_guard.0.take_changes();
         // downgrade earlier to allow more reader
@@ -39,6 +40,7 @@ impl GlobalState {
                 (canonical != changed_file.file_id).then_some((changed_file.file_id, canonical))
             })
             .collect_vec();
+        diagnostic_targets_changed |= !file_id_redirects.is_empty();
         for (from, to) in file_id_redirects {
             self.mem_docs.remap_file_id(from, to);
         }
@@ -47,6 +49,7 @@ impl GlobalState {
         let Some(changed_files) = Self::colease_modifications(changed_files) else {
             std::mem::drop(read_guard);
             if !pending_diagnostic_targets.is_empty() {
+                self.diagnostic_target_revision += 1;
                 self.request_diagnostics(pending_diagnostic_targets.into_iter().collect());
             }
             return false;
@@ -97,6 +100,9 @@ impl GlobalState {
 
         self.analysis_host.apply_change(change);
         self.diagnostics_revision += 1;
+        if diagnostic_targets_changed {
+            self.diagnostic_target_revision += 1;
+        }
         self.remove_deleted_qihe_diagnostics(&deleted_file_ids);
         self.clear_deleted_push_diagnostics(&deleted_push_diagnostics);
         if has_structure_changes {
@@ -202,7 +208,7 @@ impl GlobalState {
             .collect();
 
         self.publish_diagnostics_tasks(
-            PublishDiagnosticsBatch::from_tasks(diagnostics, self.diagnostics_revision),
+            PublishDiagnosticsBatch::from_tasks(diagnostics, self.diagnostic_publish_freshness()),
             false,
         );
     }
@@ -333,7 +339,7 @@ impl GlobalState {
             Task::Diagnostics(PublishDiagnosticsBatch::for_touched_files(
                 touched_file_ids,
                 results,
-                snapshot.diagnostics_revision,
+                snapshot.diagnostic_publish_freshness,
             ))
         });
     }
@@ -364,7 +370,9 @@ mod tests {
             handlers::notification::{
                 handle_did_close_text_document, handle_did_open_text_document,
             },
-            main_loop::{DiagnosticPublishKey, Task},
+            main_loop::{
+                DiagnosticPublishKey, PublishDiagnosticsBatch, PublishDiagnosticsTask, Task,
+            },
         },
         i18n::I18n,
         lsp_ext::to_proto,
@@ -588,6 +596,22 @@ mod tests {
             "module top; endmodule\n",
             "second open URI aliases the same FileId but must not replace the canonical analysis buffer"
         );
+        let stale_alias_batch = PublishDiagnosticsBatch::for_touched_files(
+            FxHashSet::from_iter([file_id]),
+            vec![PublishDiagnosticsTask::for_test(
+                file_id,
+                alias_uri.clone(),
+                Some(12),
+                vec![Diagnostic {
+                    range: Range::new(Position::new(0, 0), Position::new(0, 1)),
+                    severity: Some(DiagnosticSeverity::ERROR),
+                    source: Some("test".to_owned()),
+                    message: "stale alias diagnostic".to_owned(),
+                    ..Diagnostic::default()
+                }],
+            )],
+            state.diagnostic_publish_freshness(),
+        );
         state.published_diagnostics.insert(
             DiagnosticPublishKey::for_test(file_id, alias_uri.clone()),
             vec![Diagnostic {
@@ -626,5 +650,15 @@ mod tests {
         let params: PublishDiagnosticsParams = serde_json::from_value(notification.params).unwrap();
         assert_eq!(params.uri, alias_uri);
         assert!(params.diagnostics.is_empty());
+        state.publish_diagnostics_tasks(stale_alias_batch, false);
+        assert!(
+            client.receiver.recv_timeout(Duration::from_millis(50)).is_err(),
+            "stale target batch must not republish diagnostics to a closed alias URI"
+        );
+        assert!(
+            !state
+                .published_diagnostics
+                .contains_key(&DiagnosticPublishKey::for_test(file_id, alias_uri))
+        );
     }
 }

@@ -15,7 +15,7 @@ use utils::{
 };
 use vfs::{FileId, Vfs, VfsPath};
 
-use super::mem_docs::MemDocs;
+use super::{main_loop::DiagnosticPublishFreshness, mem_docs::MemDocs};
 use crate::{
     config::Config,
     global_state::QiheDiagnosticState,
@@ -62,6 +62,7 @@ pub(crate) struct GlobalStateSnapshot {
     pub(crate) sema_tokens_cache: Arc<Mutex<FxHashMap<Url, lsp_types::SemanticTokens>>>,
     pub(crate) qihe_diagnostics: Arc<Mutex<FxHashMap<FileId, QiheDiagnosticState>>>,
     pub(crate) diagnostics_revision: u64,
+    pub(crate) diagnostic_publish_freshness: DiagnosticPublishFreshness,
     pub(crate) mem_docs: MemDocs,
     pub(crate) vfs: Arc<RwLock<(Vfs, IntMap<FileId, LineEnding>)>>,
     #[allow(dead_code)]

@@ -107,7 +107,7 @@ mod tests {
     }
 
     fn publish_batch(tasks: Vec<PublishDiagnosticsTask>) -> PublishDiagnosticsBatch {
-        PublishDiagnosticsBatch::from_tasks(tasks, 0)
+        PublishDiagnosticsBatch::from_tasks(tasks, DiagnosticPublishFreshness::default())
     }
 
     #[test]
@@ -228,7 +228,7 @@ mod tests {
             PublishDiagnosticsBatch::for_touched_files(
                 FxHashSet::from_iter([file_id]),
                 Vec::new(),
-                0,
+                DiagnosticPublishFreshness::default(),
             ),
             false,
         );
@@ -278,7 +278,7 @@ mod tests {
         state.publish_diagnostics_tasks(
             PublishDiagnosticsBatch::from_tasks(
                 vec![PublishDiagnosticsTask::for_test(file_id, uri, None, vec![diagnostic])],
-                1,
+                DiagnosticPublishFreshness::new(1, 0),
             ),
             false,
         );
@@ -320,18 +320,37 @@ pub(crate) struct PublishDiagnosticsTask {
 
 #[derive(Debug)]
 pub(crate) struct PublishDiagnosticsBatch {
-    diagnostics_revision: u64,
+    freshness: DiagnosticPublishFreshness,
     touched_file_ids: FxHashSet<FileId>,
     tasks: Vec<PublishDiagnosticsTask>,
+}
+
+/// Freshness token for a diagnostics publish batch.
+///
+/// Diagnostic contents and diagnostic publish targets can change
+/// independently. VFS/content/config changes advance `diagnostics_revision`;
+/// didOpen/didClose and identity remaps advance `target_revision` because they
+/// change which URIs are live publish targets without necessarily changing the
+/// analysis text.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) struct DiagnosticPublishFreshness {
+    diagnostics_revision: u64,
+    target_revision: u64,
+}
+
+impl DiagnosticPublishFreshness {
+    pub(crate) fn new(diagnostics_revision: u64, target_revision: u64) -> Self {
+        Self { diagnostics_revision, target_revision }
+    }
 }
 
 impl PublishDiagnosticsBatch {
     pub(crate) fn from_tasks(
         tasks: Vec<PublishDiagnosticsTask>,
-        diagnostics_revision: u64,
+        freshness: DiagnosticPublishFreshness,
     ) -> Self {
         let touched_file_ids = tasks.iter().map(|task| task.file_id).collect();
-        Self { diagnostics_revision, touched_file_ids, tasks }
+        Self { freshness, touched_file_ids, tasks }
     }
 
     /// Builds a diagnostics batch for files whose publish target set may have
@@ -342,9 +361,9 @@ impl PublishDiagnosticsBatch {
     pub(crate) fn for_touched_files(
         touched_file_ids: FxHashSet<FileId>,
         tasks: Vec<PublishDiagnosticsTask>,
-        diagnostics_revision: u64,
+        freshness: DiagnosticPublishFreshness,
     ) -> Self {
-        Self { diagnostics_revision, touched_file_ids, tasks }
+        Self { freshness, touched_file_ids, tasks }
     }
 
     #[cfg(test)]
@@ -917,13 +936,10 @@ impl GlobalState {
         let mut published_files = 0usize;
         let mut published_diagnostics = 0usize;
         let mut skipped_files = 0usize;
-        let PublishDiagnosticsBatch { diagnostics_revision, touched_file_ids, tasks } = batch;
-        if diagnostics_revision != self.diagnostics_revision {
-            tracing::debug!(
-                diagnostics_revision,
-                current_diagnostics_revision = self.diagnostics_revision,
-                "stale diagnostics batch ignored"
-            );
+        let PublishDiagnosticsBatch { freshness, touched_file_ids, tasks } = batch;
+        let current_freshness = self.diagnostic_publish_freshness();
+        if freshness != current_freshness {
+            tracing::debug!(?freshness, ?current_freshness, "stale diagnostics batch ignored");
             return;
         }
         let current_targets =
