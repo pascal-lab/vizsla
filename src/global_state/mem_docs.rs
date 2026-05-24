@@ -24,13 +24,17 @@ pub(crate) struct OpenDocument {
 struct OpenDocumentAlias {
     file_id: FileId,
     version: i32,
+    buffer_attached: bool,
 }
 
 // Files managed by client via textDocument/didOpen and textDocument/didClose.
 //
 // MemDocs keeps one analysis buffer per canonical FileId and one LSP document
 // version per open URI spelling. Multiple open URI aliases therefore share
-// text, but their version numbers remain URI-local.
+// text when their didOpen contents agree, but their version numbers remain
+// URI-local. An alias opened with divergent text is tracked for close/version
+// bookkeeping but is detached from the canonical analysis buffer; supporting
+// multiple unsaved alias buffers is a separate design.
 #[derive(Default, Clone)]
 pub(crate) struct MemDocs {
     buffers: FxHashMap<FileId, OpenBuffer>,
@@ -57,8 +61,10 @@ impl MemDocs {
             return true;
         }
 
-        if let Some(old_alias) =
-            self.open_paths.insert(path.clone(), OpenDocumentAlias { file_id, version })
+        let buffer_attached = self.buffers.get(&file_id).is_none_or(|buffer| buffer.data == data);
+        if let Some(old_alias) = self
+            .open_paths
+            .insert(path.clone(), OpenDocumentAlias { file_id, version, buffer_attached })
             && old_alias.file_id != file_id
         {
             self.reconcile_buffer_path(old_alias.file_id);
@@ -90,9 +96,13 @@ impl MemDocs {
         }
 
         let duplicate_buffer = self.buffers.remove(&from);
+        let attaches_to_existing_buffer = duplicate_buffer.as_ref().is_none_or(|buffer| {
+            self.buffers.get(&to).is_none_or(|existing| existing.data == buffer.data)
+        });
         for alias in self.open_paths.values_mut() {
             if alias.file_id == from {
                 alias.file_id = to;
+                alias.buffer_attached &= attaches_to_existing_buffer;
             }
         }
         if !self.buffers.contains_key(&to)
@@ -103,18 +113,34 @@ impl MemDocs {
         self.reconcile_buffer_path(to);
     }
 
-    pub(crate) fn text_mut_for_change(
+    pub(crate) fn text_for_change(&self, path: &VfsPath, file_id: FileId) -> Option<&str> {
+        let alias = self.open_paths.get(path)?;
+        if alias.file_id != file_id || !alias.buffer_attached {
+            return None;
+        }
+        self.text(file_id)
+    }
+
+    pub(crate) fn apply_change(
         &mut self,
         path: &VfsPath,
         file_id: FileId,
         version: i32,
-    ) -> Option<&mut String> {
-        let alias = self.open_paths.get_mut(path)?;
-        if alias.file_id != file_id {
-            return None;
+        data: Option<String>,
+    ) -> bool {
+        let Some(alias) = self.open_paths.get_mut(path) else {
+            return false;
+        };
+        if alias.file_id != file_id || !alias.buffer_attached {
+            return false;
         }
         alias.version = version;
-        self.buffers.get_mut(&file_id).map(|buffer| &mut buffer.data)
+        if let Some(data) = data
+            && let Some(buffer) = self.buffers.get_mut(&file_id)
+        {
+            buffer.data = data;
+        }
+        true
     }
 
     pub(crate) fn version(&self, file_id: FileId) -> Option<i32> {
@@ -122,11 +148,15 @@ impl MemDocs {
         self.version_for_path(path)
     }
 
+    pub(crate) fn text(&self, file_id: FileId) -> Option<&str> {
+        Some(self.buffers.get(&file_id)?.data.as_str())
+    }
+
     pub(crate) fn open_documents(&self, file_id: FileId) -> Vec<OpenDocument> {
         let mut documents = self
             .open_paths
             .iter()
-            .filter(|(_, alias)| alias.file_id == file_id)
+            .filter(|(_, alias)| alias.file_id == file_id && alias.buffer_attached)
             .map(|(path, alias)| OpenDocument { path: path.clone(), version: alias.version })
             .collect::<Vec<_>>();
         documents.sort_unstable_by(|lhs, rhs| lhs.path.cmp(&rhs.path));
@@ -150,14 +180,17 @@ impl MemDocs {
         else {
             return;
         };
-        if self.open_paths.get(&current_path).is_some_and(|alias| alias.file_id == file_id) {
+        if self
+            .open_paths
+            .get(&current_path)
+            .is_some_and(|alias| alias.file_id == file_id && alias.buffer_attached)
+        {
             return;
         }
 
-        let replacement_path = self
-            .open_paths
-            .iter()
-            .find_map(|(path, alias)| (alias.file_id == file_id).then(|| path.clone()));
+        let replacement_path = self.open_paths.iter().find_map(|(path, alias)| {
+            (alias.file_id == file_id && alias.buffer_attached).then(|| path.clone())
+        });
         match replacement_path {
             Some(path) => {
                 if let Some(buffer) = self.buffers.get_mut(&file_id) {
@@ -211,6 +244,11 @@ mod tests {
         assert_eq!(docs.file_id(&alias_path), Some(canonical));
         assert_eq!(docs.version_for_path(&canonical_path), Some(1));
         assert_eq!(docs.version_for_path(&alias_path), Some(2));
+        assert_eq!(docs.text_for_change(&alias_path, canonical), None);
+        assert_eq!(
+            docs.open_documents(canonical).into_iter().map(|doc| doc.path).collect::<Vec<_>>(),
+            vec![canonical_path]
+        );
     }
 
     #[test]
@@ -220,7 +258,7 @@ mod tests {
         let canonical = FileId(0);
         let mut docs = MemDocs::default();
         docs.insert(canonical, canonical_path.clone(), 1, "canonical text".to_owned());
-        docs.insert(canonical, alias_path.clone(), 2, "alias text".to_owned());
+        docs.insert(canonical, alias_path.clone(), 2, "canonical text".to_owned());
 
         assert!(docs.remove_path(&alias_path));
 
@@ -240,7 +278,7 @@ mod tests {
         let canonical = FileId(0);
         let mut docs = MemDocs::default();
         docs.insert(canonical, canonical_path.clone(), 1, "canonical text".to_owned());
-        docs.insert(canonical, alias_path.clone(), 2, "alias text".to_owned());
+        docs.insert(canonical, alias_path.clone(), 2, "canonical text".to_owned());
 
         assert!(docs.remove_path(&canonical_path));
 
@@ -263,8 +301,9 @@ mod tests {
         docs.insert(canonical, canonical_path.clone(), 1, "module top; endmodule\n".to_owned());
         docs.insert(canonical, alias_path.clone(), 7, "module top; endmodule\n".to_owned());
 
-        let data = docs.text_mut_for_change(&alias_path, canonical, 8).unwrap();
+        let mut data = docs.text_for_change(&alias_path, canonical).unwrap().to_owned();
         data.push_str("// alias edit\n");
+        assert!(docs.apply_change(&alias_path, canonical, 8, Some(data)));
 
         assert_eq!(
             docs.buffers.get(&canonical).unwrap().data,
@@ -273,6 +312,26 @@ mod tests {
         assert_eq!(docs.version_for_path(&canonical_path), Some(1));
         assert_eq!(docs.version_for_path(&alias_path), Some(8));
         assert_eq!(docs.version(canonical), Some(1));
+    }
+
+    #[test]
+    fn divergent_alias_open_is_detached_from_canonical_buffer() {
+        let canonical_path = VfsPath::new_virtual_path("/workspace/top.sv".to_owned());
+        let alias_path = VfsPath::new_virtual_path("/alias/top.sv".to_owned());
+        let canonical = FileId(0);
+        let mut docs = MemDocs::default();
+        docs.insert(canonical, canonical_path.clone(), 1, "canonical text".to_owned());
+        docs.insert(canonical, alias_path.clone(), 7, "alias text".to_owned());
+
+        assert_eq!(docs.version_for_path(&alias_path), Some(7));
+        assert_eq!(docs.file_id(&alias_path), Some(canonical));
+        assert_eq!(docs.text_for_change(&alias_path, canonical), None);
+        assert!(!docs.apply_change(&alias_path, canonical, 8, Some("new alias text".to_owned())));
+        assert_eq!(docs.buffers.get(&canonical).unwrap().data, "canonical text");
+        assert_eq!(
+            docs.open_documents(canonical).into_iter().map(|doc| doc.path).collect::<Vec<_>>(),
+            vec![canonical_path]
+        );
     }
 
     #[test]

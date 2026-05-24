@@ -253,6 +253,16 @@ impl Vfs {
         self.identities.file_path(file_id)
     }
 
+    /// Registers a path at the VFS identity boundary without changing file
+    /// contents.
+    ///
+    /// LSP open notifications use this to learn whether a URI aliases an
+    /// already-open analysis buffer before deciding whether the incoming text
+    /// should become the canonical VFS text.
+    pub fn register_file_ingress(&mut self, path: &VfsPath) -> FileId {
+        self.file_id_or_alloc(path)
+    }
+
     /// Returns the first path spelling recorded for this exact [`FileId`].
     ///
     /// Unlike [`Self::file_path`], this does not follow identity redirects.

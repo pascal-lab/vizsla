@@ -125,6 +125,9 @@ pub(crate) struct GlobalState {
     pub(crate) pending_document_diagnostic_targets: FxHashSet<FileId>,
     pub(crate) diagnostics_revision: u64,
     pub(crate) qihe_diagnostics: Arc<Mutex<FxHashMap<FileId, QiheDiagnosticState>>>,
+    // Only the latest Qihe run is allowed to commit diagnostics or logs.
+    pub(crate) qihe_run_generation: qihe::QiheRunId,
+    pub(crate) qihe_active_progress_token: Option<String>,
 
     pub(crate) vfs_loader: Handle<Box<dyn vfs::loader::Handle>, Receiver<vfs::loader::Message>>,
     pub(crate) vfs: Arc<RwLock<(Vfs, IntMap<FileId, LineEnding>)>>,
@@ -181,6 +184,8 @@ impl GlobalState {
             pending_document_diagnostic_targets: FxHashSet::default(),
             diagnostics_revision: 0,
             qihe_diagnostics: Arc::new(Mutex::new(FxHashMap::default())),
+            qihe_run_generation: qihe::QiheRunId::default(),
+            qihe_active_progress_token: None,
 
             vfs_loader,
             vfs: Arc::new(RwLock::new((Vfs::default(), IntMap::default()))),

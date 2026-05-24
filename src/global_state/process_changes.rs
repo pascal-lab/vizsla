@@ -201,7 +201,10 @@ impl GlobalState {
             })
             .collect();
 
-        self.publish_diagnostics_tasks(PublishDiagnosticsBatch::from_tasks(diagnostics), false);
+        self.publish_diagnostics_tasks(
+            PublishDiagnosticsBatch::from_tasks(diagnostics, self.diagnostics_revision),
+            false,
+        );
     }
 
     fn collect_changes(
@@ -308,8 +311,8 @@ impl GlobalState {
 
         let snapshot = self.make_snapshot();
         self.task_pool.handle.spawn_and_send(ThreadIntent::Worker, move || {
-            let touched_file_ids = files.iter().copied().collect();
             let mut results = Vec::with_capacity(files.len());
+            let mut touched_file_ids = FxHashSet::default();
             for file_id in files {
                 let targets = match snapshot.diagnostic_publish_targets(file_id) {
                     Ok(targets) => targets,
@@ -321,12 +324,17 @@ impl GlobalState {
                         continue;
                     }
                 };
+                touched_file_ids.insert(file_id);
                 let diagnostics = snapshot.lsp_diagnostics(file_id);
                 results.extend(targets.into_iter().map(|target| {
                     PublishDiagnosticsTask::from_target(target, diagnostics.clone())
                 }));
             }
-            Task::Diagnostics(PublishDiagnosticsBatch::for_touched_files(touched_file_ids, results))
+            Task::Diagnostics(PublishDiagnosticsBatch::for_touched_files(
+                touched_file_ids,
+                results,
+                snapshot.diagnostics_revision,
+            ))
         });
     }
 }
@@ -575,6 +583,11 @@ mod tests {
         let mut expected = vec![(source_uri.clone(), Some(3)), (alias_uri.clone(), Some(12))];
         expected.sort_unstable_by(|lhs, rhs| lhs.0.cmp(&rhs.0));
         assert_eq!(targets, expected);
+        assert_eq!(
+            &*state.make_snapshot().file_text(file_id).unwrap(),
+            "module top; endmodule\n",
+            "second open URI aliases the same FileId but must not replace the canonical analysis buffer"
+        );
         state.published_diagnostics.insert(
             DiagnosticPublishKey::for_test(file_id, alias_uri.clone()),
             vec![Diagnostic {

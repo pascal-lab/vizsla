@@ -14,7 +14,7 @@ use super::{
     GlobalState, VfsProgress,
     dispatcher::{NotifDispatcher, ReqDispatcher},
     handlers,
-    qihe::QiheUpdate,
+    qihe::{QiheRunId, QiheUpdate},
     reload::FetchWorkspaceProgress,
     respond::Progress,
     snapshot::DiagnosticPublishTarget,
@@ -107,7 +107,7 @@ mod tests {
     }
 
     fn publish_batch(tasks: Vec<PublishDiagnosticsTask>) -> PublishDiagnosticsBatch {
-        PublishDiagnosticsBatch::from_tasks(tasks)
+        PublishDiagnosticsBatch::from_tasks(tasks, 0)
     }
 
     #[test]
@@ -225,7 +225,11 @@ mod tests {
         assert!(!published.diagnostics.is_empty());
 
         state.publish_diagnostics_tasks(
-            PublishDiagnosticsBatch::for_touched_files(FxHashSet::from_iter([file_id]), Vec::new()),
+            PublishDiagnosticsBatch::for_touched_files(
+                FxHashSet::from_iter([file_id]),
+                Vec::new(),
+                0,
+            ),
             false,
         );
 
@@ -237,6 +241,50 @@ mod tests {
                 .published_diagnostics
                 .contains_key(&DiagnosticPublishKey::for_test(file_id, alias_uri))
         );
+    }
+
+    #[test]
+    fn stale_diagnostics_batch_does_not_publish() {
+        let root = TestDir::new("stale-diagnostics-batch");
+        let root_path = root.path().to_path_buf();
+        let config = Config::new(
+            Opt {
+                process_name: "vizsla-test".to_string(),
+                log: "error".to_string(),
+                log_filename: None,
+                profile_trace: None,
+            },
+            root_path.clone(),
+            lsp_types::ClientCapabilities::default(),
+            vec![root_path],
+            I18n::default(),
+            UserConfig::default(),
+            Vec::new(),
+        );
+        let (server, client) = Connection::memory();
+        let mut state = GlobalState::new(server.sender, config, lsp_types::TraceValue::Off);
+        state.diagnostics_revision = 2;
+        let file_id = FileId(0);
+        let uri =
+            to_proto::url_from_abs_path(root.write("workspace/top.sv", "").as_path()).unwrap();
+        let diagnostic = Diagnostic {
+            range: Range::new(Position::new(0, 0), Position::new(0, 1)),
+            severity: Some(DiagnosticSeverity::ERROR),
+            source: Some("test".to_owned()),
+            message: "stale diagnostic".to_owned(),
+            ..Diagnostic::default()
+        };
+
+        state.publish_diagnostics_tasks(
+            PublishDiagnosticsBatch::from_tasks(
+                vec![PublishDiagnosticsTask::for_test(file_id, uri, None, vec![diagnostic])],
+                1,
+            ),
+            false,
+        );
+
+        assert!(client.receiver.recv_timeout(Duration::from_millis(50)).is_err());
+        assert!(state.published_diagnostics.is_empty());
     }
 
     #[test]
@@ -272,14 +320,18 @@ pub(crate) struct PublishDiagnosticsTask {
 
 #[derive(Debug)]
 pub(crate) struct PublishDiagnosticsBatch {
+    diagnostics_revision: u64,
     touched_file_ids: FxHashSet<FileId>,
     tasks: Vec<PublishDiagnosticsTask>,
 }
 
 impl PublishDiagnosticsBatch {
-    pub(crate) fn from_tasks(tasks: Vec<PublishDiagnosticsTask>) -> Self {
+    pub(crate) fn from_tasks(
+        tasks: Vec<PublishDiagnosticsTask>,
+        diagnostics_revision: u64,
+    ) -> Self {
         let touched_file_ids = tasks.iter().map(|task| task.file_id).collect();
-        Self { touched_file_ids, tasks }
+        Self { diagnostics_revision, touched_file_ids, tasks }
     }
 
     /// Builds a diagnostics batch for files whose publish target set may have
@@ -290,8 +342,9 @@ impl PublishDiagnosticsBatch {
     pub(crate) fn for_touched_files(
         touched_file_ids: FxHashSet<FileId>,
         tasks: Vec<PublishDiagnosticsTask>,
+        diagnostics_revision: u64,
     ) -> Self {
-        Self { touched_file_ids, tasks }
+        Self { diagnostics_revision, touched_file_ids, tasks }
     }
 
     #[cfg(test)]
@@ -389,9 +442,9 @@ pub(crate) enum Task {
 
 #[derive(Debug)]
 pub(crate) enum QiheTask {
-    Log { token: String, message: String },
-    Finished { update: QiheUpdate, progress_token: String },
-    Failed { message: String, progress_token: String },
+    Log { run_id: QiheRunId, token: String, message: String },
+    Finished { run_id: QiheRunId, update: QiheUpdate, progress_token: String },
+    Failed { run_id: QiheRunId, message: String, progress_token: String },
 }
 
 impl Task {
@@ -445,13 +498,13 @@ impl QiheTask {
 
     fn summary(&self) -> String {
         match self {
-            QiheTask::Log { token, message } => {
+            QiheTask::Log { token, message, .. } => {
                 format!("task qihe log token={token} bytes={}", message.len())
             }
             QiheTask::Finished { progress_token, .. } => {
                 format!("task qihe finished token={progress_token}")
             }
-            QiheTask::Failed { progress_token, message } => {
+            QiheTask::Failed { progress_token, message, .. } => {
                 format!("task qihe failed token={progress_token} message={message}")
             }
         }
@@ -864,7 +917,15 @@ impl GlobalState {
         let mut published_files = 0usize;
         let mut published_diagnostics = 0usize;
         let mut skipped_files = 0usize;
-        let PublishDiagnosticsBatch { touched_file_ids, tasks } = batch;
+        let PublishDiagnosticsBatch { diagnostics_revision, touched_file_ids, tasks } = batch;
+        if diagnostics_revision != self.diagnostics_revision {
+            tracing::debug!(
+                diagnostics_revision,
+                current_diagnostics_revision = self.diagnostics_revision,
+                "stale diagnostics batch ignored"
+            );
+            return;
+        }
         let current_targets =
             tasks.iter().map(PublishDiagnosticsTask::cache_key).collect::<FxHashSet<_>>();
         let stale_targets = self

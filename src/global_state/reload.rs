@@ -101,7 +101,7 @@ impl GlobalState {
             return;
         };
 
-        if !errors.is_empty() && !self.workspaces.is_empty() {
+        if !errors.is_empty() {
             return;
         }
 
@@ -546,5 +546,33 @@ mod tests {
         state.switch_workspaces("failed reload".into());
 
         assert!(Arc::ptr_eq(&state.workspaces, &existing_workspaces));
+    }
+
+    #[test]
+    fn workspace_reload_errors_do_not_commit_partial_initial_model() {
+        let root = TestDir::new("workspace-reload-error-keeps-empty-model");
+        let root_path = root.path().to_path_buf();
+        std::fs::create_dir_all(root.join("rtl")).unwrap();
+        std::fs::write(root.join(project_manifest::MANIFEST_FILE_NAME), "sources = [\"rtl/**\"]\n")
+            .unwrap();
+        let manifest = ProjectManifest::from_path(&root_path).unwrap();
+        let (model, errors) = ProjectModel::load(vec![manifest]);
+        assert!(errors.is_empty(), "{errors:#?}");
+
+        let (mut state, _client) = test_state_with_root(root_path);
+        let initial_workspaces = Arc::clone(&state.workspaces);
+        assert!(state.workspaces.is_empty());
+
+        state.request_workspace_reload("test reload");
+        assert_eq!(state.fetch_workspaces_task.should_start().as_deref(), Some("test reload"));
+        state.fetch_workspaces_task.complete(Some((
+            Arc::new(model.workspaces),
+            vec![anyhow::anyhow!("failed to load dependency")],
+        )));
+
+        state.switch_workspaces("partial reload".into());
+
+        assert!(Arc::ptr_eq(&state.workspaces, &initial_workspaces));
+        assert!(state.workspaces.is_empty());
     }
 }
