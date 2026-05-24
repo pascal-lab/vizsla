@@ -34,6 +34,7 @@ export default defineConfig({
         },
       ],
       customCss: ['./src/assets/landing.css'],
+      disable404Route: true,
       sidebar: [
         'quick-start',
         'installation',
