@@ -37,7 +37,6 @@
   "configuration.diagnostics.slang.rules.markdownDescription": "Rules that filter or override diagnostic severities. Supported selectors: `code:<subsystem>:<code>`, `option:<name>`, `group:<name>`, `source:parse`, `source:semantic`.",
   "configuration.diagnostics.slang.rules.selector.markdownDescription": "Diagnostic selector. Examples: `code:1:2`, `option:unconnected-port`, `group:default`, `source:semantic`.",
   "configuration.diagnostics.slang.rules.severity.description": "Severity to apply when this rule matches. Use ignore to hide the diagnostic.",
-  "configuration.diagnostics.slang.rules.force.description": "Reserved for future support for overriding in-source diagnostic pragmas.",
   "configuration.signature.help.params.only.description": "Show signature help for parameters only.",
   "command.showOutput.title": "Vizsla: Show Language Server Output",
   "command.restartServer.title": "Vizsla: Restart Language Server",

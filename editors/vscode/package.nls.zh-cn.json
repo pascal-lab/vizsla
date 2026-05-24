@@ -37,7 +37,6 @@
   "configuration.diagnostics.slang.rules.markdownDescription": "过滤或覆盖诊断严重程度的规则。支持的选择器：`code:<subsystem>:<code>`、`option:<name>`、`group:<name>`、`source:parse`、`source:semantic`。",
   "configuration.diagnostics.slang.rules.selector.markdownDescription": "诊断选择器。示例：`code:1:2`、`option:unconnected-port`、`group:default`、`source:semantic`。",
   "configuration.diagnostics.slang.rules.severity.description": "此规则匹配时应用的严重程度。使用 ignore 可隐藏该诊断。",
-  "configuration.diagnostics.slang.rules.force.description": "预留给未来覆盖源代码内诊断 pragma 的支持。",
   "configuration.signature.help.params.only.description": "仅显示参数的签名帮助。",
   "command.showOutput.title": "Vizsla：显示语言服务器输出",
   "command.restartServer.title": "Vizsla：重启语言服务器",
