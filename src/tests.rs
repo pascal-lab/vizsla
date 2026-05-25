@@ -2608,6 +2608,153 @@ fn document_diagnostic_result_id_changes_when_dependency_changes() {
 }
 
 #[test]
+fn document_diagnostic_result_id_changes_when_include_dependency_changes() {
+    let pull_caps = ClientCapabilities {
+        text_document: Some(TextDocumentClientCapabilities {
+            diagnostic: Some(DiagnosticClientCapabilities::default()),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+    let temp_dir = TempDir::new("diagnostic-result-id-include-dependency");
+    let rtl_dir = temp_dir.path().join("rtl");
+    let include_dir = temp_dir.path().join("include");
+    fs::create_dir_all(&rtl_dir).unwrap();
+    fs::create_dir_all(&include_dir).unwrap();
+    fs::write(
+        temp_dir.path().join("vizsla_config.toml"),
+        "top_modules = [\"top\"]\nsources = [\"rtl/**\"]\ninclude_dirs = [\"include\"]\n",
+    )
+    .unwrap();
+    let header_path = include_dir.join("defs.svh");
+    fs::write(&header_path, "`define ENABLE_COUNTER 1\n").unwrap();
+    let top_text = "`include \"defs.svh\"\nmodule top;\n  logic enable;\n  always_comb enable = `ENABLE_COUNTER;\nendmodule\n";
+    let top_path = rtl_dir.join("top.sv");
+    fs::write(&top_path, top_text).unwrap();
+
+    let (client, server_thread) =
+        spawn_test_workspace(temp_dir.path().to_path_buf(), pull_caps, UserConfig::default());
+    let top_uri = to_proto::url_from_abs_path(top_path.as_path()).unwrap();
+    let header_uri = to_proto::url_from_abs_path(header_path.as_path()).unwrap();
+
+    let (first_result_id, first_items) = request_document_diagnostics(&client, top_uri.clone(), 1);
+    let first_result_id = first_result_id.expect("expected first diagnostic result id");
+    assert!(first_items.is_empty(), "fixture should start clean: {first_items:?}");
+
+    client
+        .sender
+        .send(Message::Notification(Notification::new(
+            DidOpenTextDocument::METHOD.to_string(),
+            DidOpenTextDocumentParams {
+                text_document: TextDocumentItem {
+                    uri: header_uri,
+                    language_id: "systemverilog".to_string(),
+                    version: 1,
+                    text: String::new(),
+                },
+            },
+        )))
+        .unwrap();
+
+    let (second_result_id, second_items) = request_document_diagnostics_with_previous_result_id(
+        &client,
+        top_uri,
+        2,
+        Some(first_result_id.clone()),
+    );
+    assert_ne!(
+        second_result_id.as_deref(),
+        Some(first_result_id.as_str()),
+        "include dependency edits must invalidate the dependent document result id"
+    );
+    assert!(
+        second_items.iter().any(|diag| diag.message.contains("expected")),
+        "dependent diagnostics should be recomputed from changed include text: {second_items:?}"
+    );
+
+    shutdown_test_server(&client, server_thread);
+}
+
+#[test]
+fn document_diagnostic_result_id_ignores_unrelated_profile_changes() {
+    let pull_caps = ClientCapabilities {
+        text_document: Some(TextDocumentClientCapabilities {
+            diagnostic: Some(DiagnosticClientCapabilities::default()),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+    let temp_dir = TempDir::new("diagnostic-result-id-profile-scope");
+    let app_a_dir = temp_dir.path().join("app_a");
+    let app_b_dir = temp_dir.path().join("app_b");
+    let app_a_rtl = app_a_dir.join("rtl");
+    let app_b_rtl = app_b_dir.join("rtl");
+    fs::create_dir_all(&app_a_rtl).unwrap();
+    fs::create_dir_all(&app_b_rtl).unwrap();
+    fs::write(
+        app_a_dir.join("vizsla_config.toml"),
+        "top_modules = [\"top_a\"]\nsources = [\"rtl/**\"]\ninclude_dirs = []\n",
+    )
+    .unwrap();
+    fs::write(
+        app_b_dir.join("vizsla_config.toml"),
+        "top_modules = [\"top_b\"]\nsources = [\"rtl/**\"]\ninclude_dirs = []\n",
+    )
+    .unwrap();
+    let app_a_text = "module top_a;\nendmodule\n";
+    let app_b_text = "module top_b;\nendmodule\n";
+    let app_a_path = app_a_rtl.join("top_a.sv");
+    let app_b_path = app_b_rtl.join("top_b.sv");
+    fs::write(&app_a_path, app_a_text).unwrap();
+    fs::write(&app_b_path, app_b_text).unwrap();
+
+    let (client, server_thread) =
+        spawn_test_workspace(temp_dir.path().to_path_buf(), pull_caps, UserConfig::default());
+    let app_a_uri = to_proto::url_from_abs_path(app_a_path.as_path()).unwrap();
+    let app_b_uri = to_proto::url_from_abs_path(app_b_path.as_path()).unwrap();
+    open_test_document(&client, app_a_uri.clone(), app_a_text);
+    open_test_document(&client, app_b_uri.clone(), app_b_text);
+
+    let (first_result_id, first_items) =
+        request_document_diagnostics(&client, app_a_uri.clone(), 1);
+    let first_result_id = first_result_id.expect("expected first diagnostic result id");
+    assert!(first_items.is_empty(), "fixture should start clean: {first_items:?}");
+
+    client
+        .sender
+        .send(Message::Notification(Notification::new(
+            DidChangeTextDocument::METHOD.to_string(),
+            DidChangeTextDocumentParams {
+                text_document: VersionedTextDocumentIdentifier { uri: app_b_uri, version: 2 },
+                content_changes: vec![TextDocumentContentChangeEvent {
+                    range: None,
+                    range_length: None,
+                    text: "module top_b;\n  logic unrelated;\nendmodule\n".to_string(),
+                }],
+            },
+        )))
+        .unwrap();
+
+    let (second_result_id, second_items) = request_document_diagnostics_with_previous_result_id(
+        &client,
+        app_a_uri,
+        2,
+        Some(first_result_id.clone()),
+    );
+    assert_eq!(
+        second_result_id.as_deref(),
+        Some(first_result_id.as_str()),
+        "edits in a different semantic profile must not invalidate this result id"
+    );
+    assert!(
+        second_items.is_empty(),
+        "unchanged diagnostic reports should not resend items: {second_items:?}"
+    );
+
+    shutdown_test_server(&client, server_thread);
+}
+
+#[test]
 fn legacy_publish_diagnostics_refreshes_dependent_open_files() {
     let mut user_config = UserConfig::default();
     user_config.diagnostics.update = DiagnosticsUpdateUserConfig::OnType;

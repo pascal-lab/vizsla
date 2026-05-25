@@ -15,7 +15,13 @@ use utils::{
 };
 use vfs::{FileId, Vfs, VfsPath};
 
-use super::{main_loop::DiagnosticPublishFreshness, mem_docs::MemDocs};
+use super::{
+    diagnostics::{
+        DiagnosticCommitFreshness, DiagnosticFileRevision, DiagnosticOwner,
+        DiagnosticPublishFreshness, DiagnosticSnapshotKey,
+    },
+    mem_docs::MemDocs,
+};
 use crate::{
     config::Config,
     global_state::QiheDiagnosticState,
@@ -61,8 +67,8 @@ pub(crate) struct GlobalStateSnapshot {
     // pub(crate) check_fixes: CheckFixes,
     pub(crate) sema_tokens_cache: Arc<Mutex<FxHashMap<Url, lsp_types::SemanticTokens>>>,
     pub(crate) qihe_diagnostics: Arc<Mutex<FxHashMap<FileId, QiheDiagnosticState>>>,
-    pub(crate) diagnostics_revision: u64,
     pub(crate) diagnostic_publish_freshness: DiagnosticPublishFreshness,
+    pub(crate) diagnostic_file_revisions: FxHashMap<FileId, DiagnosticFileRevision>,
     pub(crate) mem_docs: MemDocs,
     pub(crate) vfs: Arc<RwLock<(Vfs, IntMap<FileId, LineEnding>)>>,
     #[allow(dead_code)]
@@ -157,16 +163,22 @@ impl GlobalStateSnapshot {
         self.qihe_diagnostics
             .lock()
             .get(&file_id)
+            .filter(|state| state.freshness == self.diagnostic_commit_freshness())
             .map(|state| state.diagnostics.clone())
             .unwrap_or_default()
     }
 
     pub(crate) fn qihe_generation(&self, file_id: FileId) -> u64 {
-        self.qihe_diagnostics.lock().get(&file_id).map(|state| state.generation).unwrap_or(0)
+        self.qihe_diagnostics
+            .lock()
+            .get(&file_id)
+            .filter(|state| state.freshness == self.diagnostic_commit_freshness())
+            .map(|state| state.generation)
+            .unwrap_or(0)
     }
 
-    fn file_version(&self, file_id: FileId) -> Option<i32> {
-        self.mem_docs.version(file_id)
+    pub(crate) fn diagnostic_commit_freshness(&self) -> DiagnosticCommitFreshness {
+        self.diagnostic_publish_freshness.commit()
     }
 
     /// Returns a result id scoped to the URI that receives the diagnostics.
@@ -175,34 +187,47 @@ impl GlobalStateSnapshot {
     /// must not be derived from [`FileId`] alone.
     pub(crate) fn diagnostic_result_id(&self, file_id: FileId, target_uri: &Url) -> Option<String> {
         let diagnostics_config = self.config.diagnostics_config();
-        let file_ids = if diagnostics_config.semantic.enabled {
-            self.analysis.source_root_file_ids(file_id).ok()?
+        let source_root_id = self.analysis.source_root_id(file_id).ok()?;
+        let owner = if diagnostics_config.semantic.enabled
+            && let Some(profile_id) = self.analysis.file_compilation_profile(file_id).ok()?
+        {
+            DiagnosticOwner::SemanticProfile(profile_id)
+        } else if diagnostics_config.semantic.enabled
+            && self
+                .source_root_role(file_id)
+                .is_some_and(SourceRootRole::participates_in_semantic_profile)
+        {
+            DiagnosticOwner::SourceRoot(source_root_id)
         } else {
-            vec![file_id]
+            DiagnosticOwner::File(file_id)
         };
-        let target_document = self.url_file_version(target_uri).map_or_else(
-            || target_uri.as_str().to_owned(),
-            |version| format!("{}:{version}", target_uri.as_str()),
-        );
+        let file_ids = match owner {
+            DiagnosticOwner::SemanticProfile(profile_id) => {
+                self.analysis.compilation_profile_file_ids(profile_id).ok()?
+            }
+            DiagnosticOwner::SourceRoot(_) => self.analysis.source_root_file_ids(file_id).ok()?,
+            DiagnosticOwner::File(_) => vec![file_id],
+        };
+        let target_version = self.url_file_version(target_uri);
 
-        let mut versions = file_ids
+        let revisions = file_ids
             .into_iter()
-            .filter_map(|file_id| self.file_version(file_id).map(|version| (file_id.0, version)))
+            .map(|file_id| {
+                (file_id, self.diagnostic_file_revisions.get(&file_id).copied().unwrap_or_default())
+            })
             .collect::<Vec<_>>();
-
-        versions.sort_unstable();
-        let file_versions = versions
-            .into_iter()
-            .map(|(file_id, version)| format!("{file_id}:{version}"))
-            .collect::<Vec<_>>()
-            .join(",");
-        Some(format!(
-            "diag:{}:rev:{}:target:{}:{file_versions}:qihe:{}",
-            diagnostics_config.revision,
-            self.diagnostics_revision,
-            target_document,
-            self.qihe_generation(file_id)
-        ))
+        Some(
+            DiagnosticSnapshotKey::new(
+                owner,
+                self.diagnostic_publish_freshness.commit().readiness_revision(),
+                diagnostics_config.revision,
+                target_uri,
+                target_version,
+                revisions,
+                self.qihe_generation(file_id),
+            )
+            .result_id(),
+        )
     }
 
     pub(crate) fn source_root_file_ids(&self, file_id: FileId) -> Vec<FileId> {

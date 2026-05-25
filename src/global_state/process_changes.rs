@@ -59,6 +59,7 @@ impl GlobalState {
         let mut has_structure_changes = false; // Any file was added or deleted
         let mut bytes = vec![];
         let mut changed_file_ids = FxHashSet::default();
+        let mut content_changed_file_ids = FxHashSet::default();
         let mut deleted_file_ids = FxHashSet::default();
         let mut deleted_push_diagnostics = Vec::new();
         for changed_file in changed_files {
@@ -86,6 +87,7 @@ impl GlobalState {
                 }
             }
             changed_file_ids.insert(changed_file.file_id);
+            content_changed_file_ids.insert(changed_file.file_id);
             bytes.push(changed_file);
         }
         if self.config.user_config.diagnostics.update == DiagnosticsUpdateUserConfig::OnType {
@@ -100,6 +102,10 @@ impl GlobalState {
 
         self.analysis_host.apply_change(change);
         self.diagnostics_revision += 1;
+        for file_id in content_changed_file_ids {
+            let revision = self.diagnostic_file_revisions.entry(file_id).or_default();
+            *revision = revision.next();
+        }
         if diagnostic_targets_changed {
             self.diagnostic_target_revision += 1;
         }
@@ -216,10 +222,10 @@ impl GlobalState {
             })
             .collect();
 
-        self.publish_diagnostics_tasks(
-            PublishDiagnosticsBatch::from_tasks(diagnostics, self.diagnostic_publish_freshness()),
-            false,
-        );
+        self.publish_diagnostics_tasks(PublishDiagnosticsBatch::from_tasks(
+            diagnostics,
+            self.diagnostic_publish_freshness(),
+        ));
     }
 
     fn collect_changes(
@@ -659,7 +665,7 @@ mod tests {
         assert_eq!(batch.tasks()[0].file_id(), file_id);
         assert_eq!(batch.tasks()[0].uri(), &source_uri);
         assert_eq!(batch.tasks()[0].version(), Some(3));
-        state.publish_diagnostics_tasks(batch, false);
+        state.publish_diagnostics_tasks(batch);
         let message = client.receiver.recv_timeout(Duration::from_secs(1)).unwrap();
         let lsp_server::Message::Notification(notification) = message else {
             panic!("expected publishDiagnostics notification");
@@ -668,7 +674,7 @@ mod tests {
         let params: PublishDiagnosticsParams = serde_json::from_value(notification.params).unwrap();
         assert_eq!(params.uri, alias_uri);
         assert!(params.diagnostics.is_empty());
-        state.publish_diagnostics_tasks(stale_alias_batch, false);
+        state.publish_diagnostics_tasks(stale_alias_batch);
         assert!(
             client.receiver.recv_timeout(Duration::from_millis(50)).is_err(),
             "stale target batch must not republish diagnostics to a closed alias URI"
