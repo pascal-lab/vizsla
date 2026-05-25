@@ -1,4 +1,5 @@
 use rustc_hash::FxHashMap;
+use smol_str::SmolStr;
 use triomphe::Arc;
 use utils::{
     define_enum_deriving_from,
@@ -15,10 +16,10 @@ use crate::{
         expr::declarator::{DeclId, DeclaratorParent},
         file::{config::ConfigDeclId, library::LibraryDeclId, udp::UdpDeclId},
         module::{
-            ModuleId,
+            Module, ModuleId,
             generate::GenerateBlockId,
             instantiation::InstanceId,
-            port::{NonAnsiPortId, Ports},
+            port::{NonAnsiPortId, PortDeclId, Ports},
         },
         stmt::{StmtId, StmtKind},
         subroutine::{SubroutineId, SubroutineLoc, SubroutinePortId},
@@ -278,6 +279,22 @@ impl ModuleScope {
         }
 
         Arc::new(scope)
+    }
+
+    pub fn non_ansi_port_decl_id_by_name(
+        &self,
+        module: &Module,
+        name: &SmolStr,
+    ) -> Option<PortDeclId> {
+        let ModuleEntry::NonAnsiPortEntry(NonAnsiPortEntry { port_decl, .. }) = self.get(name)?
+        else {
+            return None;
+        };
+        let decl = module.get(port_decl?);
+        let DeclaratorParent::PortDeclId(port_decl_id) = decl.parent else {
+            return None;
+        };
+        Some(port_decl_id)
     }
 }
 
