@@ -47,13 +47,16 @@ When a workspace contains Verilog/SystemVerilog files but no manifest, VS Code c
 
 ```toml
 #:schema https://pascal-lab.github.io/vizsla/schemas/v1/vizsla.schema.json
-# Default startup manifest. Omitting sources enables best-effort indexing for navigation
-# without semantic diagnostics. Fill shell globs, for example sources = ["rtl/**"]
-# and include_dirs = ["include"], to enable semantic diagnostics.
-# Set sources = [] to disable workspace indexing.
+sources = []
+
+# include_dirs = ["include"]
+# defines = ["SYNTHESIS"]
+# top_modules = ["top"]
+# libraries = ["../common_cells"]
+# exclude = ["build/**"]
 ```
 
-This default manifest lets Vizsla index Verilog/SystemVerilog files under the workspace in best-effort mode for read-only features such as navigation and references. It does not create a compile profile or run cross-file semantic diagnostics. Set `sources = []` explicitly to disable workspace indexing and return to the lower-cost mode that only handles opened files. For more accurate semantic diagnostics, add `sources` shell globs or `include_dirs` that match your project structure, then add `defines`, `libraries`, or `top_modules` as needed.
+This default manifest explicitly sets `sources = []`, so it does not scan source files under the workspace, create a compile profile, or run cross-file semantic diagnostics. If a hand-written manifest omits `sources`, Vizsla indexes Verilog/SystemVerilog files under the workspace in best-effort mode for read-only features such as navigation and references, but still does not create a compile profile or run cross-file semantic diagnostics. For more accurate semantic diagnostics, add `sources` shell globs or `include_dirs` that match your project structure, then add `defines`, `libraries`, or `top_modules` as needed.
 
 Vizsla only reads the manifest to build the project model and refreshes project information after the manifest changes. The schema directive at the top is a TOML comment and does not affect how Vizsla reads the manifest. The schema URL includes a version segment. If the manifest format changes later, newer Vizsla versions can generate a directive pointing to a newer schema while existing projects keep their current schema.
 

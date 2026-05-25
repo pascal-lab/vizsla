@@ -15,22 +15,22 @@ description: 安装 Vizsla 扩展并确认核心 IDE 功能可用。
 
 ```toml
 #:schema https://pascal-lab.github.io/vizsla/schemas/v1/vizsla.schema.json
-# Default startup manifest. Omitting sources enables best-effort indexing for navigation
-# without semantic diagnostics. Fill shell globs, for example sources = ["rtl/**"]
-# and include_dirs = ["include"], to enable semantic diagnostics.
-# Set sources = [] to disable workspace indexing.
+sources = []
+
+# include_dirs = ["include"]
+# defines = ["SYNTHESIS"]
+# top_modules = ["top"]
+# libraries = ["../common_cells"]
+# exclude = ["build/**"]
 ```
 
-这个默认项目配置文件会索引 workspace 下的 Verilog/SystemVerilog 文件, 让跨文件跳转、引用等读能力开箱可用; 但不会建立编译 profile 或运行跨文件 semantic diagnostics。显式写入 `sources = []` 可关闭 workspace 索引。
+这个默认项目配置文件显式写入 `sources = []`, 因此不会扫描 workspace 下的源文件, 也不会建立编译 profile 或运行跨文件 semantic diagnostics。需要跨文件跳转、引用和语义诊断时, 请把 `sources` 改成符合工程结构的 shell glob, 例如 `sources = ["rtl/**"]`, 并按需补充 `include_dirs`, `defines`, `libraries` 或 `top_modules`。
 
 ## 3. 确认状态栏
 
-扩展激活后, 左侧状态栏会显示 Vizsla 服务器状态:
+扩展激活后, VS Code 右侧状态栏会出现名为 `Vizsla` 的状态项。状态项通常显示 `Vizsla`; 启动或停止时会带旋转图标, 项目配置缺失时会带 warning 图标, 服务器或项目配置失败时会带 error 图标。
 
-- `Vizsla Starting`: 正在启动。
-- `Vizsla Ready`: 服务器已启动。
-- `Vizsla Error`: 启动失败, 点击状态栏打开输出通道。
-- `Vizsla Stopped`: 服务器已停止。
+将鼠标悬停在状态项上可以查看当前详情。点击状态项, 或执行 `Vizsla: Show Status`, 会打开状态菜单; 这里可以打开或创建项目配置文件、重新加载项目配置、重启语言服务器、运行 diagnostics profiling, 或打开 `Vizsla Language Server` 输出通道。
 
 ## 4. 打开 Verilog/SystemVerilog 文件
 

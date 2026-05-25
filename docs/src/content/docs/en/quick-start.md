@@ -15,22 +15,22 @@ Open the directory that contains your RTL source code in VS Code. If there is no
 
 ```toml
 #:schema https://pascal-lab.github.io/vizsla/schemas/v1/vizsla.schema.json
-# Default startup manifest. Omitting sources enables best-effort indexing for navigation
-# without semantic diagnostics. Fill shell globs, for example sources = ["rtl/**"]
-# and include_dirs = ["include"], to enable semantic diagnostics.
-# Set sources = [] to disable workspace indexing.
+sources = []
+
+# include_dirs = ["include"]
+# defines = ["SYNTHESIS"]
+# top_modules = ["top"]
+# libraries = ["../common_cells"]
+# exclude = ["build/**"]
 ```
 
-This default manifest indexes Verilog/SystemVerilog files under the workspace so read-only features such as cross-file navigation and references work out of the box. It does not create a compile profile or run cross-file semantic diagnostics. Set `sources = []` explicitly to disable workspace indexing.
+This default manifest explicitly sets `sources = []`, so it does not scan source files under the workspace and does not create a compile profile or run cross-file semantic diagnostics. When you need cross-file navigation, references, and semantic diagnostics, change `sources` to shell globs that match your project, for example `sources = ["rtl/**"]`, then add `include_dirs`, `defines`, `libraries`, or `top_modules` as needed.
 
 ## 3. Check the Status Bar
 
-After the extension activates, the left side of the status bar shows the Vizsla server state:
+After the extension activates, the right side of the VS Code status bar shows a status item named `Vizsla`. It usually displays `Vizsla`; starting or stopping adds a spinner, a missing project manifest adds a warning icon, and server or project configuration failures add an error icon.
 
-- `Vizsla Starting`: the server is starting.
-- `Vizsla Ready`: the server has started.
-- `Vizsla Error`: startup failed. Click the status bar item to open the output channel.
-- `Vizsla Stopped`: the server has stopped.
+Hover over the status item to see the current detail. Click the status item, or run `Vizsla: Show Status`, to open the status menu. From there you can open or create the project manifest, reload project configuration, restart the language server, run diagnostics profiling, or open the `Vizsla Language Server` output channel.
 
 ## 4. Open a Verilog/SystemVerilog File
 

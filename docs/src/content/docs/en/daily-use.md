@@ -42,7 +42,7 @@ Diagnostics refresh on save by default. For large RTL projects, we recommend kee
 
 Diagnostics appear in the VS Code `Problems` panel and as editor underlines. Some quick fixes read stable data attached to diagnostics, so you usually need to see the relevant diagnostic before the corresponding code action appears.
 
-Semantic diagnostics require a loadable project configuration in `vizsla.toml` under the workspace root, such as real `sources` shell globs or `include_dirs`; `defines`, `libraries`, and `top_modules` can add more project information. The legacy `vizsla_config.toml` still works, but `vizsla.toml` wins when both files exist. If the manifest is missing or `sources` is omitted, Vizsla indexes the workspace root by default for read-only features such as navigation and references, but it does not run cross-file semantic diagnostics. Setting `sources = []` explicitly disables workspace indexing.
+Semantic diagnostics require a loadable project configuration in `vizsla.toml` under the workspace root, such as real `sources` shell globs or `include_dirs`; `defines`, `libraries`, and `top_modules` can add more project information. The legacy `vizsla_config.toml` still works, but `vizsla.toml` wins when both files exist. The default `vizsla.toml` created by VS Code sets `sources = []`, so it does not scan the workspace. If the server is started by another client without a manifest, or if a hand-written manifest omits `sources`, Vizsla enters best-effort workspace indexing for read-only features such as navigation and references, but it does not run cross-file semantic diagnostics.
 
 slang warning settings live under `vizsla.diagnostics.slang.*`. For warning names, warning groups, and `-W...` semantics, see the Diagnostics section in [VS Code Settings](./vscode-settings.md#diagnostics).
 
@@ -57,7 +57,7 @@ Vizsla provides both `Go to Definition` and `Go to Declaration`. In daily RTL re
 
 `Go to Declaration` falls back to definition logic when it cannot find a better declaration. When VS Code supports location links, Vizsla returns fuller source and target ranges; otherwise it returns normal locations.
 
-If the navigation result is unexpected, first check whether the project loaded the target file. Default indexing without a manifest is best-effort. In workspaces with duplicate module names, generated directories, or third-party libraries mixed in, it may return a result that does not match the actual compile configuration. For more complex layouts, configure `sources`, `include_dirs`, and `libraries` explicitly.
+If the navigation result is unexpected, first check whether the project loaded the target file. Indexing from omitted `sources`, or from a missing manifest outside the VS Code extension flow, is best-effort. In workspaces with duplicate module names, generated directories, or third-party libraries mixed in, it may return a result that does not match the actual compile configuration. For more complex layouts, configure `sources`, `include_dirs`, and `libraries` explicitly.
 
 ## Find References and Document Highlights
 
