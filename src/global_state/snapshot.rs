@@ -124,6 +124,10 @@ impl GlobalStateSnapshot {
         &self,
         file_id: FileId,
     ) -> Cancellable<Vec<ide::diagnostics::Diagnostic>> {
+        if !self.document_diagnostics_enabled(file_id) {
+            return Ok(Vec::new());
+        }
+
         let diagnostics = if self.config.diagnostics_config().semantic.enabled {
             self.analysis.diagnostics(file_id)?
         } else {
@@ -137,6 +141,10 @@ impl GlobalStateSnapshot {
         &self,
         file_id: FileId,
     ) -> anyhow::Result<Vec<lsp_types::Diagnostic>> {
+        if !self.document_diagnostics_enabled(file_id) {
+            return Ok(Vec::new());
+        }
+
         let diagnostics = self.diagnostics(file_id)?;
         let line_info = self.line_info(file_id)?;
         let mut diagnostics = diagnostics
@@ -232,7 +240,17 @@ impl GlobalStateSnapshot {
         let source_root_id = self.analysis.source_root_id(file_id).ok()?;
         let source_root_role = self.source_root_role(file_id)?;
         match source_root_role.diagnostic_scope() {
-            SourceRootDiagnosticScope::Disabled => return None,
+            SourceRootDiagnosticScope::Disabled => {
+                // Explicitly profiled workspaces treat ignored roots as outside
+                // the diagnostic model. A workspace with no compilation
+                // profiles still allows open-file syntax diagnostics.
+                if matches!(scope, DiagnosticRequestScope::Document)
+                    && !self.analysis.has_compilation_profiles().ok()?
+                {
+                    return Some(DiagnosticOwner::File(file_id));
+                }
+                return None;
+            }
             SourceRootDiagnosticScope::OpenFile => return Some(DiagnosticOwner::File(file_id)),
             SourceRootDiagnosticScope::Workspace => {}
         }
@@ -251,6 +269,10 @@ impl GlobalStateSnapshot {
         } else {
             Some(DiagnosticOwner::File(file_id))
         }
+    }
+
+    fn document_diagnostics_enabled(&self, file_id: FileId) -> bool {
+        self.diagnostic_owner(file_id, DiagnosticRequestScope::Document).is_some()
     }
 
     fn diagnostic_owner_file_ids(

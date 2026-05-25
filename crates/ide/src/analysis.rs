@@ -113,6 +113,10 @@ impl Analysis {
         self.with_db(|db| db.file_compilation_profile(file_id))
     }
 
+    pub fn has_compilation_profiles(&self) -> Cancellable<bool> {
+        self.with_db(|db| db.project_config().has_compilation_profiles())
+    }
+
     pub fn compilation_profile_file_ids(
         &self,
         profile_id: CompilationProfileId,

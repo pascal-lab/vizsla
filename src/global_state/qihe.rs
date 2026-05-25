@@ -273,18 +273,18 @@ impl GlobalState {
                     continue;
                 }
             };
-            touched_file_ids.insert(file_id);
             let diagnostics = match snapshot.lsp_diagnostics(file_id) {
                 Ok(diagnostics) => diagnostics,
                 Err(error) if error.is::<ide::Cancelled>() => {
                     tracing::debug!(?file_id, "qihe diagnostic publish cancelled");
-                    return;
+                    continue;
                 }
                 Err(error) => {
                     tracing::debug!(?file_id, "qihe diagnostic publish failed: {error:#}");
-                    Vec::new()
+                    continue;
                 }
             };
+            touched_file_ids.insert(file_id);
 
             publish_tasks.extend(
                 targets

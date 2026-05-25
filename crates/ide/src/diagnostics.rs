@@ -145,6 +145,17 @@ fn slang_diagnostic(
 }
 
 pub(crate) fn diagnostics(db: &RootDb, file_id: FileId) -> Vec<Diagnostic> {
+    let source_root_id = db.source_root_id(file_id);
+    // Ignored roots in a profiled workspace are explicitly outside the
+    // diagnostic model. Profile-less workspaces still use open-file syntax
+    // diagnostics for ad hoc files.
+    if db.source_root(source_root_id).role().diagnostic_scope()
+        == SourceRootDiagnosticScope::Disabled
+        && db.project_config().has_compilation_profiles()
+    {
+        return Vec::new();
+    }
+
     let mut diagnostics = if slang_semantic_diagnostics_active(db, file_id) {
         Vec::new()
     } else {
@@ -494,6 +505,22 @@ mod tests {
         assert!(
             diagnostics.iter().all(|diag| !diag.message.contains("port 'b' has no connection")),
             "unconfigured roots should not run semantic diagnostics: {diagnostics:?}"
+        );
+    }
+
+    #[test]
+    fn ignored_root_disables_document_diagnostics() {
+        let db = db_with_files_in_role(
+            &[("/ignored.sv", "module ignored(;\nendmodule\n")],
+            SourceRootRole::Ignored,
+            true,
+        );
+
+        let diagnostics = diagnostics(&db, FileId(0));
+
+        assert!(
+            diagnostics.is_empty(),
+            "ignored roots must not produce diagnostics: {diagnostics:?}"
         );
     }
 

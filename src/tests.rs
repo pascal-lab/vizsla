@@ -1493,6 +1493,47 @@ endmodule
 }
 
 #[test]
+fn document_diagnostics_respect_disabled_source_root_policy() {
+    let pull_caps = ClientCapabilities {
+        text_document: Some(TextDocumentClientCapabilities {
+            diagnostic: Some(DiagnosticClientCapabilities::default()),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+    let mut user_config = UserConfig::default();
+    user_config.diagnostics.semantic.enable = false;
+    let temp_dir = TempDir::new("disabled-root-document-diagnostics");
+    let ignored_dir = temp_dir.path().join("ignored");
+    let rtl_dir = temp_dir.path().join("rtl");
+    fs::create_dir_all(&ignored_dir).unwrap();
+    fs::create_dir_all(&rtl_dir).unwrap();
+    fs::write(
+        temp_dir.path().join("vizsla_config.toml"),
+        "sources = [\"rtl/**\"]\nexclude = [\"ignored/**\"]\n",
+    )
+    .unwrap();
+    let ignored_path = ignored_dir.join("ignored.sv");
+    let ignored_text = "module ignored(;\nendmodule\n";
+    fs::write(&ignored_path, ignored_text).unwrap();
+    fs::write(rtl_dir.join("top.sv"), "module top;\nendmodule\n").unwrap();
+
+    let (client, server_thread) =
+        spawn_test_workspace(temp_dir.path().to_path_buf(), pull_caps, user_config);
+    let ignored_uri = to_proto::url_from_abs_path(ignored_path.as_path()).unwrap();
+    open_test_document(&client, ignored_uri.clone(), ignored_text);
+
+    let (result_id, diagnostics) = request_document_diagnostics(&client, ignored_uri, 1);
+    assert!(result_id.is_none(), "disabled source roots should not receive result ids");
+    assert!(
+        diagnostics.is_empty(),
+        "disabled source roots must not leak parse diagnostics: {diagnostics:?}"
+    );
+
+    shutdown_test_server(&client, server_thread);
+}
+
+#[test]
 fn workspace_diagnostics_use_multi_file_semantic_context() {
     let pull_caps = ClientCapabilities {
         text_document: Some(TextDocumentClientCapabilities {
@@ -3094,6 +3135,67 @@ fn legacy_on_save_diagnostics_refresh_profile_dependents() {
     assert!(
         second_top_diags.is_empty(),
         "saving child.sv should refresh dependent top.sv diagnostics: {second_top_diags:?}"
+    );
+
+    shutdown_test_server(&client, server_thread);
+}
+
+#[test]
+fn legacy_on_save_watched_include_refreshes_profile_dependents() {
+    let mut user_config = UserConfig::default();
+    user_config.diagnostics.update = DiagnosticsUpdateUserConfig::OnSave;
+
+    let temp_dir = TempDir::new("legacy-watched-include-diagnostics");
+    let rtl_dir = temp_dir.path().join("rtl");
+    let include_dir = temp_dir.path().join("include");
+    fs::create_dir_all(&rtl_dir).unwrap();
+    fs::create_dir_all(&include_dir).unwrap();
+    fs::write(
+        temp_dir.path().join("vizsla_config.toml"),
+        "top_modules = [\"top\"]\nsources = [\"rtl/**\"]\ninclude_dirs = [\"include\"]\n",
+    )
+    .unwrap();
+    let header_path = include_dir.join("ports.svh");
+    fs::write(&header_path, "`define CHILD_PORTS input logic a, input logic b\n").unwrap();
+    fs::write(
+        rtl_dir.join("child.sv"),
+        "`include \"ports.svh\"\nmodule child(`CHILD_PORTS);\nendmodule\n",
+    )
+    .unwrap();
+    let top_path = rtl_dir.join("top.sv");
+    let top_text = "module top;\n  logic sig;\n  child u(.a(sig));\nendmodule\n";
+    fs::write(&top_path, top_text).unwrap();
+
+    let (client, server_thread) = spawn_test_workspace(
+        temp_dir.path().to_path_buf(),
+        ClientCapabilities::default(),
+        user_config,
+    );
+    let top_uri = to_proto::url_from_abs_path(top_path.as_path()).unwrap();
+    let header_uri = to_proto::url_from_abs_path(header_path.as_path()).unwrap();
+    open_test_document(&client, top_uri.clone(), top_text);
+
+    let first_top_diags = recv_publish_diagnostics_for_uri(&client, &top_uri);
+    assert!(
+        first_top_diags.iter().any(|diag| diag.message.contains("port 'b' has no connection")),
+        "expected initial top.sv missing port diagnostic: {first_top_diags:?}"
+    );
+
+    fs::write(&header_path, "`define CHILD_PORTS input logic a\n").unwrap();
+    client
+        .sender
+        .send(Message::Notification(Notification::new(
+            DidChangeWatchedFiles::METHOD.to_string(),
+            lsp_types::DidChangeWatchedFilesParams {
+                changes: vec![FileEvent::new(header_uri, FileChangeType::CHANGED)],
+            },
+        )))
+        .unwrap();
+
+    let second_top_diags = recv_publish_diagnostics_for_uri(&client, &top_uri);
+    assert!(
+        second_top_diags.is_empty(),
+        "watched include changes should refresh dependent top.sv diagnostics: {second_top_diags:?}"
     );
 
     shutdown_test_server(&client, server_thread);

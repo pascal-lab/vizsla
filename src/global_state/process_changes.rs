@@ -360,22 +360,18 @@ impl GlobalState {
                         continue;
                     }
                 };
-                touched_file_ids.insert(file_id);
                 let diagnostics = match snapshot.lsp_diagnostics(file_id) {
                     Ok(diagnostics) => diagnostics,
                     Err(error) if error.is::<ide::Cancelled>() => {
                         tracing::debug!(?file_id, "diagnostics computation cancelled");
-                        return Task::Diagnostics(PublishDiagnosticsBatch::for_touched_files(
-                            FxHashSet::default(),
-                            Vec::new(),
-                            snapshot.diagnostic_publish_freshness,
-                        ));
+                        continue;
                     }
                     Err(error) => {
                         tracing::debug!(?file_id, "diagnostics computation failed: {error:#}");
-                        Vec::new()
+                        continue;
                     }
                 };
+                touched_file_ids.insert(file_id);
                 results.extend(targets.into_iter().map(|target| {
                     PublishDiagnosticsTask::from_target(target, diagnostics.clone())
                 }));
