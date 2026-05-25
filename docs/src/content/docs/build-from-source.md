@@ -21,6 +21,22 @@ description: 从源码构建 Vizsla 服务器、VS Code 扩展和本地 VSIX。
 不需要预先安装系统级 `slang` 命令。Vizsla 使用仓库内 vendored slang 源码，
 服务器构建和 VSIX 打包时都会随 Rust 服务器一起编译它。
 
+## 环境要求
+
+从源码构建 Vizsla 时, `cargo build` 会通过 Rust build script 编译仓库内的
+`crates/slang`, 因此除了 Rust 之外还需要能编译 slang 的 C++ 环境:
+
+- Rust 工具链和 Cargo。
+- CMake 3.20 或更新版本。
+- Python interpreter, 供 slang 的 CMake 配置阶段使用。
+- 支持 C++20 的 C++ 编译器。Windows 建议安装 Visual Studio 2022 Build Tools,
+  并选择 "Desktop development with C++" 组件; Linux/macOS 建议使用较新的
+  GCC 或 Clang, 其中 slang 至少需要 GCC 10 级别的 C++20 支持。
+- Node.js 和 npm, 用于构建 VS Code 扩展与打包 VSIX。
+
+不需要预先安装系统级 `slang` 命令。Vizsla 使用仓库内 vendored slang 源码,
+服务器构建和 VSIX 打包时都会随 Rust 服务器一起编译它。
+
 ## 构建 Rust 服务器
 
 在仓库根目录运行：
