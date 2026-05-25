@@ -85,8 +85,6 @@ pub(crate) struct SlangDiagnosticsUserConfig {
 pub(crate) struct DiagnosticRuleUserConfig {
     pub(crate) selector: String,
     pub(crate) severity: DiagnosticRuleSeverityUserConfig,
-    #[serde(default)]
-    pub(crate) force: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
@@ -247,7 +245,6 @@ impl DiagnosticRuleUserConfig {
         Some(DiagnosticRule {
             selector: parse_selector(&self.selector)?,
             severity: self.severity.into(),
-            force: self.force,
         })
     }
 }
@@ -379,6 +376,13 @@ fn parses_nested_diagnostics_config() {
     assert!(!config.semantic.enabled);
     assert_eq!(config.slang.warnings, ["default", "no-unused"]);
     assert_eq!(config.slang.rules.len(), 2);
+    assert_eq!(
+        config.slang.rules[1],
+        DiagnosticRule {
+            selector: DiagnosticSelector::Code { subsystem: 1, code: 2 },
+            severity: DiagnosticRuleSeverity::Error,
+        }
+    );
 }
 
 #[test]

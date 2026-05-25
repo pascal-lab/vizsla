@@ -31,11 +31,11 @@ test('renders concise diagnostic selector labels', () => {
 test('upserts diagnostic severity rules by selector', () => {
   assert.deepEqual(
     upsertDiagnosticRule(
-      [{ selector: 'code:6:129', severity: 'error', force: true }],
+      [{ selector: 'code:6:129', severity: 'error' }],
       'code:6:129',
       'warning',
     ),
-    [{ selector: 'code:6:129', severity: 'warning', force: true }],
+    [{ selector: 'code:6:129', severity: 'warning' }],
   );
 
   assert.deepEqual(upsertDiagnosticRule([], 'code:2:260', 'ignore'), [

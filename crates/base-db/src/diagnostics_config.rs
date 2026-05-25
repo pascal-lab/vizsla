@@ -28,7 +28,6 @@ pub struct SlangDiagnosticsConfig {
 pub struct DiagnosticRule {
     pub selector: DiagnosticSelector,
     pub severity: DiagnosticRuleSeverity,
-    pub force: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -133,7 +132,6 @@ mod tests {
                 rules: vec![DiagnosticRule {
                     selector: DiagnosticSelector::Source(DiagnosticSource::Parse),
                     severity: DiagnosticRuleSeverity::Ignore,
-                    force: false,
                 }],
             },
             ..DiagnosticsConfig::default()

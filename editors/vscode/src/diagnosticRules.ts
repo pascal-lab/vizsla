@@ -3,7 +3,6 @@ export type DiagnosticRuleSeverity = 'ignore' | 'info' | 'warning' | 'error' | '
 export interface DiagnosticRule {
   selector: string;
   severity: DiagnosticRuleSeverity;
-  force?: boolean;
 }
 
 export type DiagnosticRuleTarget = 'user' | 'workspace';

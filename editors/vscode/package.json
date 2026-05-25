@@ -321,11 +321,6 @@
                   "fatal"
                 ],
                 "description": "%configuration.diagnostics.slang.rules.severity.description%"
-              },
-              "force": {
-                "type": "boolean",
-                "default": false,
-                "description": "%configuration.diagnostics.slang.rules.force.description%"
               }
             },
             "additionalProperties": false

@@ -14,6 +14,8 @@ type PackageJson = {
   };
 };
 
+type JsonObject = Record<string, unknown>;
+
 function readJson<T>(fileName: string): T {
   return JSON.parse(fs.readFileSync(path.join(__dirname, '..', fileName), 'utf8')) as T;
 }
@@ -26,6 +28,13 @@ function readConfigurationProperties(): Record<string, unknown> {
   const packageJson = readPackageJson();
 
   return packageJson.contributes?.configuration?.properties ?? {};
+}
+
+function asObject(value: unknown): JsonObject {
+  assert.equal(typeof value, 'object');
+  assert.notEqual(value, null);
+
+  return value as JsonObject;
 }
 
 function collectNlsPlaceholders(value: unknown, keys = new Set<string>()): Set<string> {
@@ -119,6 +128,15 @@ test('does not expose the old vizslaLsp settings namespace', () => {
   const oldSettings = Object.keys(properties).filter((key) => key.startsWith('vizslaLsp.'));
 
   assert.deepEqual(oldSettings, []);
+});
+
+test('does not expose inactive diagnostic rule options', () => {
+  const properties = readConfigurationProperties();
+  const rules = asObject(properties['vizsla.diagnostics.slang.rules']);
+  const items = asObject(rules.items);
+  const itemProperties = asObject(items.properties);
+
+  assert.equal('force' in itemProperties, false);
 });
 
 test('localizes package contribution strings for English and Simplified Chinese', () => {
