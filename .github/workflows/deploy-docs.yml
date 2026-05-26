@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
   release:
     types: [published]
-  pull_request_target:
+  issues:
     types: [closed]
 
 permissions:
@@ -226,8 +226,9 @@ jobs:
   cleanup-preview:
     name: Remove closed PR preview
     if: >
-      github.event_name == 'pull_request_target' &&
+      github.event_name == 'issues' &&
       github.event.action == 'closed' &&
+      github.event.issue.pull_request != null &&
       vars.ENABLE_DOCS_DEPLOY == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -259,7 +260,7 @@ jobs:
       - name: Delete preview from OSS
         env:
           OSS_BUCKET_NAME: ${{ secrets.bucketName }}
-          PREVIEW_PATH: preview/pr-${{ github.event.pull_request.number }}/
+          PREVIEW_PATH: preview/pr-${{ github.event.issue.number }}/
         run: |
           set -euo pipefail
 
@@ -268,4 +269,13 @@ jobs:
             exit 1
           fi
 
+          case "${PREVIEW_PATH}" in
+            preview/pr-[0-9]*/) ;;
+            *)
+              echo "Invalid preview path: ${PREVIEW_PATH}"
+              exit 1
+              ;;
+          esac
+
           ossutil rm "oss://${OSS_BUCKET_NAME}/${PREVIEW_PATH}" -rf || true
+          echo "Removed ${PREVIEW_PATH}" >> "${GITHUB_STEP_SUMMARY}"
