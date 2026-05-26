@@ -15,10 +15,6 @@ pub(super) fn add_instance_parens(
     collector: &mut CodeActionCollector,
     ctx: &CodeActionCtx,
 ) -> Option<()> {
-    if !ctx.allows_repair(RepairKind::AddInstanceParens) {
-        return None;
-    }
-
     let token = ctx.syntax().token_before_offset(ctx.range().end())?;
     if !token.kind().name_like() || token.text_range()?.end() != ctx.range().end() {
         return None;
