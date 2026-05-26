@@ -68,8 +68,8 @@ export default defineConfig({
           ],
         },
         {
-          label: '进阶用法',
-          translations: { en: 'Advanced Usage' },
+          label: '进阶',
+          translations: { en: 'Advanced' },
           items: [
             'advanced-guide',
             'advanced-guide/advanced-installation',

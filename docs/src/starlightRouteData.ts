@@ -5,7 +5,7 @@ type SidebarLink = Extract<SidebarEntry, { type: 'link' }>;
 
 const sectionLabels = {
   'user-guide': new Set(['用户手册', 'User Guide']),
-  'advanced-guide': new Set(['进阶用法', 'Advanced Usage']),
+  'advanced-guide': new Set(['进阶', 'Advanced']),
   changelog: new Set(['Changelog']),
   playground: new Set(['Playground']),
 } as const;
