@@ -5,13 +5,13 @@ description: 按状态栏、启动、Qihe、诊断、项目扫描和文件监听
 
 这页按症状处理问题。先确认扩展是否正常启动时，用 [当扩展无法正常启动](./check-server.md)；查命令、状态项和输出通道入口时，用 [操作参考](./commands-status-logs.md)。
 
-## `Vizsla` 状态栏显示错误或警告
+## `Vide` 状态栏显示错误或警告
 
-点击 `Vizsla` 状态项打开状态菜单。项目配置错误会显示在菜单顶部；也可以选择显示输出，或执行 `Vizsla：显示语言服务器输出`。
+点击 `Vide` 状态项打开状态菜单。项目配置错误会显示在菜单顶部；也可以选择显示输出，或执行 `Vide：显示语言服务器输出`。
 
 优先看这些输出：
 
-- `Bundled Vizsla Language Server binary not found`
+- `Bundled Vide Language Server binary not found`
 - `Unsupported platform-architecture combination`
 - `Failed to start language server`
 - `Server command`
@@ -38,7 +38,7 @@ npm run package:debug
 }
 ```
 
-保存后选择提示里的 `重启`，或执行 `Vizsla：重启语言服务器`。
+保存后选择提示里的 `重启`，或执行 `Vide：重启语言服务器`。
 
 ## 自定义启动命令、参数或工作目录启动失败
 
@@ -62,7 +62,7 @@ npm run package:debug
 
 ## Qihe 命令不可用或按钮没有效果
 
-`Vizsla：运行 Qihe 分析` 只对本地 Verilog/SystemVerilog 文件可用。目标必须是 `file:` URI，扩展名必须是 `.v`、`.vh`、`.sv`、`.svh` 或 `.svi`。
+`Vide：运行 Qihe 分析` 只对本地 Verilog/SystemVerilog 文件可用。目标必须是 `file:` URI，扩展名必须是 `.v`、`.vh`、`.sv`、`.svh` 或 `.svi`。
 
 如果 Qihe 进程无法启动：
 
@@ -72,9 +72,9 @@ npm run package:debug
 
 ## Qihe 分析失败
 
-运行 Qihe 时会出现独立的 `Qihe` 状态项。失败后点击该状态项会打开 `Vizsla Qihe` 输出通道；错误通知里的 `显示 Qihe 输出` 也会打开同一通道。
+运行 Qihe 时会出现独立的 `Qihe` 状态项。失败后点击该状态项会打开 `Vide Qihe` 输出通道；错误通知里的 `显示 Qihe 输出` 也会打开同一通道。
 
-在 `Vizsla Qihe` 中检查目标文件、Qihe 的编译和运行参数、Qihe 输出以及最后的失败信息。Qihe 参数默认会从当前项目配置文件推导；已经由脚本管理参数的工程，可以在 [VS Code 设置](./vscode-settings.md#qihe) 中关闭自动推导并显式配置编译和运行参数。
+在 `Vide Qihe` 中检查目标文件、Qihe 的编译和运行参数、Qihe 输出以及最后的失败信息。Qihe 参数默认会从当前项目配置文件推导；已经由脚本管理参数的工程，可以在 [VS Code 设置](./vscode-settings.md#qihe) 中关闭自动推导并显式配置编译和运行参数。
 
 ## 诊断太频繁或不更新
 
@@ -88,11 +88,11 @@ npm run package:debug
 }
 ```
 
-如果诊断不更新，先保存文件，再执行 `Vizsla：重新加载项目配置`。如果仍然不更新，执行 `Vizsla：重启语言服务器` 并查看项目配置错误。
+如果诊断不更新，先保存文件，再执行 `Vide：重新加载项目配置`。如果仍然不更新，执行 `Vide：重启语言服务器` 并查看项目配置错误。
 
 ## 实例端口或参数报错
 
-如果 `Problems` 面板提示实例连接或参数有问题，先把光标放到对应实例附近，打开灯泡菜单。Vizsla 目前支持这些场景：
+如果 `Problems` 面板提示实例连接或参数有问题，先把光标放到对应实例附近，打开灯泡菜单。Vide 目前支持这些场景：
 
 - 端口没有接全：使用 `补全连接`。
 - 参数没有值：使用 `补全参数`。
@@ -101,11 +101,11 @@ npm run package:debug
 - 写了 `.port` 但缺少 `()`：使用 `添加显式空端口连接`。
 - 实例完全没有端口列表：使用 `添加空实例端口列表`。
 
-如果灯泡里没有这些操作，先确认目标模块能被 Vizsla 找到。最直接的检查方式是在实例模块名上执行 `Go to Definition`：跳不过去时，优先修正 `sources`、`include_dirs`、`defines` 或 `libraries`。Vizsla 当前不会自动修复找不到模块、找不到 include 或 import 解析失败这类问题。
+如果灯泡里没有这些操作，先确认目标模块能被 Vide 找到。最直接的检查方式是在实例模块名上执行 `Go to Definition`：跳不过去时，优先修正 `sources`、`include_dirs`、`defines` 或 `libraries`。Vide 当前不会自动修复找不到模块、找不到 include 或 import 解析失败这类问题。
 
 ## 想隐藏或降低某类诊断
 
-把光标放在对应诊断位置，打开灯泡菜单。对于带有可识别诊断代码的 slang 诊断，Vizsla 会提供写入用户设置或工作区设置的快速修复，例如忽略此类诊断，或把错误降级为警告。
+把光标放在对应诊断位置，打开灯泡菜单。对于带有可识别诊断代码的 slang 诊断，Vide 会提供写入用户设置或工作区设置的快速修复，例如忽略此类诊断，或把错误降级为警告。
 
 如果灯泡里没有这些选项，可以手动编辑 `vizsla.diagnostics.slang.rules`。规则写法见 [VS Code 设置](./vscode-settings.md#diagnostics)。
 
@@ -124,7 +124,7 @@ npm run package:debug
 
 目录末尾加不加 `/` 要分场景看：`include_dirs = ["include"]` 和 `include_dirs = ["include/"]` 都是在写 include 搜索目录，文档里统一推荐不带 `/`；但 `sources = ["rtl"]` 和 `sources = ["rtl/"]` 都不是“递归扫描 `rtl` 下所有文件”的写法，想扫目录请写 `sources = ["rtl/**"]`。
 
-扩展创建的默认 `vizsla.toml` 会写入 `sources = []`；需要索引项目时，请写入实际 `sources` 路径模式，并按需补充 `include_dirs`、`defines`、`libraries` 或 `top_modules`。手写配置省略 `sources` 时，Vizsla 会尽力扫描工作区，方便基础跳转和阅读，但不会启用完整的跨文件诊断视图。
+扩展创建的默认 `vizsla.toml` 会写入 `sources = []`；需要索引项目时，请写入实际 `sources` 路径模式，并按需补充 `include_dirs`、`defines`、`libraries` 或 `top_modules`。手写配置省略 `sources` 时，Vide 会尽力扫描工作区，方便基础跳转和阅读，但不会启用完整的跨文件诊断视图。
 
 ## include 或宏没有生效
 
@@ -135,7 +135,7 @@ defines = ["SYNTHESIS", "WIDTH=32"]
 include_dirs = ["include", "rtl"]
 ```
 
-如果显式写了 `include_dirs = []`，Vizsla 不会回退到 `sources`。
+如果显式写了 `include_dirs = []`，Vide 不会回退到 `sources`。
 
 ## 格式化没有结果或失败
 

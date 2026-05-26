@@ -5,13 +5,13 @@ description: Troubleshoot status bar, startup, Qihe, diagnostics, project scanni
 
 This page starts from symptoms. To confirm whether the server can launch, use [Server Self-Check Flow](./check-server.md). For command, status item, and output channel entry points, use the [operations reference](./commands-status-logs.md).
 
-## `Vizsla` Status Bar Shows Error or Warning
+## `Vide` Status Bar Shows Error or Warning
 
-Click the `Vizsla` status item to open the status menu. Project configuration errors appear at the top of that menu; you can also choose `Show Output` or run `Vizsla: Show Language Server Output`.
+Click the `Vide` status item to open the status menu. Project configuration errors appear at the top of that menu; you can also choose `Show Output` or run `Vide: Show Language Server Output`.
 
 Focus on these output lines:
 
-- `Bundled Vizsla Language Server binary not found`
+- `Bundled Vide Language Server binary not found`
 - `Unsupported platform-architecture combination`
 - `Failed to start language server`
 - `Server command`
@@ -62,7 +62,7 @@ Example:
 
 ## Qihe Command Is Unavailable or the Button Does Nothing
 
-`Vizsla: Run Qihe Analysis` is available only for local Verilog/SystemVerilog files. The target must be a `file:` URI whose extension is `.v`, `.vh`, `.sv`, `.svh`, or `.svi`.
+`Vide: Run Qihe Analysis` is available only for local Verilog/SystemVerilog files. The target must be a `file:` URI whose extension is `.v`, `.vh`, `.sv`, `.svh`, or `.svi`.
 
 If the Qihe process cannot start:
 
@@ -72,9 +72,9 @@ If the Qihe process cannot start:
 
 ## Qihe Analysis Fails
 
-While Qihe runs, a separate `Qihe` status item appears. After a failure, clicking that status item opens the `Vizsla Qihe` output channel; the `Show Qihe Output` action in the error notification opens the same channel.
+While Qihe runs, a separate `Qihe` status item appears. After a failure, clicking that status item opens the `Vide Qihe` output channel; the `Show Qihe Output` action in the error notification opens the same channel.
 
-In `Vizsla Qihe`, check the target file, Qihe compile/run arguments, Qihe output, and final failure details. Qihe arguments are derived from the current project manifest by default; projects that already manage those arguments through scripts can disable automatic derivation and configure compile/run arguments explicitly in [VS Code Settings](./vscode-settings.md#qihe).
+In `Vide Qihe`, check the target file, Qihe compile/run arguments, Qihe output, and final failure details. Qihe arguments are derived from the current project manifest by default; projects that already manage those arguments through scripts can disable automatic derivation and configure compile/run arguments explicitly in [VS Code Settings](./vscode-settings.md#qihe).
 
 ## Diagnostics Are Too Frequent or Stale
 
@@ -88,11 +88,11 @@ If you need diagnostics while editing:
 }
 ```
 
-If diagnostics do not update, save the file first, then run `Vizsla: Reload Project Configuration`. If they still do not update, run `Vizsla: Restart Language Server` and check for project configuration errors.
+If diagnostics do not update, save the file first, then run `Vide: Reload Project Configuration`. If they still do not update, run `Vide: Restart Language Server` and check for project configuration errors.
 
 ## Instance Ports or Parameters Report Errors
 
-If the `Problems` panel reports instance connection or parameter problems, place the cursor near the instance and open the lightbulb menu. Vizsla currently supports these cases:
+If the `Problems` panel reports instance connection or parameter problems, place the cursor near the instance and open the lightbulb menu. Vide currently supports these cases:
 
 - Missing port connections: use `Fill connections`.
 - Parameters without values: use `Fill parameters`.
@@ -101,11 +101,11 @@ If the `Problems` panel reports instance connection or parameter problems, place
 - A `.port` shorthand missing explicit `()`: use `Add explicit empty port connection`.
 - An instance with no port list: use `Add empty instance port list`.
 
-If these actions are missing, confirm that Vizsla can resolve the target module first. A direct check is `Go to Definition` on the instance module name. If that does not jump, fix `sources`, `include_dirs`, `defines`, or `libraries` first. Vizsla currently does not provide a dedicated automatic fix for unresolved modules, missing includes, or unresolved imports.
+If these actions are missing, confirm that Vide can resolve the target module first. A direct check is `Go to Definition` on the instance module name. If that does not jump, fix `sources`, `include_dirs`, `defines`, or `libraries` first. Vide currently does not provide a dedicated automatic fix for unresolved modules, missing includes, or unresolved imports.
 
 ## You Want to Hide or Downgrade a Diagnostic Type
 
-Place the cursor on the diagnostic and open the lightbulb menu. For slang diagnostics with an identifiable code, Vizsla provides quick fixes that write a rule to user or workspace settings, such as ignoring that diagnostic type or downgrading an error to a warning.
+Place the cursor on the diagnostic and open the lightbulb menu. For slang diagnostics with an identifiable code, Vide provides quick fixes that write a rule to user or workspace settings, such as ignoring that diagnostic type or downgrading an error to a warning.
 
 If those actions are not available, edit `vizsla.diagnostics.slang.rules` manually. See [VS Code Settings](./vscode-settings.md#diagnostics) for the rule format.
 
@@ -124,7 +124,7 @@ These path patterns use glob syntax with `*` and `**`: `*` does not cross direct
 
 Trailing `/` depends on the field. `include_dirs = ["include"]` and `include_dirs = ["include/"]` both describe an include search directory, and the docs prefer the version without `/`. But `sources = ["rtl/"]` is not the recursive “all files under `rtl`” pattern; use `sources = ["rtl/**"]` for that.
 
-The default `vizsla.toml` created by the extension writes `sources = []`. To index project files, add real `sources` patterns and add `include_dirs`, `defines`, `libraries`, or `top_modules` as needed. If a hand-written manifest omits `sources`, Vizsla scans the workspace as a best effort for basic reading and navigation, but it does not enable the full cross-file diagnostics view.
+The default `vizsla.toml` created by the extension writes `sources = []`. To index project files, add real `sources` patterns and add `include_dirs`, `defines`, `libraries`, or `top_modules` as needed. If a hand-written manifest omits `sources`, Vide scans the workspace as a best effort for basic reading and navigation, but it does not enable the full cross-file diagnostics view.
 
 ## Includes or Macros Do Not Work
 
@@ -135,7 +135,7 @@ defines = ["SYNTHESIS", "WIDTH=32"]
 include_dirs = ["include", "rtl"]
 ```
 
-If you set `include_dirs = []` explicitly, Vizsla does not fall back to `sources`.
+If you set `include_dirs = []` explicitly, Vide does not fall back to `sources`.
 
 ## Formatting Produces No Result or Fails
 
@@ -151,7 +151,7 @@ Formatter failures usually come from formatter stderr. Reduce custom `vizsla.for
 
 ## File Changes Do Not Trigger Refresh
 
-The default `vizsla.files.watcher` is `client`, so Vizsla prefers VS Code watched-file notifications. If the client does not support dynamic watched files, Vizsla falls back to the server-side watcher.
+The default `vizsla.files.watcher` is `client`, so Vide prefers VS Code watched-file notifications. If the client does not support dynamic watched files, Vide falls back to the server-side watcher.
 
 If project file changes do not trigger a refresh:
 

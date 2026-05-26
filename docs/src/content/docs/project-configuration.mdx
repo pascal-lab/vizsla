@@ -54,9 +54,9 @@ endmodule
   },
 ];
 
-项目配置文件回答的是这些问题：哪些 RTL 文件属于这个工程，include 文件去哪找，启用哪些宏，外部依赖放在哪里。推荐文件名是 `vizsla.toml`。旧文件名 `vizsla_config.toml` 仍然兼容，但已经弃用；两个文件同时存在时，Vizsla 会优先读取 `vizsla.toml`。
+项目配置文件回答的是这些问题：哪些 RTL 文件属于这个工程，include 文件去哪找，启用哪些宏，外部依赖放在哪里。推荐文件名是 `vizsla.toml`。旧文件名 `vizsla_config.toml` 仍然兼容，但已经弃用；两个文件同时存在时，Vide 会优先读取 `vizsla.toml`。
 
-项目配置文件通常放在工作区根目录，也就是你用 VS Code 打开的顶层目录。Vizsla 不会自动向父目录或子目录寻找其它项目配置文件。
+项目配置文件通常放在工作区根目录，也就是你用 VS Code 打开的顶层目录。Vide 不会自动向父目录或子目录寻找其它项目配置文件。
 
 ## 最小可用配置
 
@@ -69,8 +69,8 @@ defines = ["SYNTHESIS"]
 top_modules = ["top"]
 ```
 
-- `sources`：告诉 Vizsla 哪些 RTL 文件属于工程。上面的 `rtl/**` 表示包含 `rtl` 目录以及它下面子目录里的文件。
-- `include_dirs`：告诉 Vizsla include 文件去哪找。
+- `sources`：告诉 Vide 哪些 RTL 文件属于工程。上面的 `rtl/**` 表示包含 `rtl` 目录以及它下面子目录里的文件。
+- `include_dirs`：告诉 Vide include 文件去哪找。
 - `defines`：预先定义宏，相当于编译命令里的 `+define+SYNTHESIS` 或 `-D SYNTHESIS`。
 - `top_modules`：声明顶层模块名。它不会决定扫描哪些文件，只帮助项目分析更贴近你的真实入口。
 
@@ -85,7 +85,7 @@ top_modules = ["top"]
 
 想了解这个概念，可以看 [glob 简介](https://en.wikipedia.org/wiki/Glob_(programming))。
 
-Vizsla 对 `sources` 和 `exclude` 有几条固定规则：
+Vide 对 `sources` 和 `exclude` 有几条固定规则：
 
 - 必须相对工作区根目录，例如 `rtl/**`。
 - 路径分隔符统一写 `/`，不要写 `rtl\**`。
@@ -133,7 +133,7 @@ exclude = [
 ]
 ```
 
-文件开头的 `#:schema ...` 是 TOML 注释。它只帮助编辑器识别配置格式，不会改变 Vizsla 读取项目配置文件的方式。VS Code 自动创建的默认模板见 [第一个工程](./first-project.md)。
+文件开头的 `#:schema ...` 是 TOML 注释。它只帮助编辑器识别配置格式，不会改变 Vide 读取项目配置文件的方式。VS Code 自动创建的默认模板见 [第一个工程](./first-project.md)。
 
 ## 字段说明
 
@@ -152,7 +152,7 @@ exclude = [
 
 | 写法 | 结果 |
 | --- | --- |
-| 省略 | Vizsla 会尽力索引工作区，用于跳转、引用、悬停等阅读功能，但不会把它当成完整工程配置。 |
+| 省略 | Vide 会尽力索引工作区，用于跳转、引用、悬停等阅读功能，但不会把它当成完整工程配置。 |
 | `sources = []` | 不自动扫描工作区。用于先打开工程，之后再手动补配置。 |
 | `sources = ["rtl/**"]` | 按 glob 加载匹配文件，并让这些文件进入项目分析。 |
 
@@ -171,9 +171,9 @@ sources = ["rtl/**", "ip/**/*.sv", "tb/**/*.sv"]
 - `.svi`
 - `.map`
 
-`include_dirs` 用于处理 `` `include "file.svh" ``。如果你已经写了 `sources`，但没有写 `include_dirs`，Vizsla 会从 `sources` 推导一个默认 include 目录。例如 `sources = ["rtl/**/*.sv"]` 会把 `rtl` 作为默认 include 目录。
+`include_dirs` 用于处理 `` `include "file.svh" ``。如果你已经写了 `sources`，但没有写 `include_dirs`，Vide 会从 `sources` 推导一个默认 include 目录。例如 `sources = ["rtl/**/*.sv"]` 会把 `rtl` 作为默认 include 目录。
 
-如果 `sources` 被省略，Vizsla 不会从尽力索引结果反推 include 目录。显式写成 `include_dirs = []` 时，也不会使用这个回退。
+如果 `sources` 被省略，Vide 不会从尽力索引结果反推 include 目录。显式写成 `include_dirs = []` 时，也不会使用这个回退。
 
 <VizslaLab
   projectId="configuration-include-macro"
@@ -205,8 +205,8 @@ defines = [
 
 `libraries` 用于声明依赖库。路径相对当前项目配置文件所在目录解析。每个库路径都会被当作另一个工作区继续加载：
 
-- 如果库目录下有 `vizsla.toml`，Vizsla 会按这个项目配置文件加载库；否则再尝试旧版且已弃用的 `vizsla_config.toml`。
-- 如果库目录没有项目配置文件，Vizsla 会把该目录作为未配置库加载。
+- 如果库目录下有 `vizsla.toml`，Vide 会按这个项目配置文件加载库；否则再尝试旧版且已弃用的 `vizsla_config.toml`。
+- 如果库目录没有项目配置文件，Vide 会把该目录作为未配置库加载。
 - 依赖会参与当前工程的项目分析，并支持传递依赖。
 
 `libraries` 不会替代当前工程自己的 `sources`。当前工作区的 RTL 仍然应该通过 `sources` 声明；`libraries` 只描述被当前工程引用的外部工程或库目录。
@@ -219,11 +219,11 @@ defines = [
 exclude = ["build/**", "out/**", "sim/work/**", "**/*_bb.v"]
 ```
 
-`exclude = ["build"]` 只匹配名为 `build` 的路径本身，不会递归排除目录内容；目录递归请写 `build/**`。如果你还希望 VS Code 自己减少文件监听，可以同时配置 VS Code 的 `files.watcherExclude`。Vizsla 的 `exclude` 和 VS Code 的文件监听设置是两套机制。
+`exclude = ["build"]` 只匹配名为 `build` 的路径本身，不会递归排除目录内容；目录递归请写 `build/**`。如果你还希望 VS Code 自己减少文件监听，可以同时配置 VS Code 的 `files.watcherExclude`。Vide 的 `exclude` 和 VS Code 的文件监听设置是两套机制。
 
 ## 常见注意事项
 
 - 推荐项目配置文件名是 `vizsla.toml`；`vizsla_config.toml` 仅作为兼容旧工程的已弃用备用文件。
 - `top_module`、`include`、`macros` 这类旧字段不会被接受。
-- Vizsla 不会从子目录自动发现项目配置文件。打开 `repo` 时，只检查 `repo/vizsla.toml`，再回退检查 `repo/vizsla_config.toml`。
+- Vide 不会从子目录自动发现项目配置文件。打开 `repo` 时，只检查 `repo/vizsla.toml`，再回退检查 `repo/vizsla_config.toml`。
 - 配置了 `sources = []` 的工程可以只加载 include 目录，适合头文件型工作区，或暂时不想扫描 RTL 的工作区。

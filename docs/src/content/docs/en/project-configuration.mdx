@@ -54,9 +54,9 @@ endmodule
   },
 ];
 
-The project manifest tells Vizsla three things: which RTL files belong to the project, where include files live, and which macros or dependency libraries should be used. The recommended file name is `vizsla.toml`. The old file name `vizsla_config.toml` is still supported but deprecated; if both files exist, Vizsla reads `vizsla.toml`.
+The project manifest tells Vide three things: which RTL files belong to the project, where include files live, and which macros or dependency libraries should be used. The recommended file name is `vizsla.toml`. The old file name `vizsla_config.toml` is still supported but deprecated; if both files exist, Vide reads `vizsla.toml`.
 
-The project manifest usually lives in the workspace root: the top-level folder you opened in VS Code. Vizsla does not automatically search parent or child directories for other manifests.
+The project manifest usually lives in the workspace root: the top-level folder you opened in VS Code. Vide does not automatically search parent or child directories for other manifests.
 
 ## Minimal Configuration
 
@@ -69,8 +69,8 @@ defines = ["SYNTHESIS"]
 top_modules = ["top"]
 ```
 
-- `sources`: tells Vizsla which RTL files belong to the project. `rtl/**` recursively includes files under `rtl`.
-- `include_dirs`: tells Vizsla where to search for include files.
+- `sources`: tells Vide which RTL files belong to the project. `rtl/**` recursively includes files under `rtl`.
+- `include_dirs`: tells Vide where to search for include files.
 - `defines`: predefines macros, similar to `+define+SYNTHESIS` or `-D SYNTHESIS` in a compile command.
 - `top_modules`: declares top-level module names. It does not decide which files are scanned; it helps project analysis match your real entry points.
 
@@ -80,7 +80,7 @@ If you only want to open files and check syntax highlighting or single-file erro
 
 `sources` and `exclude` are not plain directory paths. They are workspace-relative globs. A glob is a path pattern with wildcards: `*.sv` matches `.sv` files in one directory, while `rtl/**` recursively matches content under `rtl`. For background, see this [glob overview](https://en.wikipedia.org/wiki/Glob_(programming)).
 
-Vizsla applies these rules to `sources` and `exclude`:
+Vide applies these rules to `sources` and `exclude`:
 
 - Patterns are relative to the workspace root, for example `rtl/**`.
 - Use `/` as the path separator. Do not write `rtl\**`.
@@ -128,7 +128,7 @@ exclude = [
 ]
 ```
 
-The `#:schema ...` line is a TOML comment. It helps editors understand the manifest format, but it does not change how Vizsla reads the file. For the default template created by VS Code, see [First Project](./first-project.md).
+The `#:schema ...` line is a TOML comment. It helps editors understand the manifest format, but it does not change how Vide reads the file. For the default template created by VS Code, see [First Project](./first-project.md).
 
 ## Fields
 
@@ -147,7 +147,7 @@ The `#:schema ...` line is a TOML comment. It helps editors understand the manif
 
 | Form | Result |
 | --- | --- |
-| Omitted | Vizsla best-effort indexes the workspace for read features such as navigation, references, and hover, but does not treat it as a fully configured project. |
+| Omitted | Vide best-effort indexes the workspace for read features such as navigation, references, and hover, but does not treat it as a fully configured project. |
 | `sources = []` | Disables automatic workspace scanning. This is useful when you want to open the project safely and configure it later. |
 | `sources = ["rtl/**"]` | Loads matching files with globs and puts them into project analysis. |
 
@@ -166,7 +166,7 @@ The current project loader reads these extensions:
 - `.svi`
 - `.map`
 
-`include_dirs` controls `` `include "file.svh" `` search. If `include_dirs` is not configured explicitly and `sources` is set explicitly, Vizsla infers a default include directory from `sources`. For example, `sources = ["rtl/**/*.sv"]` uses `rtl` as the default include directory. If `sources` is omitted, Vizsla does not infer include directories from best-effort indexing. If `include_dirs = []` is set explicitly, no fallback is used.
+`include_dirs` controls `` `include "file.svh" `` search. If `include_dirs` is not configured explicitly and `sources` is set explicitly, Vide infers a default include directory from `sources`. For example, `sources = ["rtl/**/*.sv"]` uses `rtl` as the default include directory. If `sources` is omitted, Vide does not infer include directories from best-effort indexing. If `include_dirs = []` is set explicitly, no fallback is used.
 
 <VizslaLab
   projectId="configuration-include-macro"
@@ -198,8 +198,8 @@ Macro names must be valid identifiers. Macros with values are parsed as `NAME=va
 
 `libraries` declares dependency libraries. Paths are resolved relative to the directory that contains the current project manifest. Each library path is loaded as another workspace:
 
-- If the library directory contains `vizsla.toml`, Vizsla loads the library with that manifest; otherwise it falls back to the deprecated legacy `vizsla_config.toml`.
-- If the library directory has no manifest, Vizsla loads it as an unconfigured library.
+- If the library directory contains `vizsla.toml`, Vide loads the library with that manifest; otherwise it falls back to the deprecated legacy `vizsla_config.toml`.
+- If the library directory has no manifest, Vide loads it as an unconfigured library.
 - Dependencies participate in the current project's analysis, and transitive dependencies are supported.
 
 `libraries` does not replace the current project's own `sources`. The current workspace's RTL should still be declared through `sources`; `libraries` only describes external projects or library directories referenced by the current project.
@@ -212,11 +212,11 @@ Macro names must be valid identifiers. Macros with values are parsed as `NAME=va
 exclude = ["build/**", "out/**", "sim/work/**", "**/*_bb.v"]
 ```
 
-`exclude = ["build"]` only matches the path named `build` itself and does not recursively exclude the directory contents. Use `build/**` for recursive directory exclusion. If you also want VS Code to reduce file watching, configure VS Code's `files.watcherExclude` as well. Vizsla's `exclude` and VS Code's watcher settings are separate mechanisms.
+`exclude = ["build"]` only matches the path named `build` itself and does not recursively exclude the directory contents. Use `build/**` for recursive directory exclusion. If you also want VS Code to reduce file watching, configure VS Code's `files.watcherExclude` as well. Vide's `exclude` and VS Code's watcher settings are separate mechanisms.
 
 ## Notes
 
 - The recommended manifest file name is `vizsla.toml`; `vizsla_config.toml` is only a deprecated fallback for compatibility with old projects.
 - Old fields such as `top_module`, `include`, or `macros` are not accepted.
-- Vizsla does not automatically discover manifests from subdirectories. When you open `repo`, it only checks `repo/vizsla.toml` and then `repo/vizsla_config.toml`.
+- Vide does not automatically discover manifests from subdirectories. When you open `repo`, it only checks `repo/vizsla.toml` and then `repo/vizsla_config.toml`.
 - Projects configured with `sources = []` can still load include directories, which is useful for header-only workspaces or workspaces where you do not want to scan RTL yet.

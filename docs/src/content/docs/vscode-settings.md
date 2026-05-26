@@ -1,9 +1,9 @@
 ---
 title: VS Code 设置参考
-description: Vizsla VS Code 扩展的紧凑配置项参考。
+description: Vide VS Code 扩展的紧凑配置项参考。
 ---
 
-所有设置都在 `vizsla.*` 命名空间下。可以在 VS Code 设置界面搜索 `Vizsla`，也可以直接编辑 `settings.json`。
+所有设置都在 `vizsla.*` 命名空间下。可以在 VS Code 设置界面搜索 `Vide`，也可以直接编辑 `settings.json`。
 
 ## 常用设置速查
 
@@ -45,16 +45,16 @@ description: Vizsla VS Code 扩展的紧凑配置项参考。
 
 ## Qihe
 
-运行 `Vizsla：运行 Qihe 分析` 时才需要看这组设置。
+运行 `Vide：运行 Qihe 分析` 时才需要看这组设置。
 
 | 设置 | 默认值 | 说明 |
 | --- | --- | --- |
 | `vizsla.qihe.command` | `"qihe"` | 调用 Qihe 的命令。必须在 VS Code 可见的 `PATH` 中，也可以写绝对路径。 |
 | `vizsla.qihe.autoConfigureArgsFromManifest` | `true` | 根据当前项目配置文件自动添加 Qihe 编译模式和转发给 slang 的选项。 |
 | `vizsla.qihe.compileArgs` | `[]` | 插入到 `qihe compile` 之后的参数，用于手动选择编译模式或转发 slang 选项。 |
-| `vizsla.qihe.runArgs` | `["-g", "std"]` | 通过 `Vizsla：运行 Qihe 分析` 执行 `qihe run` 时追加的参数。 |
+| `vizsla.qihe.runArgs` | `["-g", "std"]` | 通过 `Vide：运行 Qihe 分析` 执行 `qihe run` 时追加的参数。 |
 
-`Vizsla：运行 Qihe 分析` 只对本地 Verilog/SystemVerilog 文件可用。默认会从当前项目配置文件推导 Qihe 编译模式、顶层模块、include 目录和宏定义；推荐文件名是 `vizsla.toml`，旧版 `vizsla_config.toml` 仍兼容但已弃用。如果项目已经用脚本管理这些参数，关闭自动推导并显式配置 `compileArgs` / `runArgs`。
+`Vide：运行 Qihe 分析` 只对本地 Verilog/SystemVerilog 文件可用。默认会从当前项目配置文件推导 Qihe 编译模式、顶层模块、include 目录和宏定义；推荐文件名是 `vizsla.toml`，旧版 `vizsla_config.toml` 仍兼容但已弃用。如果项目已经用脚本管理这些参数，关闭自动推导并显式配置 `compileArgs` / `runArgs`。
 
 示例：
 
@@ -96,7 +96,7 @@ description: Vizsla VS Code 扩展的紧凑配置项参考。
 
 ## Formatter 和 Formatting
 
-配置格式化时看这组。Vizsla 会调用外部 `verible-verilog-format`。
+配置格式化时看这组。Vide 会调用外部 `verible-verilog-format`。
 
 | 设置 | 默认值 | 说明 |
 | --- | --- | --- |
@@ -142,7 +142,7 @@ description: Vizsla VS Code 扩展的紧凑配置项参考。
 
 | 设置 | 默认值 | 说明 |
 | --- | --- | --- |
-| `vizsla.diagnostics.enable` | `true` | 启用所有 Vizsla 诊断。 |
+| `vizsla.diagnostics.enable` | `true` | 启用所有 Vide 诊断。 |
 | `vizsla.diagnostics.update` | `"onSave"` | 诊断刷新时机。可选 `"onSave"`、`"onType"`。 |
 | `vizsla.diagnostics.parse.enable` | `true` | 启用单文件语法诊断。 |
 | `vizsla.diagnostics.semantic.enable` | `true` | 启用需要项目信息的跨文件诊断。 |

@@ -1,13 +1,13 @@
 ---
 title: 从源码构建
-description: 从源码构建 Vizsla 语言服务器、VS Code 扩展和本地 VSIX。
+description: 从源码构建 Vide 语言服务器、VS Code 扩展和本地 VSIX。
 ---
 
 本页面面向需要本地开发、调试或打包 VSIX 的用户。构建完成后，扩展启动检查请看 [当扩展无法正常启动](./check-server.md)。
 
 ## 环境要求
 
-从源码构建 Vizsla 时，`cargo build` 会通过 Rust 构建脚本编译仓库内的
+从源码构建 Vide 时，`cargo build` 会通过 Rust 构建脚本编译仓库内的
 `crates/slang`，因此除了 Rust 之外还需要能编译 slang 的 C++ 环境：
 
 - Rust 工具链和 Cargo。
@@ -18,10 +18,10 @@ description: 从源码构建 Vizsla 语言服务器、VS Code 扩展和本地 VS
   GCC 或 Clang，其中 slang 至少需要 GCC 10 级别的 C++20 支持。
 - Node.js 和 npm，用于构建 VS Code 扩展与打包 VSIX。
 
-Vizsla 使用仓库内置的 slang 源码。构建 Vizsla 语言服务器和打包 VSIX 时，
+Vide 使用仓库内置的 slang 源码。构建 Vide 语言服务器和打包 VSIX 时，
 构建脚本会一起编译这部分代码。
 
-## 构建 Vizsla 语言服务器
+## 构建 Vide 语言服务器
 
 在仓库根目录运行：
 
@@ -59,7 +59,7 @@ cargo build --release
 }
 ```
 
-保存后 VS Code 会提示 `重启`；接受提示后可用 `Vizsla：显示服务器版本` 验证扩展实际使用的二进制。
+保存后 VS Code 会提示 `重启`；接受提示后可用 `Vide：显示服务器版本` 验证扩展实际使用的二进制。
 
 ## 构建 VS Code 扩展
 

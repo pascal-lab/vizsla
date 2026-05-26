@@ -1,9 +1,9 @@
 ---
 title: VS Code Settings Reference
-description: Compact configuration reference for the Vizsla VS Code extension.
+description: Compact configuration reference for the Vide VS Code extension.
 ---
 
-All settings are under the `vizsla.*` namespace. Search for `Vizsla` in the VS Code Settings UI or edit `settings.json` directly.
+All settings are under the `vizsla.*` namespace. Search for `Vide` in the VS Code Settings UI or edit `settings.json` directly.
 
 ## Common Settings Quick Reference
 
@@ -12,7 +12,7 @@ Most users only change these:
 | Goal | Common settings |
 | --- | --- |
 | Point VS Code at a local Qihe executable | `vizsla.qihe.command` |
-| Point Vizsla at `verible-verilog-format` | `vizsla.formatter.path` |
+| Point Vide at `verible-verilog-format` | `vizsla.formatter.path` |
 | Refresh diagnostics on save or while typing | `vizsla.diagnostics.update` |
 | Toggle port, parameter, and end-structure inlay hints | `vizsla.inlayHints.*` |
 | Toggle instance counts above module declarations | `vizsla.lens.instantiations.enable` |
@@ -45,16 +45,16 @@ Example:
 
 ## Qihe
 
-If you do not use `Vizsla: Run Qihe Analysis`, keep these defaults.
+If you do not use `Vide: Run Qihe Analysis`, keep these defaults.
 
 | Setting | Default | Description |
 | --- | --- | --- |
 | `vizsla.qihe.command` | `"qihe"` | Command used to invoke Qihe. It must be available on the `PATH` seen by VS Code, or it can be an absolute path. |
 | `vizsla.qihe.autoConfigureArgsFromManifest` | `true` | Automatically adds the Qihe compile mode and forwarded slang options from the current project manifest. |
 | `vizsla.qihe.compileArgs` | `[]` | Arguments inserted after `qihe compile`, used for manual compile mode selection or forwarded slang options. |
-| `vizsla.qihe.runArgs` | `["-g", "std"]` | Arguments appended when `Vizsla: Run Qihe Analysis` runs `qihe run`. |
+| `vizsla.qihe.runArgs` | `["-g", "std"]` | Arguments appended when `Vide: Run Qihe Analysis` runs `qihe run`. |
 
-`Vizsla: Run Qihe Analysis` is available only for local Verilog/SystemVerilog files. By default, Vizsla derives the Qihe compile mode, top module, include directories, and macro definitions from the current project manifest; the recommended file name is `vizsla.toml`, and the legacy `vizsla_config.toml` name is still supported but deprecated. If your project already manages those arguments through scripts, disable automatic derivation and configure `compileArgs` / `runArgs` explicitly.
+`Vide: Run Qihe Analysis` is available only for local Verilog/SystemVerilog files. By default, Vide derives the Qihe compile mode, top module, include directories, and macro definitions from the current project manifest; the recommended file name is `vizsla.toml`, and the legacy `vizsla_config.toml` name is still supported but deprecated. If your project already manages those arguments through scripts, disable automatic derivation and configure `compileArgs` / `runArgs` explicitly.
 
 Example:
 
@@ -76,7 +76,7 @@ These settings are mainly for file-watching troubleshooting. Use `sources` / `ex
 | `vizsla.files.excludeDirs` | `[]` | Workspace-relative directory exclusion list. Globs are not supported here; file-selection globs belong in the project manifest's `sources` / `exclude`. |
 | `vizsla.files.watcher` | `"client"` | File watching mode. Options: `"client"`, `"notify"`, `"server"`. |
 
-`client` prefers VS Code watched-file notifications. If the client does not support dynamic watched files, Vizsla falls back to the server-side watcher. Both `notify` and `server` use the server-side watching path.
+`client` prefers VS Code watched-file notifications. If the client does not support dynamic watched files, Vide falls back to the server-side watcher. Both `notify` and `server` use the server-side watching path.
 
 ## Workspace
 
@@ -96,12 +96,12 @@ This setting affects references, rename, and document highlights.
 
 ## Formatter and Formatting
 
-Configure these only if you use Verilog/SystemVerilog formatting. Vizsla does not bundle `verible-verilog-format`.
+Configure these only if you use Verilog/SystemVerilog formatting. Vide does not bundle `verible-verilog-format`.
 
 | Setting | Default | Description |
 | --- | --- | --- |
 | `vizsla.formatter.provider` | `"verible"` | Formatter backend. Currently supports `verible`, which calls external `verible-verilog-format`. |
-| `vizsla.formatter.path` | `null` | Executable path used by the `verible` provider. When empty, Vizsla looks for `verible-verilog-format`. |
+| `vizsla.formatter.path` | `null` | Executable path used by the `verible` provider. When empty, Vide looks for `verible-verilog-format`. |
 | `vizsla.formatter.args` | `["--failsafe_success=false"]` | Arguments passed to `verible-verilog-format`. |
 | `vizsla.formatting.on.enter` | `true` | Enables formatting behavior when pressing Enter. |
 | `vizsla.formatting.in.comments` | `true` | Enables Enter assistance inside comments. |
@@ -142,7 +142,7 @@ Diagnostics appear in the VS Code `Problems` panel and as editor underlines.
 
 | Setting | Default | Description |
 | --- | --- | --- |
-| `vizsla.diagnostics.enable` | `true` | Enables all Vizsla diagnostics. |
+| `vizsla.diagnostics.enable` | `true` | Enables all Vide diagnostics. |
 | `vizsla.diagnostics.update` | `"onSave"` | Diagnostics refresh timing. Options: `"onSave"`, `"onType"`. |
 | `vizsla.diagnostics.parse.enable` | `true` | Enables syntax and parse diagnostics. |
 | `vizsla.diagnostics.semantic.enable` | `true` | Enables compile and semantic diagnostics. |

@@ -1,6 +1,6 @@
 ---
 title: Features
-description: Diagnostics, navigation, completion, formatting, and code actions provided by Vizsla in VS Code.
+description: Diagnostics, navigation, completion, formatting, and code actions provided by Vide in VS Code.
 ---
 
 import FeatureExample from "../../../components/FeatureExample.astro";
@@ -242,7 +242,7 @@ endmodule
   },
 ];
 
-This page introduces Vizsla by feature. It is not the full settings reference; use [VS Code Settings](./vscode-settings.md) for every setting and [Project Configuration](./project-configuration.md) for project semantics.
+This page introduces Vide by feature. It is not the full settings reference; use [VS Code Settings](./vscode-settings.md) for every setting and [Project Configuration](./project-configuration.md) for project semantics.
 
 ## Language Detection
 
@@ -253,7 +253,7 @@ The VS Code extension registers two languages:
 | Verilog | `.v`, `.vh` |
 | SystemVerilog | `.sv`, `.svh`, `.svi` |
 
-After opening one of these files, VS Code first applies Vizsla's TextMate grammar and language configuration. Basic syntax highlighting, comment rules, and bracket matching do not depend on the language server starting successfully.
+After opening one of these files, VS Code first applies Vide's TextMate grammar and language configuration. Basic syntax highlighting, comment rules, and bracket matching do not depend on the language server starting successfully.
 
 After the language server starts, diagnostics, navigation, completion, hover, signature help, inlay hints, semantic tokens, outline, folding, selection ranges, and code lens are connected. Cross-file features need enough project information from the current workspace.
 
@@ -278,7 +278,7 @@ After the language server starts, diagnostics, navigation, completion, hover, si
 
 ## Diagnostics
 
-During daily editing, diagnostics appear in the VS Code `Problems` panel and as editor underlines. Vizsla provides both single-file parse diagnostics and semantic diagnostics that need project information.
+During daily editing, diagnostics appear in the VS Code `Problems` panel and as editor underlines. Vide provides both single-file parse diagnostics and semantic diagnostics that need project information.
 
 Diagnostics are enabled by default, and `vizsla.diagnostics.update` defaults to `"onSave"`. Large RTL projects usually benefit from keeping this default. If you explicitly want refreshes while typing, change the setting to `"onType"`.
 
@@ -341,13 +341,13 @@ These features depend more on the semantic index than plain text search does. Wh
 
 Completion appears at common Verilog/SystemVerilog input positions, such as module bodies, members after `.`, instance port lists, parameter lists, event controls, preprocessor directives, and system task/function positions.
 
-Vizsla chooses completion sources by the current position instead of dumping every candidate into the list. Common results include preprocessor directives, keywords and snippets, expression candidates, members after `.`, instance ports and parameters, signals in event controls, and system tasks/functions. It avoids unrelated candidates inside comments, strings, and literals where possible. Port and parameter completion require the instantiated target module to be resolvable.
+Vide chooses completion sources by the current position instead of dumping every candidate into the list. Common results include preprocessor directives, keywords and snippets, expression candidates, members after `.`, instance ports and parameters, signals in event controls, and system tasks/functions. It avoids unrelated candidates inside comments, strings, and literals where possible. Port and parameter completion require the instantiated target module to be resolvable.
 
 Hover first identifies names and literals:
 
-- For symbol names, Vizsla resolves the definition and renders information about modules, ports, parameters, declarations, instances, functions, and other items.
-- For port connection shorthand, Vizsla shows information for both the port side and the local side.
-- For literals, Vizsla renders parsed literal information.
+- For symbol names, Vide resolves the definition and renders information about modules, ports, parameters, declarations, instances, functions, and other items.
+- For port connection shorthand, Vide shows information for both the port side and the local side.
+- For literals, Vide renders parsed literal information.
 
 Signature help triggers on `(`, `,`, and `.`. It mainly serves module instance port connections and parameter assignment lists: while you type a connection, you can see the target module's port or parameter order, and the active parameter follows the cursor. Use `vizsla.signature.help.params.only` when you only want parameter-related signatures.
 
@@ -363,9 +363,9 @@ Code actions appear next to the problems or edits they can solve:
 - If a parameter has no value, use `Fill parameters`.
 - If ports or parameters mix ordered and named style, use `Convert ordered port connections to named connections`, `Convert ordered parameter assignments to named assignments`, or `Remove empty port connections`.
 - If `.port` is missing explicit `()`, use `Add explicit empty port connection`. If an instance has no port list at all, use `Add empty instance port list`.
-- When the cursor is on an integer literal, Vizsla may offer `Convert literal to binary`, `Convert literal to decimal`, `Convert literal to hexadecimal`, and related base conversions.
+- When the cursor is on an integer literal, Vide may offer `Convert literal to binary`, `Convert literal to decimal`, `Convert literal to hexadecimal`, and related base conversions.
 
-These actions need Vizsla to understand the current position. Instance port and parameter actions also need the target module to be resolvable. If the target module itself cannot be found, fix `sources`, `include_dirs`, `defines`, or `libraries` first. Vizsla currently does not provide a dedicated automatic fix for unresolved modules or imports.
+These actions need Vide to understand the current position. Instance port and parameter actions also need the target module to be resolvable. If the target module itself cannot be found, fix `sources`, `include_dirs`, `defines`, or `libraries` first. Vide currently does not provide a dedicated automatic fix for unresolved modules or imports.
 
 <FeatureExample
   image={codeActionsGif}
@@ -409,7 +409,7 @@ Formatting entry points include `Format Document`, `Format Selection`, and on-ty
 
 ## Visual and Structure Assistance
 
-Semantic tokens add semantic roles on top of TextMate highlighting. The default settings enable clock/reset port modifiers, input/output port modifiers, and Vizsla-contributed default styling for the `read` and `write` modifiers. When your theme supports the corresponding tokens, port direction, clock/reset ports, and ordinary symbols are easier to distinguish.
+Semantic tokens add semantic roles on top of TextMate highlighting. The default settings enable clock/reset port modifiers, input/output port modifiers, and Vide-contributed default styling for the `read` and `write` modifiers. When your theme supports the corresponding tokens, port direction, clock/reset ports, and ordinary symbols are easier to distinguish.
 
 Outline and folding ranges are aimed at reading long files. Outline shows symbols such as modules, ports, parameters, declarations, instances, blocks, functions, and generate blocks. Folding collapses structures such as modules, blocks, statements, and comments.
 
@@ -440,8 +440,8 @@ Instance code lens is enabled by default and shows `0 instances`, `1 instance`, 
 
 The full cross-file experience depends on project configuration. The default `vizsla.toml` created by VS Code contains `sources = []`, so it does not scan the workspace. To enable more accurate semantic diagnostics, port/parameter completion, and instance-related assistance, add `sources`, `include_dirs`, `defines`, `libraries`, or `top_modules` for your project layout. See [Project Configuration](./project-configuration.md) for details.
 
-When includes, macros, libraries, or target modules are missing, Vizsla keeps as many single-file features as it can, but cross-file diagnostics, instance signatures, port/parameter completion, inlay hints, code actions, and code lens may be reduced or unavailable.
+When includes, macros, libraries, or target modules are missing, Vide keeps as many single-file features as it can, but cross-file diagnostics, instance signatures, port/parameter completion, inlay hints, code actions, and code lens may be reduced or unavailable.
 
-For daily troubleshooting, start with `Vizsla: Show Status`, `Vizsla: Show Language Server Output`, `Vizsla: Reload Project Configuration`, `Vizsla: Restart Language Server`, and `Vizsla: Show Server Version` from the command palette. Qihe analysis and diagnostics profiling commands are documented in [Commands, Status, and Logs](./commands-status-logs.md).
+For daily troubleshooting, start with `Vide: Show Status`, `Vide: Show Language Server Output`, `Vide: Reload Project Configuration`, `Vide: Restart Language Server`, and `Vide: Show Server Version` from the command palette. Qihe analysis and diagnostics profiling commands are documented in [Commands, Status, and Logs](./commands-status-logs.md).
 
 If behavior differs from this page, check [Troubleshooting](./troubleshooting.md) first. It covers server startup, project loading, diagnostics refresh, formatter failures, and watcher refresh issues.

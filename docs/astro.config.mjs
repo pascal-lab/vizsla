@@ -9,11 +9,11 @@ export default defineConfig({
   integrations: [
     starlight({
       title: {
-        'zh-CN': 'Vizsla 用户手册',
-        en: 'Vizsla User Guide',
+        'zh-CN': 'Vide 用户手册',
+        en: 'Vide User Guide',
       },
       description:
-        'User guide for the Vizsla Verilog/SystemVerilog language server and VS Code extension.',
+        'User guide for the Vide Verilog/SystemVerilog language server and VS Code extension.',
       locales: {
         root: {
           label: '简体中文',

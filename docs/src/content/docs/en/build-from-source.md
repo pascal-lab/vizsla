@@ -1,13 +1,13 @@
 ---
 title: Build from Source
-description: Build the Vizsla server, VS Code extension, and local VSIX packages from source.
+description: Build the Vide server, VS Code extension, and local VSIX packages from source.
 ---
 
 This page is for users who need local development, debugging, or VSIX packaging. After building, use [Server Self-Check Flow](./check-server.md) to verify the server launch.
 
 ## Prerequisites
 
-When building Vizsla from source, `cargo build` compiles the vendored
+When building Vide from source, `cargo build` compiles the vendored
 `crates/slang` tree through a Rust build script, so the build needs a C++
 environment that can compile slang:
 
@@ -20,13 +20,13 @@ environment that can compile slang:
   support.
 - Node.js and npm for building the VS Code extension and packaging VSIX files.
 
-You do not need to install a system-level `slang` command first. Vizsla uses the
+You do not need to install a system-level `slang` command first. Vide uses the
 vendored slang sources in this repository, and server builds or VSIX packaging
 compile them together with the Rust server.
 
 ## Prerequisites
 
-When building Vizsla from source, `cargo build` compiles the vendored
+When building Vide from source, `cargo build` compiles the vendored
 `crates/slang` tree through a Rust build script, so the build needs a C++
 environment that can compile slang:
 
@@ -39,7 +39,7 @@ environment that can compile slang:
   support.
 - Node.js and npm for building the VS Code extension and packaging VSIX files.
 
-You do not need to install a system-level `slang` command first. Vizsla uses the
+You do not need to install a system-level `slang` command first. Vide uses the
 vendored slang sources in this repository, and server builds or VSIX packaging
 compile them together with the Rust server.
 
@@ -82,7 +82,7 @@ If you only want the VS Code extension to use the locally built server, configur
 }
 ```
 
-After saving, VS Code prompts you to `Restart`; accept it, then use `Vizsla: Show Server Version` to verify the binary used by the extension.
+After saving, VS Code prompts you to `Restart`; accept it, then use `Vide: Show Server Version` to verify the binary used by the extension.
 
 ## Build the VS Code Extension
 
@@ -98,7 +98,7 @@ npm run compile
 `dist`, runs TypeScript type checking, bundles `src/extension.ts` to
 `dist/extension.js` with esbuild, and copies the speedscope static assets needed
 by the profiling view into `dist/speedscope`. This step does not build or copy
-the Vizsla server binary.
+the Vide server binary.
 
 ## Package a VSIX
 

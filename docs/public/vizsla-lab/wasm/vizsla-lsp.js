@@ -73,7 +73,7 @@ function callJson(module, name, payload) {
     module.stringToUTF8(payload, ptr, byteLength + 1);
     const fn = module[`_${name}`];
     if (typeof fn !== "function") {
-      throw new Error(`Vizsla WASM export not found: ${name}`);
+      throw new Error(`Vide WASM export not found: ${name}`);
     }
     const resultPtr = fn(ptr, byteLength);
     try {
@@ -101,7 +101,7 @@ function callVoid(module, name, path, text) {
     module.stringToUTF8(text, textPtr, textLength + 1);
     const fn = module[`_${name}`];
     if (typeof fn !== "function") {
-      throw new Error(`Vizsla WASM export not found: ${name}`);
+      throw new Error(`Vide WASM export not found: ${name}`);
     }
     const resultPtr = fn(pathPtr, pathLength, textPtr, textLength);
     try {

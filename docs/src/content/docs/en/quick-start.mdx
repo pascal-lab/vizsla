@@ -1,6 +1,6 @@
 ---
 title: Quick Start
-description: Install the Vizsla extension and confirm that the core IDE features work.
+description: Install the Vide extension and confirm that the core IDE features work.
 ---
 
 import VizslaLab from '../../../components/VizslaLab.astro';
@@ -61,11 +61,11 @@ endmodule
   },
 ];
 
-Follow these steps to confirm that Vizsla works in VS Code.
+Follow these steps to confirm that Vide works in VS Code.
 
 ## 1. Install the Extension
 
-Search for the display name `Vizsla` in the VS Code Extensions view and install it.
+Search for the display name `Vide` in the VS Code Extensions view and install it.
 
 ![vizsla in extension market](../assets/quick-start/extension-marketplace.png)
 
@@ -73,11 +73,11 @@ Search for the display name `Vizsla` in the VS Code Extensions view and install 
 
 Open the directory that contains your RTL source code in VS Code. This directory is the workspace root: the top-level folder you opened in VS Code.
 
-If this directory contains Verilog/SystemVerilog source files but has no `vizsla.toml` or deprecated legacy `vizsla_config.toml`, the extension prompts you to create a default project manifest. After you choose to create it, the extension writes a conservative `vizsla.toml` and reloads Vizsla.
+If this directory contains Verilog/SystemVerilog source files but has no `vizsla.toml` or deprecated legacy `vizsla_config.toml`, the extension prompts you to create a default project manifest. After you choose to create it, the extension writes a conservative `vizsla.toml` and reloads Vide.
 
 ![notification on creating manifest](../assets/quick-start/create-manifest-notification.png)
 
-The default configuration sets `sources = []`, which means Vizsla does not scan the whole project automatically. You can leave it unchanged while trying syntax highlighting, single-file error reporting, the status bar, and commands. To tell Vizsla where your RTL files are, add the source directory to `sources`, for example:
+The default configuration sets `sources = []`, which means Vide does not scan the whole project automatically. You can leave it unchanged while trying syntax highlighting, single-file error reporting, the status bar, and commands. To tell Vide where your RTL files are, add the source directory to `sources`, for example:
 
 ```toml
 sources = ["rtl/**"]
@@ -87,7 +87,7 @@ For the full default template and the difference between `sources = []` and omit
 
 ## 3. Check the Status Bar
 
-After the extension activates, the right side of the VS Code status bar shows a status item named `Vizsla`. The item usually displays `Vizsla`; it shows a spinner while starting or stopping, a warning icon when the project manifest is missing, and an error icon when startup or project configuration fails. Hover over the status item to see the current details.
+After the extension activates, the right side of the VS Code status bar shows a status item named `Vide`. The item usually displays `Vide`; it shows a spinner while starting or stopping, a warning icon when the project manifest is missing, and an error icon when startup or project configuration fails. Hover over the status item to see the current details.
 
 ![status bar](../assets/quick-start/status-bar.png)
 
@@ -123,4 +123,4 @@ You can verify features in this order:
   description="This quick-start project starts with one missing semicolon. Check the diagnostics, fix the instance ending to `);`, then try hover, completion, and navigation."
 />
 
-If VS Code prompts you to restart Vizsla after changing server launch settings, choose `Restart`.
+If VS Code prompts you to restart Vide after changing server launch settings, choose `Restart`.
