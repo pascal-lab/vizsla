@@ -9,11 +9,11 @@ export default defineConfig({
   integrations: [
     starlight({
       title: {
-        'zh-CN': 'Vide 用户手册',
-        en: 'Vide User Guide',
+        'zh-CN': 'Vide 文档',
+        en: 'Vide Docs',
       },
       description:
-        'User guide for the Vide Verilog/SystemVerilog language server and VS Code extension.',
+        'Documentation for the Vide Verilog/SystemVerilog language server, VS Code extension, and playground.',
       locales: {
         root: {
           label: '简体中文',
@@ -36,39 +36,52 @@ export default defineConfig({
         },
       ],
       customCss: ['./src/assets/landing.css'],
+      components: {
+        Header: './src/components/Header.astro',
+      },
+      routeMiddleware: './src/starlightRouteData.ts',
       sidebar: [
         {
-          label: '从这里开始',
-          translations: { en: 'Start Here' },
-          items: ['installation', 'quick-start', 'playground'],
+          label: '用户手册',
+          translations: { en: 'User Guide' },
+          items: [
+            'user-guide',
+            'user-guide/installation',
+            'user-guide/quick-start',
+            'user-guide/first-project',
+            'user-guide/project-configuration',
+            {
+              label: '日常使用',
+              translations: { en: 'Daily Use' },
+              items: [
+                'user-guide/daily-use',
+                'user-guide/daily-use/language-support',
+                'user-guide/daily-use/diagnostics',
+                'user-guide/daily-use/navigation',
+                'user-guide/daily-use/editing-assistance',
+                'user-guide/daily-use/formatting',
+                'user-guide/daily-use/structure',
+                'user-guide/daily-use/qihe',
+              ],
+            },
+          ],
         },
         {
-          label: '项目设置',
-          translations: { en: 'Project Setup' },
-          items: ['first-project', 'project-configuration'],
+          label: '进阶用法',
+          translations: { en: 'Advanced Usage' },
+          items: [
+            'advanced-guide',
+            'advanced-guide/advanced-installation',
+            'advanced-guide/build-from-source',
+            'advanced-guide/check-server',
+            'advanced-guide/commands-status-logs',
+            'advanced-guide/troubleshooting',
+            'advanced-guide/parsing-and-analysis',
+            'advanced-guide/vscode-settings',
+          ],
         },
         {
-          label: '功能特性',
-          translations: { en: 'Features' },
-          items: ['daily-use'],
-        },
-        {
-          label: '操作',
-          translations: { en: 'Operations' },
-          items: ['check-server', 'commands-status-logs', 'troubleshooting'],
-        },
-        {
-          label: '进阶',
-          translations: { en: 'Advanced' },
-          items: ['parsing-and-analysis'],
-        },
-        {
-          label: '参考',
-          translations: { en: 'Reference' },
-          items: ['vscode-settings', 'build-from-source'],
-        },
-        {
-          label: '更新日志',
+          label: 'Changelog',
           translations: { en: 'Changelog' },
           items: [
             'changelog',
@@ -78,6 +91,11 @@ export default defineConfig({
             'changelog/v0-1-2',
             'changelog/v0-1-1',
           ],
+        },
+        {
+          label: 'Playground',
+          translations: { en: 'Playground' },
+          items: ['playground'],
         },
       ],
     }),
