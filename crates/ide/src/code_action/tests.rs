@@ -506,8 +506,8 @@ fn instance_missing_parens_repair_adds_port_list() {
 }
 
 #[test]
-fn instance_missing_parens_repair_is_available_without_diagnostics() {
+fn instance_missing_parens_repair_requires_diagnostics() {
     let text = "module child; endmodule\nmodule top; child u/*caret*/; endmodule\n";
-    let fixed = apply_action_without_diagnostics(text, "add_instance_parens").unwrap();
-    assert_eq!(fixed, "module child; endmodule\nmodule top; child u(); endmodule\n");
+    let labels = action_labels_without_diagnostics(text);
+    assert!(!labels.iter().any(|label| label == "Add empty instance port list"));
 }
