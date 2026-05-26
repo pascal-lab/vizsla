@@ -25,7 +25,7 @@ runs:
           git clone --filter=blob:none --no-recurse-submodules https://github.com/emscripten-core/emsdk.git "${emsdk_root}"
         fi
         git -C "${emsdk_root}" reset --hard
-        git -C "${emsdk_root}" fetch --depth=1 origin "refs/tags/upstream/${{ inputs.version }}"
+        git -C "${emsdk_root}" fetch --depth=1 origin "refs/tags/${{ inputs.version }}"
         git -C "${emsdk_root}" checkout --detach FETCH_HEAD
         "${emsdk_root}/emsdk" install "${{ inputs.version }}"
         "${emsdk_root}/emsdk" activate "${{ inputs.version }}"
