@@ -2,9 +2,10 @@ import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 
 const base = process.env.ASTRO_BASE ?? '/';
+const site = process.env.ASTRO_SITE ?? 'https://vide.pascal-lab.net';
 
 export default defineConfig({
-  site: 'https://pascal-lab.github.io',
+  site,
   base,
   integrations: [
     starlight({
