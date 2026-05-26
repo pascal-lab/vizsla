@@ -76,6 +76,16 @@ jobs:
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+        continue-on-error: true
+        with:
+          shared-key: docs-wasm-${{ runner.os }}-${{ env.EMSDK_VERSION }}
+          cache-workspace-crates: true
+          cache-on-failure: true
 
       - name: Install Emscripten SDK
         uses: ./.github/actions/setup-emscripten
