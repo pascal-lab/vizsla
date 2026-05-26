@@ -3,7 +3,7 @@ title: 按症状故障排查
 description: 按状态栏、启动、Qihe、诊断、项目扫描和文件监听症状定位问题。
 ---
 
-这页按症状处理问题。先确认服务器是否能启动时，用 [服务器自检流程](./check-server.md)；查命令、状态项和输出通道入口时，用 [操作参考](./commands-status-logs.md)。
+这页按症状处理问题。先确认扩展是否正常启动时，用 [当扩展无法正常启动](./check-server.md)；查命令、状态项和输出通道入口时，用 [操作参考](./commands-status-logs.md)。
 
 ## `Vizsla` 状态栏显示错误或警告
 
@@ -22,7 +22,7 @@ description: 按状态栏、启动、Qihe、诊断、项目扫描和文件监听
 
 ## 找不到扩展自带服务器
 
-扩展默认在自己的安装目录下寻找 `server/vizsla.exe` 或 `server/vizsla`。本地开发时，只运行 `npm run compile` 不会生成这个服务器二进制。
+扩展默认在自己的安装目录下寻找 `server/vizsla.exe` 或 `server/vizsla`。本地开发时，只运行 `npm run compile` 不会生成服务器二进制。
 
 可以在 `editors/vscode` 下打包 debug VSIX：
 
@@ -74,7 +74,7 @@ npm run package:debug
 
 运行 Qihe 时会出现独立的 `Qihe` 状态项。失败后点击该状态项会打开 `Vizsla Qihe` 输出通道；错误通知里的 `显示 Qihe 输出` 也会打开同一通道。
 
-在 `Vizsla Qihe` 中检查目标文件、Qihe compile/run 参数、Qihe 输出和最后的失败信息。Qihe 参数默认会从当前项目配置文件推导；已经由脚本管理参数的工程，可以在 [VS Code 设置](./vscode-settings.md#qihe) 中关闭自动推导并显式配置 compile/run 参数。
+在 `Vizsla Qihe` 中检查目标文件、Qihe 的编译和运行参数、Qihe 输出以及最后的失败信息。Qihe 参数默认会从当前项目配置文件推导；已经由脚本管理参数的工程，可以在 [VS Code 设置](./vscode-settings.md#qihe) 中关闭自动推导并显式配置编译和运行参数。
 
 ## 诊断太频繁或不更新
 
@@ -105,7 +105,7 @@ npm run package:debug
 
 ## 想隐藏或降低某类诊断
 
-把光标放在对应诊断位置，打开灯泡菜单。对于带有可识别诊断代码的 slang 诊断，Vizsla 会提供写入用户设置或工作区设置的快速修复，例如忽略此类诊断，或把错误降级为 warning。
+把光标放在对应诊断位置，打开灯泡菜单。对于带有可识别诊断代码的 slang 诊断，Vizsla 会提供写入用户设置或工作区设置的快速修复，例如忽略此类诊断，或把错误降级为警告。
 
 如果灯泡里没有这些选项，可以手动编辑 `vizsla.diagnostics.slang.rules`。规则写法见 [VS Code 设置](./vscode-settings.md#diagnostics)。
 
@@ -122,7 +122,7 @@ npm run package:debug
 
 这里的路径模式是带 `*` 和 `**` 的 glob 写法；`*` 不跨目录，`**` 可以跨目录。`sources` 和 `exclude` 里不要用 Windows 反斜杠 `\`，统一写 `/`。
 
-目录末尾加不加 `/` 要分场景看：`include_dirs = ["include"]` 和 `include_dirs = ["include/"]` 都是在写 include 搜索目录，文档里统一推荐不带 `/`；但 `sources = ["rtl/"]` 不是“递归扫描 `rtl` 下所有文件”的写法，想扫目录请写 `sources = ["rtl/**"]`。
+目录末尾加不加 `/` 要分场景看：`include_dirs = ["include"]` 和 `include_dirs = ["include/"]` 都是在写 include 搜索目录，文档里统一推荐不带 `/`；但 `sources = ["rtl"]` 和 `sources = ["rtl/"]` 都不是“递归扫描 `rtl` 下所有文件”的写法，想扫目录请写 `sources = ["rtl/**"]`。
 
 扩展创建的默认 `vizsla.toml` 会写入 `sources = []`；需要索引项目时，请写入实际 `sources` 路径模式，并按需补充 `include_dirs`、`defines`、`libraries` 或 `top_modules`。手写配置省略 `sources` 时，Vizsla 会尽力扫描工作区，方便基础跳转和阅读，但不会启用完整的跨文件诊断视图。
 
@@ -151,7 +151,7 @@ include_dirs = ["include", "rtl"]
 
 ## 文件变化没有触发刷新
 
-默认 `vizsla.files.watcher` 是 `client`，会优先使用 VS Code watched-file notifications。客户端不支持动态 watched files 时会回退到服务端 watcher。
+默认 `vizsla.files.watcher` 是 `client`，会优先使用 VS Code 的文件变化通知。客户端不支持动态监听文件时，会回退到服务端监听。
 
 如果工程文件变化后没有触发刷新：
 
@@ -161,8 +161,8 @@ include_dirs = ["include", "rtl"]
 }
 ```
 
-`vizsla.files.excludeDirs` 只接受工作区相对目录，不支持 glob。文件选择请优先使用项目配置文件的 `sources` / `exclude` 路径模式；如果还要减少 VS Code 自己的 watcher 事件，另配 VS Code 的 `files.watcherExclude`。
+`vizsla.files.excludeDirs` 只接受工作区相对目录，不支持 glob。文件选择请优先使用项目配置文件的 `sources` / `exclude` 路径模式；如果还要减少 VS Code 自己的文件监听事件，另配 VS Code 的 `files.watcherExclude`。
 
 ## 需要更详细的服务器日志
 
-如果进程能启动，但需要服务器内部日志，在 `vizsla.server.additionalArgs` 中添加 `--log` 和 `--log_file`，然后重启语言服务器。具体步骤见 [服务器自检流程](./check-server.md)。
+如果语言服务器能启动，但需要更详细的内部日志，在 `vizsla.server.additionalArgs` 中添加 `--log` 和 `--log_file`，然后重启语言服务器。具体步骤见 [当扩展无法正常启动](./check-server.md)。

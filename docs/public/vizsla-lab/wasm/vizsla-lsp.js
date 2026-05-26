@@ -18,6 +18,9 @@ export async function createVizslaLspEngine(options = {}) {
     poll() {
       return drainMessages(module, []);
     },
+    writeFile(path, text) {
+      writeWorkspace(module, options.rootUri ?? "file:///workspace", [{ path, text }]);
+    },
     reset() {
       module._vizsla_lsp_reset();
     },

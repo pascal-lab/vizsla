@@ -45,17 +45,22 @@ export default defineConfig({
         {
           label: '项目设置',
           translations: { en: 'Project Setup' },
-          items: ['first-project', 'project-configuration', 'parsing-and-analysis'],
+          items: ['first-project', 'project-configuration'],
         },
         {
-          label: '日常使用',
-          translations: { en: 'Daily Work' },
+          label: '功能特性',
+          translations: { en: 'Features' },
           items: ['daily-use'],
         },
         {
           label: '操作',
           translations: { en: 'Operations' },
           items: ['check-server', 'commands-status-logs', 'troubleshooting'],
+        },
+        {
+          label: '进阶',
+          translations: { en: 'Advanced' },
+          items: ['parsing-and-analysis'],
         },
         {
           label: '参考',

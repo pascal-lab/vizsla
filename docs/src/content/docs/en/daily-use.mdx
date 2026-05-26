@@ -1,15 +1,81 @@
 ---
-title: Daily Use
+title: Features
 description: Diagnostics, navigation, completion, formatting, and code actions provided by Vizsla in VS Code.
 ---
 
+import FeatureExample from "../../../components/FeatureExample.astro";
 import VizslaLab from "../../../components/VizslaLab.astro";
+import codeActionsGif from "../assets/features/code-actions.gif";
+
+export const languageFiles = [
+  {
+    path: "vizsla.toml",
+    languageId: "toml",
+    source: `sources = ["rtl/**"]
+`,
+  },
+  {
+    path: "rtl/traffic_light.sv",
+    source: `typedef enum logic [1:0] {
+  RED,
+  YELLOW,
+  GREEN
+} light_state_t;
+
+module traffic_light (
+  input  logic clk,
+  input  logic rst_n,
+  output light_state_t state_o
+);
+  light_state_t state_q;
+
+  always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+      state_q <= RED;
+    end else begin
+      unique case (state_q)
+        RED:    state_q <= GREEN;
+        GREEN:  state_q <= YELLOW;
+        YELLOW: state_q <= RED;
+      endcase
+    end
+  end
+
+  assign state_o = state_q;
+endmodule
+`,
+  },
+];
+
+export const diagnosticFiles = [
+  {
+    path: "vizsla.toml",
+    languageId: "toml",
+    source: `sources = ["rtl/**"]
+`,
+  },
+  {
+    path: "rtl/diagnostic_demo.sv",
+    source: `module diagnostic_demo (
+  input  logic [7:0] data_i,
+  output logic [7:0] data_o
+);
+  logic [7:0] data_q;
+
+  always_comb begin
+    data_q = data_i & ;
+  end
+
+  assign data_o = data_q;
+endmodule
+`,
+  },
+];
 
 export const navigationFiles = [
   {
     path: "vizsla.toml",
     languageId: "toml",
-    editable: false,
     source: `sources = ["rtl/**"]
 `,
   },
@@ -66,7 +132,6 @@ export const editAidFiles = [
   {
     path: "vizsla.toml",
     languageId: "toml",
-    editable: false,
     source: `sources = ["rtl/**"]
 `,
   },
@@ -111,7 +176,73 @@ endmodule
   },
 ];
 
-This page introduces Vizsla by daily IDE workflow. It is not the full settings reference; use [VS Code Settings](./vscode-settings.md) for every setting and [Project Configuration](./project-configuration.md) for project semantics.
+export const formattingFiles = [
+  {
+    path: "vizsla.toml",
+    languageId: "toml",
+    source: `sources = ["rtl/**"]
+`,
+  },
+  {
+    path: "rtl/formatting_demo.sv",
+    source: `module formatting_demo(input logic clk,input logic rst_n,output logic done_o);
+always_ff@(posedge clk or negedge rst_n)begin
+if(!rst_n)begin
+done_o<=1'b0;
+end else begin
+done_o<=~done_o;
+end
+end
+endmodule
+`,
+  },
+];
+
+export const structureFiles = [
+  {
+    path: "vizsla.toml",
+    languageId: "toml",
+    source: `sources = ["rtl/**"]
+`,
+  },
+  {
+    path: "rtl/feature_stage.sv",
+    source: `module feature_stage #(
+  parameter int WIDTH = 8
+) (
+  input  logic [WIDTH-1:0] data_i,
+  output logic [WIDTH-1:0] data_o
+);
+  assign data_o = data_i;
+endmodule
+`,
+  },
+  {
+    path: "rtl/feature_top.sv",
+    source: `module feature_top (
+  input  logic [7:0] sample_i,
+  output logic [7:0] sample_o
+);
+  logic [7:0] stage_a;
+  logic [7:0] stage_b;
+
+  feature_stage u_decode (
+    .data_i(sample_i),
+    .data_o(stage_a)
+  );
+
+  feature_stage u_execute (
+    .data_i(stage_a),
+    .data_o(stage_b)
+  );
+
+  assign sample_o = stage_b;
+endmodule
+`,
+  },
+];
+
+This page introduces Vizsla by feature. It is not the full settings reference; use [VS Code Settings](./vscode-settings.md) for every setting and [Project Configuration](./project-configuration.md) for project semantics.
 
 ## Language Detection
 
@@ -126,6 +257,25 @@ After opening one of these files, VS Code first applies Vizsla's TextMate gramma
 
 After the language server starts, diagnostics, navigation, completion, hover, signature help, inlay hints, semantic tokens, outline, folding, selection ranges, and code lens are connected. Cross-file features need enough project information from the current workspace.
 
+<FeatureExample
+  image={codeActionsGif}
+  imageAlt="Placeholder animation for SystemVerilog language detection and syntax highlighting in VS Code"
+  imageCaption="Language detection in VS Code"
+  labCaption="The browser example opens a SystemVerilog file"
+>
+  <VizslaLab
+    projectId="daily-language"
+    projectLabel="Features: Language Detection"
+    entryFile="rtl/traffic_light.sv"
+    files={languageFiles}
+    height="100%"
+    initialActiveFile="rtl/traffic_light.sv"
+    initialSelection="1:1-5:16"
+    title="Language Detection and Syntax Highlighting"
+    description="This example uses a .sv file, typedef enum, and always_ff, which is enough to confirm syntax highlighting and language server wiring."
+  />
+</FeatureExample>
+
 ## Diagnostics
 
 During daily editing, diagnostics appear in the VS Code `Problems` panel and as editor underlines. Vizsla provides both single-file parse diagnostics and semantic diagnostics that need project information.
@@ -135,6 +285,26 @@ Diagnostics are enabled by default, and `vizsla.diagnostics.update` defaults to 
 Quick fixes usually appear with the related diagnostic. If an expected fix is missing, first confirm that the diagnostic has refreshed, then check whether the instance target, includes, defines, and libraries are loaded by the current project.
 
 For slang warnings, severity overrides, and refresh timing, see [Diagnostics in VS Code Settings](./vscode-settings.md#diagnostics). For how project files affect semantic diagnostics, see [Project Configuration](./project-configuration.md) and [Parsing and Analysis Model](./parsing-and-analysis.md).
+
+<FeatureExample
+  image={codeActionsGif}
+  imageAlt="Placeholder animation for VS Code Problems diagnostics and editor underlines"
+  imageCaption="Diagnostics in VS Code"
+  labCaption="The browser example contains a diagnostic"
+>
+  <VizslaLab
+    projectId="daily-diagnostics"
+    projectLabel="Features: Diagnostics"
+    entryFile="rtl/diagnostic_demo.sv"
+    files={diagnosticFiles}
+    height="100%"
+    initialActiveFile="rtl/diagnostic_demo.sv"
+    initialSelection="8:5-8:22"
+    initialDiagnosticsOpen
+    title="Diagnostics and the Problems Panel"
+    description="This example intentionally leaves a syntax problem. Open the diagnostics panel to see markers and the diagnostics list in the browser playground."
+  />
+</FeatureExample>
 
 ## Navigation and Reading
 
@@ -148,17 +318,24 @@ For RTL reading, the common entry points are `Go to Definition`, `Go to Declarat
 
 These features depend more on the semantic index than plain text search does. When results are unexpected, first check whether the target files are loaded by the project configuration and whether `vizsla.scope.visibility` matches your scope expectations.
 
-<VizslaLab
-  projectId="daily-navigation"
-  projectLabel="Daily Use: Navigation"
-  entryFile="rtl/pipeline_top.sv"
-  files={navigationFiles}
-  height="360px"
-  activeFile="rtl/pipeline_top.sv"
-  selection="9:3-9:17"
-  title="Cross-file Navigation and Hover"
-  description="Try Go to Definition or Hover on pipeline_stage. The target module lives in another file, and the project is provided directly by this docs page."
-/>
+<FeatureExample
+  image={codeActionsGif}
+  imageAlt="Placeholder animation for VS Code navigation and hover"
+  imageCaption="Navigation and hover in VS Code"
+  labCaption="Try cross-file navigation in the browser"
+>
+  <VizslaLab
+    projectId="daily-navigation"
+    projectLabel="Features: Navigation"
+    entryFile="rtl/pipeline_top.sv"
+    files={navigationFiles}
+    height="100%"
+    initialActiveFile="rtl/pipeline_top.sv"
+    initialSelection="9:3-9:17"
+    title="Cross-file Navigation and Hover"
+    description="Try Go to Definition or Hover on pipeline_stage. The target module lives in another file, and the project is provided directly by this docs page."
+  />
+</FeatureExample>
 
 ## Editing Assistance
 
@@ -190,19 +367,45 @@ Code actions appear next to the problems or edits they can solve:
 
 These actions need Vizsla to understand the current position. Instance port and parameter actions also need the target module to be resolvable. If the target module itself cannot be found, fix `sources`, `include_dirs`, `defines`, or `libraries` first. Vizsla currently does not provide a dedicated automatic fix for unresolved modules or imports.
 
-<VizslaLab
-  projectId="daily-edit-aids"
-  projectLabel="Daily Use: Edit Aids"
-  entryFile="rtl/fifo_client.sv"
-  files={editAidFiles}
-  height="360px"
-  activeFile="rtl/fifo_client.sv"
-  selection="9:3-9:14"
-  title="Ordered Ports, Parameters, and Code Actions"
-  description="This instance uses ordered parameters and ordered ports. Try inlay hints, signature help, and the action that converts ordered connections to named connections."
-/>
+<FeatureExample
+  image={codeActionsGif}
+  imageAlt="Animated VS Code code action menu showing quick fixes"
+  imageCaption="Quick fixes in VS Code"
+  labCaption="Try the same project in the browser"
+>
+  <VizslaLab
+    projectId="daily-edit-aids"
+    projectLabel="Features: Edit Aids"
+    entryFile="rtl/fifo_client.sv"
+    files={editAidFiles}
+    height="100%"
+    initialActiveFile="rtl/fifo_client.sv"
+    initialSelection="9:3-9:14"
+    title="Ordered Ports, Parameters, and Code Actions"
+    description="This instance uses ordered parameters and ordered ports. Try inlay hints, signature help, and the action that converts ordered connections to named connections."
+  />
+</FeatureExample>
 
 Formatting entry points include `Format Document`, `Format Selection`, and on-type formatting when pressing Enter. The only current formatter provider is `verible`, which calls the external `verible-verilog-format` executable. If it is not on `PATH`, configure an absolute path with `vizsla.formatter.path`. Formatter arguments and Enter behavior settings are covered in [Formatter and Formatting in VS Code Settings](./vscode-settings.md#formatter-and-formatting).
+
+<FeatureExample
+  image={codeActionsGif}
+  imageAlt="Placeholder animation for VS Code formatting commands"
+  imageCaption="Formatting entry points in VS Code"
+  labCaption="The browser example keeps unformatted source"
+>
+  <VizslaLab
+    projectId="daily-formatting"
+    projectLabel="Features: Formatting"
+    entryFile="rtl/formatting_demo.sv"
+    files={formattingFiles}
+    height="100%"
+    initialActiveFile="rtl/formatting_demo.sv"
+    initialSelection="1:1-3:1"
+    title="Source Before Formatting"
+    description="This example keeps compact formatting so it can be compared with the VS Code Format Document and Format Selection entry points."
+  />
+</FeatureExample>
 
 ## Visual and Structure Assistance
 
@@ -213,6 +416,25 @@ Outline and folding ranges are aimed at reading long files. Outline shows symbol
 Selection ranges support VS Code's expand/shrink selection commands, growing the current token into an expression, statement, block, or larger syntax structure.
 
 Instance code lens is enabled by default and shows `0 instances`, `1 instance`, or `N instances` at module declarations. The current code lens only shows the instance count and does not bind a navigation command. Use `Find References` when you need to locate the actual instances.
+
+<FeatureExample
+  image={codeActionsGif}
+  imageAlt="Placeholder animation for semantic highlighting, outline, and instance code lens in VS Code"
+  imageCaption="Structured reading aids in VS Code"
+  labCaption="The browser example contains a small module hierarchy"
+>
+  <VizslaLab
+    projectId="daily-structure"
+    projectLabel="Features: Structure"
+    entryFile="rtl/feature_top.sv"
+    files={structureFiles}
+    height="100%"
+    initialActiveFile="rtl/feature_top.sv"
+    initialSelection="8:3-15:5"
+    title="Semantic Highlighting, Folding, and Code Lens"
+    description="This example contains two modules and two instances, which is useful for observing semantic highlighting, folding ranges, references, and instance code lens."
+  />
+</FeatureExample>
 
 ## Common Requirements and Limits
 

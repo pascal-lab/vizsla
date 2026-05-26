@@ -3,7 +3,7 @@ title: VS Code 设置参考
 description: Vizsla VS Code 扩展的紧凑配置项参考。
 ---
 
-所有设置都在 `vizsla.*` 命名空间下。可以在 VS Code Settings UI 搜索 `Vizsla`，也可以直接编辑 `settings.json`。
+所有设置都在 `vizsla.*` 命名空间下。可以在 VS Code 设置界面搜索 `Vizsla`，也可以直接编辑 `settings.json`。
 
 ## 常用设置速查
 
@@ -18,11 +18,11 @@ description: Vizsla VS Code 扩展的紧凑配置项参考。
 | 开关模块声明上方的实例数量提示 | `vizsla.lens.instantiations.enable` |
 | 项目配置变化后是否自动刷新 | `vizsla.workspace.auto.reload` |
 
-服务器启动命令、文件监听、诊断规则和通信跟踪更偏排障或开发场景；不确定时保持默认值。
+服务器启动命令、文件监听、诊断规则和通信跟踪更偏排障或开发场景；日常使用保持默认值即可。
 
 ## Server
 
-这组设置用于替换或调试后台语言服务器。普通安装通常不需要改。
+这组设置用于替换或调试后台语言服务器。日常使用保持默认值即可。
 
 | 设置 | 默认值 | 说明 |
 | --- | --- | --- |
@@ -45,14 +45,14 @@ description: Vizsla VS Code 扩展的紧凑配置项参考。
 
 ## Qihe
 
-如果你不用 `Vizsla：运行 Qihe 分析`，这组设置可以保持默认值。
+运行 `Vizsla：运行 Qihe 分析` 时才需要看这组设置。
 
 | 设置 | 默认值 | 说明 |
 | --- | --- | --- |
 | `vizsla.qihe.command` | `"qihe"` | 调用 Qihe 的命令。必须在 VS Code 可见的 `PATH` 中，也可以写绝对路径。 |
 | `vizsla.qihe.autoConfigureArgsFromManifest` | `true` | 根据当前项目配置文件自动添加 Qihe 编译模式和转发给 slang 的选项。 |
 | `vizsla.qihe.compileArgs` | `[]` | 插入到 `qihe compile` 之后的参数，用于手动选择编译模式或转发 slang 选项。 |
-| `vizsla.qihe.runArgs` | `["-g", "std"]` | 通过 `Vizsla：运行 Qihe 分析` 运行 `qihe run` 时追加的参数。 |
+| `vizsla.qihe.runArgs` | `["-g", "std"]` | 通过 `Vizsla：运行 Qihe 分析` 执行 `qihe run` 时追加的参数。 |
 
 `Vizsla：运行 Qihe 分析` 只对本地 Verilog/SystemVerilog 文件可用。默认会从当前项目配置文件推导 Qihe 编译模式、顶层模块、include 目录和宏定义；推荐文件名是 `vizsla.toml`，旧版 `vizsla_config.toml` 仍兼容但已弃用。如果项目已经用脚本管理这些参数，关闭自动推导并显式配置 `compileArgs` / `runArgs`。
 
@@ -86,7 +86,7 @@ description: Vizsla VS Code 扩展的紧凑配置项参考。
 
 ## Scope
 
-这组设置会影响跳转、引用、重命名等阅读能力；不确定时保持默认值。
+这组设置会影响跳转、引用、重命名等阅读能力；日常使用保持默认值即可。
 
 | 设置 | 默认值 | 说明 |
 | --- | --- | --- |
@@ -96,7 +96,7 @@ description: Vizsla VS Code 扩展的紧凑配置项参考。
 
 ## Formatter 和 Formatting
 
-只有需要格式化 Verilog/SystemVerilog 时才需要配置这组。Vizsla 不自带 `verible-verilog-format`。
+配置格式化时看这组。Vizsla 会调用外部 `verible-verilog-format`。
 
 | 设置 | 默认值 | 说明 |
 | --- | --- | --- |
@@ -105,7 +105,7 @@ description: Vizsla VS Code 扩展的紧凑配置项参考。
 | `vizsla.formatter.args` | `["--failsafe_success=false"]` | 传给 `verible-verilog-format` 的参数。 |
 | `vizsla.formatting.on.enter` | `true` | 按 Enter 时启用格式化行为。 |
 | `vizsla.formatting.in.comments` | `true` | 在注释内启用 Enter 辅助格式化。 |
-| `vizsla.formatting.indent.width` | `4` | 编辑器没有提供 formatting options 时使用的后备缩进宽度。 |
+| `vizsla.formatting.indent.width` | `4` | 编辑器没有提供格式化选项时使用的后备缩进宽度。 |
 
 `verible` 格式化后端会在自定义参数后追加当前缩进宽度对应的 `--indentation_spaces=<N>`。
 
@@ -149,7 +149,7 @@ description: Vizsla VS Code 扩展的紧凑配置项参考。
 | `vizsla.diagnostics.slang.warnings` | `[]` | slang warning 选项，例如 `default`、`everything`、`none`、`error`、`no-<name>`、`error=<name>`。 |
 | `vizsla.diagnostics.slang.rules` | `[]` | 诊断过滤或严重程度覆盖规则。 |
 
-`vizsla.diagnostics.slang.warnings` 对齐 slang `-W...` 语义，但在 VS Code 设置里不写前导 `-W`。`vizsla.diagnostics.slang.rules` selector 支持 `code:<subsystem>:<code>`、`option:<name>`、`group:<name>`、`source:parse`、`source:semantic`；`severity` 可选 `ignore`、`info`、`warning`、`error`、`fatal`。
+`vizsla.diagnostics.slang.warnings` 对齐 slang `-W...` 语义，但在 VS Code 设置里不写前导 `-W`。`vizsla.diagnostics.slang.rules` 的选择器支持 `code:<subsystem>:<code>`、`option:<name>`、`group:<name>`、`source:parse`、`source:semantic`；`severity` 可选 `ignore`、`info`、`warning`、`error`、`fatal`。
 
 示例：
 

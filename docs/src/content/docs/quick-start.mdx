@@ -71,13 +71,15 @@ endmodule
 
 ## 2. 打开工程目录
 
-用 VS Code 打开包含 RTL 源码的目录。这个目录就是后面文档里说的工作区根目录，也就是你在 VS Code 里打开的顶层目录。
+用 VS Code 打开包含 RTL 源码的目录。后面文档里的「工作区根目录」，指的就是你在 VS Code 里打开的这个顶层目录。
 
 如果这个目录里有 Verilog/SystemVerilog 源文件，但没有 `vizsla.toml` 或旧版且已弃用的 `vizsla_config.toml`，扩展会提示你创建默认的项目配置文件。选择创建后，扩展会写入一个保守的 `vizsla.toml`，然后重新加载 Vizsla。
 
 ![创建项目配置文件提示](assets/quick-start/create-manifest-notification.png)
 
-默认配置会写入 `sources = []`，意思是先不自动扫描整个工程。只想先看语法高亮、单文件错误提示、状态栏和命令时，可以暂时不改它；如果希望 Vizsla 了解你的 RTL 文件放在哪里，把源码目录写进 `sources`，例如：
+默认配置会写入 `sources = []`。这表示 Vizsla 暂时只提供基础编辑体验，例如语法高亮、单文件错误提示、状态栏和命令；等工程目录确认清楚后再补 `sources`。
+
+等你准备让 Vizsla 按真实工程理解文件关系时，再把源码目录写进 `sources`，例如：
 
 ```toml
 sources = ["rtl/**"]
@@ -87,7 +89,7 @@ sources = ["rtl/**"]
 
 ## 3. 确认状态栏
 
-扩展激活后，VS Code 右侧状态栏会出现名为 `Vizsla` 的状态项。状态项通常显示 `Vizsla`；启动或停止时会带旋转图标，缺少项目配置文件时会带警告图标，启动或项目配置失败时会带错误图标。把鼠标停在状态项上，可以看到当前详情。
+扩展激活后，VS Code 右侧状态栏会出现名为 `Vizsla` 的状态项。正常启动后通常只显示 `Vizsla`；启动或停止时会显示旋转图标，缺少项目配置文件时会显示警告图标，启动失败或项目配置失败时会显示错误图标。把鼠标停在状态项上，可以看到当前详情。
 
 ![status bar](assets/quick-start/status-bar.png)
 
@@ -103,10 +105,10 @@ sources = ["rtl/**"]
 
 ## 5. 试用核心功能
 
-你可以按这个顺序验证：
+你可以按这个顺序试一下：
 
 1. 写一处明显语法错误，查看 `Problems` 面板中的诊断，也就是错误、警告和提示。
-2. 在模块名、信号名或实例名上执行 `Go to Definition` 或 `Go to Declaration`。
+2. 在模块名、信号名或实例名上执行 `Go to Definition` 或 `Go to Declaration`，看看能不能跳到对应位置。
 3. 在实例端口连接、参数赋值、表达式或预处理位置触发补全。
 4. 把光标放到符号上查看悬停说明。
 

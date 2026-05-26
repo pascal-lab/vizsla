@@ -5,7 +5,7 @@ description: 为 Vizsla 准备第一个 Verilog/SystemVerilog 工程目录。
 
 ## 推荐目录
 
-小工程可以先用简单结构：
+小工程可以先用这种结构：
 
 ```text
 my-rtl/
@@ -16,13 +16,13 @@ my-rtl/
     defs.svh
 ```
 
-直接用 VS Code 打开 `my-rtl`。这个目录就是工作区根目录，也就是 VS Code 当前打开的顶层目录：
+直接用 VS Code 打开 `my-rtl`。后面说到“工作区根目录”时，指的就是 VS Code 当前打开的这个顶层目录：
 
 ```powershell
 code D:\work\my-rtl
 ```
 
-然后打开 Verilog `.v`/`.vh` 文件，或 SystemVerilog `.sv`/`.svh`/`.svi` 文件。安装扩展后，VS Code 应该识别语言、显示语法高亮，并启动 Vizsla 的后台服务。
+然后打开 Verilog `.v`/`.vh` 文件，或 SystemVerilog `.sv`/`.svh`/`.svi` 文件。安装扩展后，VS Code 应该能识别语言、显示语法高亮，并启动 Vizsla 语言服务器。
 
 ## 没有项目配置文件时会怎样
 
@@ -39,7 +39,7 @@ sources = []
 # exclude = ["build/**"]
 ```
 
-这个默认项目配置文件写入 `sources = []`，意思是：先不要自动扫描整个工作区。这样可以先安全打开工程、确认扩展能启动，再由你决定哪些目录应该纳入项目分析。
+这个默认项目配置文件写入 `sources = []`，意思是：先不要自动扫描整个工作区。确认工程结构后，再把需要分析的目录写进 `sources`。
 
 如果你手写 `vizsla.toml` 但不写 `sources`，Vizsla 会尽力索引工作区里的 Verilog/SystemVerilog 文件。尽力索引可以让跳转、引用、悬停等阅读功能尽量可用，但它仍然不等于完整工程配置。显式写入 `sources = []` 则表示不要自动扫描工作区。
 
@@ -47,12 +47,12 @@ sources = []
 
 ## 什么时候需要编辑项目配置文件
 
-可以先按上面的方式跑起来。出现这些需求时，再编辑工作区根目录下的 `vizsla.toml`：
+可以先按上面的方式跑起来。出现下面这些需求时，再编辑工作区根目录下的 `vizsla.toml`：
 
 - 你希望跨文件跳转、引用、补全和诊断更接近真实工程。
-- 你只想扫描 `rtl` 和 `include`，不想扫描仿真输出、生成目录或第三方缓存。
-- 你需要设置 `defines`。
-- 你需要告诉 Vizsla include 文件在哪里。
+- 工程源码集中在 `rtl` 和 `include`，仿真输出、生成目录或第三方缓存需要排除。
+- 你需要设置宏，也就是 `defines`。
+- 你需要告诉 Vizsla include 文件在哪里，也就是 `include_dirs`。
 - 你有外部库目录，希望它们作为依赖参与分析。
 - 你想显式声明 `top_modules`。
 
