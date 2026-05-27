@@ -17,7 +17,7 @@ Vide 会在实例端口、参数、部分诊断和可重命名符号附近提供
   image={inlayHintsGif}
   imageAlt="VS Code 中双击行内提示将有序端口连接转换为命名连接的动图"
   imageCaption="从行内提示转换端口连接"
-  labCaption="右侧示例复用同一个 mux demo"
+  labCaption="示例复用同一个 mux demo"
 >
   <VideLab
     projectId="daily-port-connection-fix"
@@ -36,7 +36,7 @@ Vide 会在实例端口、参数、部分诊断和可重命名符号附近提供
   image={codeActionRenameGif}
   imageAlt="VS Code 中使用代码操作和重命名的动图"
   imageCaption="VS Code 中的代码操作和重命名"
-  labCaption="右侧示例复用同一个 counter demo"
+  labCaption="示例复用同一个 counter demo"
 >
   <VideLab
     projectId="daily-edit-aids"
@@ -47,7 +47,7 @@ Vide 会在实例端口、参数、部分诊断和可重命名符号附近提供
     initialActiveFile="code_action_rename.v"
     initialSelection="22:16-22:23"
     title="代码操作和重命名"
-    description="这个示例使用 counter/top demo。试试在实例附近打开灯泡菜单，或先用 Find References 检查 smp_cnt 的重命名范围。"
+    description="这个示例使用 counter/top demo。试试在实例附近打开灯泡菜单，或先用查找所有引用检查 smp_cnt 的重命名范围。"
   />
 </FeatureExample>
 
@@ -62,8 +62,8 @@ Vide 会在实例端口、参数、部分诊断和可重命名符号附近提供
 - 写了 `.port` 但缺少 `()`：使用 `添加显式空端口连接`。
 - 实例完全没有端口列表：使用 `添加空实例端口列表`。
 
-如果灯泡里没有这些操作，先确认目标模块能被 Vide 找到。最直接的检查方式是在实例模块名上执行 `Go to Definition`；跳不过去时，优先修正 `sources`、`include_dirs`、`defines` 或 `libraries`。
+如果灯泡里没有这些操作，先确认目标模块能被 Vide 找到。最直接的检查方式是在实例模块名上执行 `转到定义`；跳不过去时，优先修正 `sources`、`include_dirs`、`defines` 或 `libraries`。
 
 ## 重命名前先确认范围
 
-重命名依赖符号解析结果。大范围重命名前，先用 `Find References` 看结果是否符合预期；如果引用结果缺文件，先补项目配置并重新加载。
+重命名依赖符号解析结果。大范围重命名前，先用 `查找所有引用` 看结果是否符合预期；如果引用结果缺文件，先补项目配置并重新加载。
