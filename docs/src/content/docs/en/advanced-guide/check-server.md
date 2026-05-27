@@ -3,7 +3,7 @@ title: Server Self-Check Flow
 description: Step-by-step checks for the Vide bundled server or a custom server launch.
 ---
 
-Use this page only for the question "did the extension start the language server?" Command IDs, status item meanings, and output channel inventory live in the [operations reference](../commands-status-logs/). If the process starts but behavior is still wrong, continue with [Advanced Troubleshooting](../troubleshooting/).
+Use this page only for the question "did the extension start the language server?" Command IDs, status item meanings, and output channel inventory live in [Commands, Status, and Logs](../../user-guide/commands-status-logs/). If the process starts but behavior is still wrong, continue with [Advanced Troubleshooting](../troubleshooting/).
 
 ## 1. Open the Status Menu
 

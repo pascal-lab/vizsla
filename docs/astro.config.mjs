@@ -90,7 +90,11 @@ export default defineConfig({
             {
               label: '参考',
               translations: { en: 'Reference' },
-              items: ['user-guide/project-configuration', 'user-guide/vscode-settings'],
+              items: [
+                'user-guide/project-configuration',
+                'user-guide/vscode-settings',
+                'user-guide/commands-status-logs',
+              ],
             },
           ],
         },
@@ -99,12 +103,24 @@ export default defineConfig({
           translations: { en: 'Advanced' },
           items: [
             'advanced-guide',
-            'advanced-guide/advanced-installation',
-            'advanced-guide/build-from-source',
-            'advanced-guide/check-server',
-            'advanced-guide/commands-status-logs',
-            'advanced-guide/troubleshooting',
-            'advanced-guide/parsing-and-analysis',
+            {
+              label: '安装与构建',
+              translations: { en: 'Installation and Build' },
+              items: ['advanced-guide/advanced-installation', 'advanced-guide/build-from-source'],
+            },
+            {
+              label: '排障与日志',
+              translations: { en: 'Troubleshooting and Logs' },
+              items: [
+                'advanced-guide/check-server',
+                'advanced-guide/troubleshooting',
+              ],
+            },
+            {
+              label: '分析模型',
+              translations: { en: 'Analysis Model' },
+              items: ['advanced-guide/parsing-and-analysis'],
+            },
           ],
         },
         {
