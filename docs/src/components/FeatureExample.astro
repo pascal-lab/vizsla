@@ -13,7 +13,10 @@ const imageSrc = typeof image === "string" ? image : image.src;
 <div class="feature-example">
   <figure class="feature-example-media">
     <img src={imageSrc} alt={imageAlt} loading="lazy" decoding="async" />
-    <figcaption>{imageCaption}</figcaption>
+    <figcaption>
+      <span>{imageCaption}</span>
+      <span class="feature-example-lab-caption">{labCaption}</span>
+    </figcaption>
   </figure>
   <figure class="feature-example-live">
     <div class="feature-example-lab">
@@ -30,6 +33,7 @@ const imageSrc = typeof image === "string" ? image : image.src;
     position: relative;
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--feature-example-column-min)), 1fr));
+    container-type: inline-size;
     gap: 1rem;
     align-items: start;
     max-width: 100%;
@@ -48,6 +52,7 @@ const imageSrc = typeof image === "string" ? image : image.src;
   }
 
   .feature-example-media img {
+    box-sizing: border-box;
     width: 100%;
     min-width: 0;
     block-size: auto;
@@ -58,6 +63,7 @@ const imageSrc = typeof image === "string" ? image : image.src;
   }
 
   .feature-example-lab {
+    box-sizing: border-box;
     width: 100%;
     min-width: 0;
     block-size: var(--feature-example-lab-block-size);
@@ -81,6 +87,32 @@ const imageSrc = typeof image === "string" ? image : image.src;
     color: var(--sl-color-gray-3);
     font-size: 0.8125rem;
     line-height: 1.35;
+  }
+
+  figcaption span {
+    display: block;
+  }
+
+  figcaption span + span {
+    margin-block-start: 0.2rem;
+  }
+
+  .feature-example-lab-caption {
+    display: none;
+  }
+
+  @container (min-width: 65.25rem) {
+    .feature-example-media figcaption {
+      text-align: right;
+    }
+
+    .feature-example-lab-caption {
+      display: block;
+    }
+
+    .feature-example-live figcaption {
+      display: none;
+    }
   }
 
   @media (min-width: 72rem) {

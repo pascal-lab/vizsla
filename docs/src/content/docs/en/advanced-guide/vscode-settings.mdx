@@ -4,6 +4,7 @@ description: Compact configuration reference for the Vide VS Code extension.
 ---
 
 import VscodeSettingsTable from '../../../../components/VscodeSettingsTable.astro';
+import ThinLinkCard from '../../../../components/ThinLinkCard.astro';
 
 All settings are under the `vide.*` namespace. Search for `Vide` in the VS Code Settings UI or edit `settings.json` directly.
 
@@ -53,6 +54,22 @@ Example:
 If you do not use `Vide: Run Qihe Analysis`, keep these defaults.
 
 Related daily-use page: [Qihe](../../user-guide/daily-use/qihe/).
+
+<ThinLinkCard
+  href="https://qihe.pascal-lab.net/"
+  title="Qihe Project Site"
+  action="Open"
+>
+  Find the project entry point and access information for Qihe.
+</ThinLinkCard>
+
+<ThinLinkCard
+  href="https://qihe-docs.pascal-lab.net/platform-cli/getting-started.html"
+  title="Qihe CLI Getting Started"
+  action="Open"
+>
+  Confirm the local <code>qihe</code> command works before configuring VS Code.
+</ThinLinkCard>
 
 <VscodeSettingsTable
   locale="en"
@@ -106,6 +123,22 @@ This setting affects references, rename, and document highlights.
 Configure these only if you use Verilog/SystemVerilog formatting. Vide does not bundle `verible-verilog-format`.
 
 Related daily-use page: [Formatting](../../user-guide/daily-use/formatting/).
+
+<ThinLinkCard
+  href="https://github.com/chipsalliance/verible#installation"
+  title="Verible Installation"
+  action="Open"
+>
+  Install or update the external <code>verible-verilog-format</code> tool.
+</ThinLinkCard>
+
+<ThinLinkCard
+  href="https://chipsalliance.github.io/verible/verilog_format.html"
+  title="verible-verilog-format Options"
+  action="Open"
+>
+  Check this before configuring <code>vide.formatter.args</code>.
+</ThinLinkCard>
 
 <VscodeSettingsTable
   locale="en"

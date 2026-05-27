@@ -4,6 +4,7 @@ description: Vide VS Code 扩展的紧凑配置项参考。
 ---
 
 import VscodeSettingsTable from '../../../components/VscodeSettingsTable.astro';
+import ThinLinkCard from '../../../components/ThinLinkCard.astro';
 
 所有设置都在 `vide.*` 命名空间下。可以在 VS Code 设置界面搜索 `Vide`，也可以直接编辑 `settings.json`。
 
@@ -13,7 +14,7 @@ import VscodeSettingsTable from '../../../components/VscodeSettingsTable.astro';
 
 | 你想做什么 | 常用设置 |
 | --- | --- |
-| 让 VS Code 调用本机的 Qihe | `vide.qihe.command` |
+| 让 VS Code 调用本机的骑河（Qihe） | `vide.qihe.command` |
 | 指定本机的 `verible-verilog-format` | `vide.formatter.path` |
 | 控制诊断刷新是保存后还是输入时 | `vide.diagnostics.update` |
 | 开关端口、参数、结构结尾的行内提示 | `vide.inlayHints.*` |
@@ -52,7 +53,23 @@ import VscodeSettingsTable from '../../../components/VscodeSettingsTable.astro';
 
 运行 `Vide：运行 Qihe 分析` 时才需要看这组设置。
 
-对应日常使用页：[Qihe](../../user-guide/daily-use/qihe/)。
+对应日常使用页：[骑河（Qihe）](../../user-guide/daily-use/qihe/)。
+
+<ThinLinkCard
+  href="https://qihe.pascal-lab.net/"
+  title="骑河（Qihe）项目主页"
+  action="打开"
+>
+  了解骑河（Qihe）的获取方式和项目入口。
+</ThinLinkCard>
+
+<ThinLinkCard
+  href="https://qihe-docs.pascal-lab.net/platform-cli/getting-started.html"
+  title="骑河（Qihe）命令行快速开始"
+  action="打开"
+>
+  配置 VS Code 前，先确认本机 <code>qihe</code> 命令可用。
+</ThinLinkCard>
 
 <VscodeSettingsTable
   locale="zh"
@@ -64,7 +81,7 @@ import VscodeSettingsTable from '../../../components/VscodeSettingsTable.astro';
   ]}
 />
 
-`Vide：运行 Qihe 分析` 只对本地 Verilog/SystemVerilog 文件可用。默认会从当前 `vide.toml` 推导 Qihe 编译模式、顶层模块、include 目录和宏定义。如果项目已经用脚本管理这些参数，关闭自动推导并显式配置 `compileArgs` / `runArgs`。
+`Vide：运行 Qihe 分析` 只对本地 Verilog/SystemVerilog 文件可用。默认会从当前 `vide.toml` 推导骑河（Qihe）编译模式、顶层模块、include 目录和宏定义。如果项目已经用脚本管理这些参数，关闭自动推导并显式配置 `compileArgs` / `runArgs`。
 
 示例：
 
@@ -106,6 +123,22 @@ import VscodeSettingsTable from '../../../components/VscodeSettingsTable.astro';
 配置格式化时看这组。Vide 会调用外部 `verible-verilog-format`。
 
 对应日常使用页：[格式化](../../user-guide/daily-use/formatting/)。
+
+<ThinLinkCard
+  href="https://github.com/chipsalliance/verible#installation"
+  title="Verible 安装说明"
+  action="打开"
+>
+  安装或更新外部 <code>verible-verilog-format</code> 工具。
+</ThinLinkCard>
+
+<ThinLinkCard
+  href="https://chipsalliance.github.io/verible/verilog_format.html"
+  title="verible-verilog-format 参数文档"
+  action="打开"
+>
+  配置 <code>vide.formatter.args</code> 前先对照这里的参数。
+</ThinLinkCard>
 
 <VscodeSettingsTable
   locale="zh"
