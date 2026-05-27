@@ -10,9 +10,9 @@ import { inlayHintFiles } from '../../../../../examples/dailyUse';
 
 ## What It Is
 
-Inlay hints are inline annotations shown by VS Code. Vide shows target port names next to ordered port connections, target parameter names next to ordered parameter assignments, and structure names near endings such as `endmodule`.
+Inlay hints are inline annotations shown by VS Code. Vide shows target port names and direction arrows next to instance port connections: input `←`, output `→`, inout `↔`, ref `&`; if the port name already exists in code, Vide only shows the direction arrow to avoid repetition. It also shows target parameter names next to ordered parameter assignments and structure names near endings such as `endmodule`.
 
-These hints do not change source code; they only make the relationship between the target module and the current position visible in the editor.
+These hints display the relationship between the target module and the current position directly in the editor. Ctrl-click or double-click can trigger different navigation or code actions.
 
 ## Demo
 

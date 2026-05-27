@@ -3,6 +3,7 @@ title: Automatic Refactoring
 description: Fill ports and parameters, convert connection styles, remove empty connections, and convert numeric literal bases.
 ---
 
+import Codicon from '../../../../../components/Codicon.astro';
 import FeatureExample from '../../../../../components/FeatureExample.astro';
 import VideLab from '../../../../../components/VideLab.astro';
 import missingPortGif from '../../../assets/features/missing-port.gif';
@@ -10,7 +11,7 @@ import { missingPortFiles } from '../../../../../examples/dailyUse';
 
 ## What It Is
 
-Code actions are the fixes and refactors shown in VS Code's lightbulb menu. Vide generates them from the current position, instance structure, and selected diagnostics to handle repetitive RTL edits such as port connections, parameter assignments, and integer literals.
+Automatic refactoring is VS Code <Codicon name="lightbulb" label="Lightbulb menu icon" color="#facc15" /> lightbulb Code Actions. Vide generates fixes or rewrites from the current position, instance structure, and selected diagnostics to handle repetitive and error-prone RTL edits such as port connections, parameter assignments, and integer literal base conversion.
 
 ## Demo
 

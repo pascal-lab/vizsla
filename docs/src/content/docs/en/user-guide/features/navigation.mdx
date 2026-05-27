@@ -37,15 +37,10 @@ Vide wires VS Code's `Go to Definition`, `Peek Definition`, `Go to Declaration`,
 
 ## Project Configuration
 
-Definition needs Vide to resolve the target file. Without `vide.toml`, Vide scans the workspace to provide reading-time jumps. After `vide.toml` is configured, targets are resolved through `sources`, `libraries`, `include_dirs`, and `defines`.
-
-Check these fields first:
-
-- `sources` covers the file containing the target module.
-- `libraries` includes external dependency projects.
-- `include_dirs` contains directories used by `` `include ``.
-- `defines` enables the macro branch containing the target code.
+Definition needs Vide to resolve the target file. Without `vide.toml`, Vide scans the workspace to provide reading-time jumps. After `vide.toml` is configured, go to definition resolves targets through the project structure described by `vide.toml`.
 
 ## Duplicate Modules
 
-Without project configuration, Vide chooses a nearby and unique candidate for reading. Real projects should handle duplicate module names through explicit project configuration, library boundaries, or build scripts. See [Analysis Model](../../../../advanced-guide/parsing-and-analysis/#navigation-and-duplicate-module-names) for details.
+Without project configuration, if one instance can match multiple modules with the same name, Vide chooses a nearby and unique candidate for reading. If no unique target can be analyzed, Vide reports a hint on the code.
+
+This behavior is not a standard language rule. Real projects should handle duplicate module names through explicit project configuration, library boundaries, or build scripts. See [Analysis Model](../../../advanced-guide/parsing-and-analysis/#navigation-and-duplicate-modules) for details.

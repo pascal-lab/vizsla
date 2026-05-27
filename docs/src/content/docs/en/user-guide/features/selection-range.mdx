@@ -1,31 +1,35 @@
 ---
 title: Selection Range
-description: Expand or shrink selections by RTL syntax nodes.
+description: Expand or shrink selections from the cursor to identifiers, expressions, connections, and code blocks.
 ---
 
 import VideLab from '../../../../../components/VideLab.astro';
-import { inlayHintFiles } from '../../../../../examples/dailyUse';
+import { structureFiles } from '../../../../../examples/dailyUse';
 
 ## What It Is
 
-Selection range powers VS Code's `Expand Selection` and `Shrink Selection`. Plain text selection expands by characters; Vide expands by RTL syntax nodes, which is better for selecting expressions, port connections, parameter lists, instances, block statements, or whole modules.
+Selection range powers VS Code's `Expand Selection` and `Shrink Selection`. For example, when the cursor is on `choose_b`, repeated expansion can grow from `choose_b` to `.sel(choose_b)`, then to the whole instance connection, and then to the surrounding module. When copying, deleting, replacing, or wrapping RTL structures, you do not need to drag the mouse precisely to parentheses, commas, or `end`.
+
+There are two ways to run it: press `F1` and search `Expand Selection` or `Shrink Selection`; or use the default shortcuts, `Shift+Alt+Right` and `Shift+Alt+Left` on Windows/Linux, `Ctrl+Shift+Cmd+Right` and `Ctrl+Shift+Cmd+Left` on macOS. If another extension owns the shortcut, search `editor.action.smartSelect.expand` and `editor.action.smartSelect.shrink` in VS Code Keyboard Shortcuts to rebind them.
 
 ## Demo
+
+Place the cursor on `choose_b` and run `Expand Selection` repeatedly. The selection grows outward along the RTL syntax structure; `Shrink Selection` moves back in the reverse order.
 
 <VideLab
   projectId="daily-selection-range"
   projectLabel="Features: Selection Range"
   entryFile="inlay_hints.v"
-  files={inlayHintFiles}
+  files={structureFiles}
   initialActiveFile="inlay_hints.v"
-  initialSelection="18:28-18:36"
+  initialSelection="21:14-21:22"
   title="Expand by syntax structure"
-  description="Run Expand Selection near choose_b and watch the selection grow from identifier to connection, instance, and module."
+  description="Run Expand Selection on choose_b and watch the selection grow from signal name to port connection, instance, and module."
 />
 
 ## Project Configuration
 
-Selection ranges mainly come from the current file's syntax tree, so they work in single-file cases. Project configuration makes macro branches and include-expanded structure closer to the real project, which improves the selection hierarchy.
+Selection ranges mainly come from the current file's syntax tree, so they work in single-file cases. Project configuration affects include and macro-expanded structure; after it is configured correctly, the selection hierarchy from those structures follows the real project.
 
 ## Related Features
 

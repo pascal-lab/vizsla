@@ -1,6 +1,6 @@
 ---
 title: Semantic Highlighting
-description: Highlight port direction, clock/reset signals, and read/write positions with RTL semantics.
+description: Distinguish port directions, clock/reset ports, instances, and types with RTL semantics.
 ---
 
 import FeatureExample from '../../../../../components/FeatureExample.astro';
@@ -10,15 +10,15 @@ import { semanticTokenFiles } from '../../../../../examples/dailyUse';
 
 ## What It Is
 
-Syntax highlighting only knows whether text looks like a keyword, number, or comment. Semantic highlighting uses Vide's analysis result to mark port direction, clock/reset ports, and symbol read/write positions. When the active VS Code theme styles semantic tokens, these details appear as colors or font styles.
+Syntax highlighting only knows whether a token looks like a keyword, number, or comment. Semantic highlighting uses Vide's parse result so RTL identifiers that look the same can use different styles. When reading code, you can more quickly distinguish clock/reset ports, input/output ports, module instance names, and `typedef` types. In the default display, input ports are bold (for example <strong>data_i</strong>), output ports are bold and underlined (for example <strong><u>data_o</u></strong>), and clock/reset ports use colors that differ from ordinary ports.
 
 ## Demo
 
 <FeatureExample
   image={semanticTokensImage}
-  imageAlt="Screenshot showing semantic colors for input/output, clk/rst, and read/write positions"
+  imageAlt="Screenshot showing semantic colors for input/output ports, clk/rst ports, instances, and types"
   imageCaption="Semantic highlighting in VS Code"
-  labCaption="Inspect the same semantic tokens in the browser"
+  labCaption="Inspect the same semantic markings in the browser"
 >
   <VideLab
     projectId="daily-semantic-tokens"
@@ -29,13 +29,13 @@ Syntax highlighting only knows whether text looks like a keyword, number, or com
     initialActiveFile="semantic-token-demo.v"
     initialSelection="1:1-18:10"
     title="Semantic highlighting"
-    description="Compare input/output ports, clk/rst ports, and signal read/write positions."
+    description="Compare semantic colors for input/output ports, clk/rst ports, instance names, and type names."
   />
 </FeatureExample>
 
 ## Project Configuration
 
-Basic semantic tokens for the current file can be computed directly. Cross-file resolution, macro branches, and include relationships affect target modules, ports, and declarations. After `vide.toml` is configured, semantic highlighting follows the project structure described by `sources`, `include_dirs`, `defines`, and `libraries`.
+Basic semantic markings for the current file can be computed directly. Cross-file resolution, macro branches, and include relationships affect target modules, ports, and declarations. After `vide.toml` is configured, semantic highlighting refreshes from the project structure described by `vide.toml`.
 
 ## Settings
 

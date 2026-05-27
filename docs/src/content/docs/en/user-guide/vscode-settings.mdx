@@ -43,6 +43,8 @@ After these server launch settings change, the extension prompts you to `Restart
 
 If you do not use `Vide: Run Qihe Analysis`, keep these defaults. By default, Vide derives the Qihe compile mode, top module, include directories, and macro definitions from the current `vide.toml`.
 
+Related feature: [Qihe Analysis](../features/qihe/).
+
 <VscodeSettingsTable
   locale="en"
   settings={[
@@ -57,21 +59,29 @@ If you do not use `Vide: Run Qihe Analysis`, keep these defaults. By default, Vi
 
 These settings are mainly for file-watching troubleshooting. Use `sources` / `exclude` in `vide.toml` for project file selection.
 
+Related docs: [Project Configuration Reference](../project-configuration/).
+
 <VscodeSettingsTable locale="en" settings={['vide.files.excludeDirs', 'vide.files.watcher']} />
 
 ## Workspace
+
+Related docs: [Configure the First Project](../first-project/) and [Project Configuration Reference](../project-configuration/).
 
 <VscodeSettingsTable locale="en" settings={['vide.workspace.auto.reload']} />
 
 ## Scope
 
-This setting affects reading features such as navigation, references, and rename. Keep the default when unsure.
+This setting affects local-symbol visibility in find references, rename, and document highlights. Keep the default when unsure.
+
+Related features: [Find References](../features/references/) and [Rename](../features/rename/).
 
 <VscodeSettingsTable locale="en" settings={['vide.scope.visibility']} />
 
 ## Formatter and Formatting
 
 Configure these only if you use Verilog/SystemVerilog formatting. Vide calls an external `verible-verilog-format`.
+
+Related feature: [Formatting](../features/formatting/).
 
 <VscodeSettingsTable
   locale="en"
@@ -89,6 +99,8 @@ Configure these only if you use Verilog/SystemVerilog formatting. Vide calls an 
 
 Inlay hints appear directly in the editor and are useful for reading port and parameter connections.
 
+Related feature: [Inlay Hints](../features/inlay-hints/).
+
 <VscodeSettingsTable
   locale="en"
   settings={[
@@ -102,11 +114,15 @@ Inlay hints appear directly in the editor and are useful for reading port and pa
 
 Instance-count lens entries appear above module declarations.
 
+Related features: [Document Symbols](../features/document-symbols/) and [Find References](../features/references/).
+
 <VscodeSettingsTable locale="en" settings={['vide.lens.instantiations.enable']} />
 
 ## Semantic Tokens
 
-Semantic tokens can make port direction, clock/reset ports, and read/write positions easier to distinguish when your theme supports them.
+Semantic tokens can make port direction, clock signals, and reset signals easier to distinguish when your theme supports them.
+
+Related feature: [Semantic Highlighting](../features/semantic-highlighting/).
 
 <VscodeSettingsTable
   locale="en"
@@ -116,6 +132,8 @@ Semantic tokens can make port direction, clock/reset ports, and read/write posit
 ## Diagnostics
 
 Diagnostics appear in the VS Code `Problems` panel and as editor underlines.
+
+Related feature: [Diagnostics](../features/diagnostics/).
 
 <VscodeSettingsTable
   locale="en"
@@ -132,5 +150,7 @@ Diagnostics appear in the VS Code `Problems` panel and as editor underlines.
 ## Signature Help
 
 Signature help is used for instance port connections and parameter assignment lists.
+
+Related feature: [Signature Help](../features/signature-help/).
 
 <VscodeSettingsTable locale="en" settings={['vide.signature.help.params.only']} />
