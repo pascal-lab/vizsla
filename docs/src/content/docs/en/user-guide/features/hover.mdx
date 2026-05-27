@@ -6,7 +6,7 @@ description: Inspect modules, ports, parameters, tasks, functions, and literals 
 import FeatureExample from '../../../../../components/FeatureExample.astro';
 import VideLab from '../../../../../components/VideLab.astro';
 import hoverGif from '../../../assets/features/hover.gif';
-import { navigationFiles } from '../../../../../examples/dailyUse';
+import { hoverFiles } from '../../../../../examples/dailyUse';
 
 ## What It Is
 
@@ -25,13 +25,13 @@ Vide generates VS Code hover content from the resolved symbol at the current pos
   <VideLab
     projectId="daily-hover"
     projectLabel="Features: Hover"
-    entryFile="top.v"
-    files={navigationFiles}
+    entryFile="hover.v"
+    files={hoverFiles}
     height="100%"
-    initialActiveFile="top.v"
-    initialSelection="8:5-8:13"
+    initialActiveFile="hover.v"
+    initialSelection="18:5-18:12"
     title="Inspect an instance target"
-    description="Place the cursor on and_gate to inspect the target module ports."
+    description="Place the cursor on blinker or a number literal to inspect the module interface and literal interpretation."
   />
 </FeatureExample>
 

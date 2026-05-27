@@ -6,11 +6,11 @@ description: Rename RTL symbols across the project and update declarations and r
 import FeatureExample from '../../../../../components/FeatureExample.astro';
 import VideLab from '../../../../../components/VideLab.astro';
 import codeActionRenameGif from '../../../assets/features/code-action-rename.gif';
-import { editAidFiles } from '../../../../../examples/dailyUse';
+import { codeActionRenameFiles } from '../../../../../examples/dailyUse';
 
 ## What It Is
 
-Rename changes a symbol's declaration and references together. It is useful for signals, ports, parameters, and local names. Vide first resolves the symbol at the cursor, then generates a VS Code workspace edit.
+Rename changes the declaration and references of the same RTL symbol together. It is safer than manual search-and-replace because Vide first resolves the symbol at the cursor, then generates a VS Code workspace edit.
 
 ## Demo
 
@@ -24,12 +24,12 @@ Rename changes a symbol's declaration and references together. It is useful for 
     projectId="daily-rename"
     projectLabel="Features: Rename"
     entryFile="code_action_rename.v"
-    files={editAidFiles}
+    files={codeActionRenameFiles}
     height="100%"
     initialActiveFile="code_action_rename.v"
-    initialSelection="22:16-22:23"
+    initialSelection="22:16-22:28"
     title="Rename a connected signal"
-    description="Rename smp_cnt and observe the declaration and references update together."
+    description="Rename sample_count and observe the declaration and references update together."
   />
 </FeatureExample>
 

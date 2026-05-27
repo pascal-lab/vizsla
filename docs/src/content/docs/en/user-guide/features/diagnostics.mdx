@@ -5,8 +5,8 @@ description: Use Vide diagnostics in the Problems panel, tune refresh behavior, 
 
 import FeatureExample from '../../../../../components/FeatureExample.astro';
 import VideLab from '../../../../../components/VideLab.astro';
-import missingPortGif from '../../../assets/features/missing-port.gif';
-import { diagnosticFiles } from '../../../../../examples/dailyUse';
+import diagnosticImage from '../../../assets/features/diagnostic.png';
+import { slangDiagnosticFiles } from '../../../../../examples/dailyUse';
 
 ## What Diagnostics Are
 
@@ -15,22 +15,22 @@ Diagnostics are errors, warnings, and hints that Vide asks the editor to show. T
 ## Demo
 
 <FeatureExample
-  image={missingPortGif}
-  imageAlt="Animation showing a missing port connection diagnostic in VS Code"
-  imageCaption="Missing port diagnostic in VS Code"
-  labCaption="Inspect the same missing port in the browser"
+  image={diagnosticImage}
+  imageAlt="VS Code screenshot showing an undeclared identifier diagnostic"
+  imageCaption="Undeclared identifier diagnostic in VS Code"
+  labCaption="Inspect the same diagnostic in the browser"
 >
   <VideLab
     projectId="daily-diagnostics"
     projectLabel="Features: Diagnostics"
-    entryFile="missing_port_example.v"
-    files={diagnosticFiles}
+    entryFile="diagnostics.v"
+    files={slangDiagnosticFiles}
     height="100%"
-    initialActiveFile="missing_port_example.v"
-    initialSelection="14:5-17:6"
+    initialActiveFile="diagnostics.v"
+    initialSelection="15:32-15:44"
     initialDiagnosticsOpen
-    title="Missing port connection diagnostic"
-    description="child.y is not connected. Open the diagnostics panel and inspect the marker and diagnostic list."
+    title="Undeclared identifier diagnostic"
+    description="missing_step and missing_enable are not declared. Load the example, open the diagnostics panel, and inspect the markers and diagnostic list."
   />
 </FeatureExample>
 

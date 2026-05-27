@@ -11,11 +11,7 @@ import ThinLinkCard from '../../../../../components/ThinLinkCard.astro';
 
 Qihe is a general-purpose Verilog static analysis framework from the PASCAL research group behind Vide. It includes a set of deep hardware analysis capabilities that can be used out of the box.
 
-## How Qihe Relates to Vide
-
 Qihe and Vide are complementary. Vide focuses on fast, immediate static-analysis feedback during hardware development, so it is not the right place for deeper and more expensive tasks such as hardware vulnerability mining. Qihe focuses on deep static analysis for non-realtime workflows.
-
-## What the Vide Integration Does
 
 Vide can call the Qihe command-line tool from `vide.toml`, run Qihe analysis for the whole project, and show Qihe diagnostics in the editor. Together, Vide and Qihe provide both immediate feedback and deeper analysis results inside the same VS Code workflow.
 
@@ -41,11 +37,11 @@ Before using Qihe from Vide, register on the [Qihe project site](https://qihe.pa
 
 ## Run Qihe
 
-Vide can run Qihe on the whole project or on the current file. The command only accepts local saved RTL files: the target must be a `file:` URI, and its extension must be `.v`, `.vh`, `.sv`, `.svh`, or `.svi`.
+Vide currently supports running Qihe on the whole project or on the current file.
 
 ### Analyze a Project
 
-Project analysis needs a `vide.toml` manifest that describes source files, include directories, macro definitions, and top modules. See [Configure the First Project](../../first-project/) and [Project Configuration Reference](../../project-configuration/) for the full setup.
+Project analysis needs `vide.toml` to describe source files, include directories, macro definitions, and top modules. See [Configure the First Project](../../first-project/) and [Project Configuration Reference](../../project-configuration/) for the full setup.
 
 A single-file project can be organized like this:
 
@@ -178,6 +174,6 @@ If Qihe analysis fails, open the `Vide Qihe` output channel first and check:
 
 If the error is related to include paths, macro definitions, or top modules, fix [Project Configuration](../../project-configuration/) first.
 
-If the error is related to the Qihe command path, set `vide.qihe.command` to the absolute path of the `qihe` executable.
+If the error is related to the Qihe command path, first set `vide.qihe.command` to the absolute path of the `qihe` executable. On Windows, if the default shell resolves the batch entry point, set it to the absolute path of `qihe.bat`.
 
 If the problem comes from Qihe's own compile or run process, file an issue in the [Qihe project](https://qihe.pascal-lab.net/).

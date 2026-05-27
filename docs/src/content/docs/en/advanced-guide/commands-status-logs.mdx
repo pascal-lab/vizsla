@@ -16,7 +16,7 @@ The VS Code extension contributes these commands. Use the Command Palette title 
 | `vide.showOutput` | `Vide: Show Language Server Output` | Opens the `Vide Language Server` output channel. |
 | `vide.restartServer` | `Vide: Restart Language Server` | Stops and restarts the current language server. |
 | `vide.showServerVersion` | `Vide: Show Server Version` | Runs the current server command with the current cwd and environment, combines `vide.server.args` with `--version`, and does not append `vide.server.additionalArgs`. |
-| `vide.reloadWorkspace` | `Vide: Reload Project Configuration` | Rereads project manifests and refreshes project information without restarting the server. |
+| `vide.reloadWorkspace` | `Vide: Reload Project Configuration` | Rereads project configuration files and refreshes project information without restarting the server. |
 | `vide.showStatus` | `Vide: Show Status` | Opens the Vide status menu. |
 | `vide.runQiheAnalysis` | `Vide: Run Qihe Analysis` | Runs Qihe analysis for the current local Verilog/SystemVerilog file. |
 | `vide.profileDiagnostics` | `Vide: Profile Diagnostics` | Starts a temporary language server and runs one diagnostics profiling pass for the workspace or current file. |
@@ -31,10 +31,10 @@ The main status item is named `Vide` and appears on the right side of the VS Cod
 | --- | --- |
 | `Vide` | The server has started; hover to see project configuration state. |
 | <Codicon name="sync" modifier="spin" label="Sync spin icon" /> `Vide` | Server startup, shutdown, or project configuration loading is in progress. |
-| <Codicon name="warning" label="Warning icon" /> `Vide` | Usually means the current workspace has no project manifest. |
+| <Codicon name="warning" label="Warning icon" /> `Vide` | Usually means the current workspace has no project configuration file. |
 | <Codicon name="error" label="Error icon" /> `Vide` | Server startup or project configuration loading failed. |
 
-Click the `Vide` status item or run `Vide: Show Status` to open the status menu. Menu items vary with project state; common actions include opening or creating the project manifest, profiling diagnostics, reloading the project, restarting the language server, and showing output.
+Click the `Vide` status item or run `Vide: Show Status` to open the status menu. Menu items vary with project state; common actions include opening or creating the project configuration file, profiling diagnostics, reloading the project, restarting the language server, and showing output.
 
 When Qihe analysis runs, a separate `Qihe` status item appears. If Qihe fails, clicking that item opens the `Vide Qihe` output channel.
 

@@ -1,12 +1,12 @@
 ---
-title: Code Actions
+title: Automatic Refactoring
 description: Fill ports and parameters, convert connection styles, remove empty connections, and convert numeric literal bases.
 ---
 
 import FeatureExample from '../../../../../components/FeatureExample.astro';
 import VideLab from '../../../../../components/VideLab.astro';
-import codeActionsGif from '../../../assets/features/code-actions.gif';
-import { editAidFiles } from '../../../../../examples/dailyUse';
+import missingPortGif from '../../../assets/features/missing-port.gif';
+import { missingPortFiles } from '../../../../../examples/dailyUse';
 
 ## What It Is
 
@@ -15,21 +15,21 @@ Code actions are the fixes and refactors shown in VS Code's lightbulb menu. Vide
 ## Demo
 
 <FeatureExample
-  image={codeActionsGif}
-  imageAlt="Animation showing VS Code code actions and refactors"
-  imageCaption="Code actions in VS Code"
-  labCaption="Edit the same counter in the browser"
+  image={missingPortGif}
+  imageAlt="Animation showing VS Code code actions completing a missing port connection"
+  imageCaption="Completing a missing port connection in VS Code"
+  labCaption="Edit the same missing-port example in the browser"
 >
   <VideLab
     projectId="daily-code-actions"
     projectLabel="Features: Code Actions"
-    entryFile="code_action_rename.v"
-    files={editAidFiles}
+    entryFile="missing_port_example.v"
+    files={missingPortFiles}
     height="100%"
-    initialActiveFile="code_action_rename.v"
-    initialSelection="22:5-27:6"
-    title="Code actions near an instance"
-    description="Open the lightbulb menu near u_counter to inspect available refactors."
+    initialActiveFile="missing_port_example.v"
+    initialSelection="14:5-17:6"
+    title="Complete a missing port connection"
+    description="child.y is not connected. Load the example, open the lightbulb menu near u_child, and run the connection completion action."
   />
 </FeatureExample>
 

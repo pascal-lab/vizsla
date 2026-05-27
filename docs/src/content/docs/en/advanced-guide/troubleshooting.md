@@ -3,7 +3,7 @@ title: Advanced Troubleshooting
 description: Debug local VSIX packages, bundled servers, custom servers, file watching, logs, and profiling.
 ---
 
-This page keeps advanced startup, logging, and debugging issues only. For normal stale diagnostics, failed navigation, formatting failures, or Qihe run failures, start from the related page in [Features](../../user-guide/daily-use/).
+This page keeps advanced startup, logging, and debugging issues only. For normal stale diagnostics, failed navigation, formatting failures, or Qihe run failures, start from the related page in [Features](../../user-guide/features/).
 
 For startup checks, use [Server Self-Check](../check-server/). Command, status bar, and output channel entry points are in the [Operations Reference](../commands-status-logs/).
 
@@ -74,7 +74,7 @@ If project file changes do not trigger a refresh:
 }
 ```
 
-`vide.files.excludeDirs` only accepts workspace-relative directories and does not support globs. Prefer the project manifest's `sources` / `exclude` globs for file selection. If you also want to reduce VS Code watcher events, configure VS Code's `files.watcherExclude` separately.
+`vide.files.excludeDirs` only accepts workspace-relative directories and does not support globs. Prefer the project configuration file's `sources` / `exclude` globs for file selection. If you also want to reduce VS Code watcher events, configure VS Code's `files.watcherExclude` separately.
 
 ## Need More Detailed Server Logs
 

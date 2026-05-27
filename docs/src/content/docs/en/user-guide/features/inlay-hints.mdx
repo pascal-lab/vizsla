@@ -6,7 +6,7 @@ description: Show port, parameter, and structure-name hints near instance connec
 import FeatureExample from '../../../../../components/FeatureExample.astro';
 import VideLab from '../../../../../components/VideLab.astro';
 import inlayHintsGif from '../../../assets/features/inlay-hints.gif';
-import { structureFiles } from '../../../../../examples/dailyUse';
+import { inlayHintFiles } from '../../../../../examples/dailyUse';
 
 ## What It Is
 
@@ -26,12 +26,12 @@ These hints do not change source code; they only make the relationship between t
     projectId="daily-inlay-hints"
     projectLabel="Features: Inlay Hints"
     entryFile="inlay_hints.v"
-    files={structureFiles}
+    files={inlayHintFiles}
     height="100%"
     initialActiveFile="inlay_hints.v"
-    initialSelection="18:5-23:6"
-    title="Instance port hints"
-    description="Inspect the hints beside u_mux, then open mux2 to compare the port list."
+    initialSelection="18:5-18:40"
+    title="Instance port inlay hints"
+    description="Inspect the parameter and port names shown beside u_mux ordered parameter and port connections."
   />
 </FeatureExample>
 

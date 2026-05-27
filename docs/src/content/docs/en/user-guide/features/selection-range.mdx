@@ -4,7 +4,7 @@ description: Expand or shrink selections by RTL syntax nodes.
 ---
 
 import VideLab from '../../../../../components/VideLab.astro';
-import { structureFiles } from '../../../../../examples/dailyUse';
+import { inlayHintFiles } from '../../../../../examples/dailyUse';
 
 ## What It Is
 
@@ -16,9 +16,9 @@ Selection range powers VS Code's `Expand Selection` and `Shrink Selection`. Plai
   projectId="daily-selection-range"
   projectLabel="Features: Selection Range"
   entryFile="inlay_hints.v"
-  files={structureFiles}
+  files={inlayHintFiles}
   initialActiveFile="inlay_hints.v"
-  initialSelection="20:14-20:15"
+  initialSelection="18:28-18:36"
   title="Expand by syntax structure"
   description="Run Expand Selection near choose_b and watch the selection grow from identifier to connection, instance, and module."
 />

@@ -14,7 +14,7 @@ Click `Vide` on the right side of the VS Code status bar, or run `Vide: Show Sta
 | No menu-top error, and hover text says the server is connected | Startup is usually healthy; if diagnostics or navigation are missing, check project configuration next. |
 | The menu shows a language server error | Note the error text, then open the `Vide Language Server` output channel. |
 | The status keeps showing startup progress | Open the `Vide Language Server` output channel directly. |
-| The menu says no project manifest is available | Startup is usually not the issue; create or open the project manifest first. |
+| The menu says no project configuration file is available | Startup is usually not the issue; create or open the project configuration file first. |
 
 ## 2. Check Language Server Output
 

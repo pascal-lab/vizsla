@@ -5,8 +5,8 @@ description: Find where modules, ports, parameters, and signals are used across 
 
 import FeatureExample from '../../../../../components/FeatureExample.astro';
 import VideLab from '../../../../../components/VideLab.astro';
-import findAllReferencesImage from '../../../../../assets/homepage-features/find-all-references.jpeg';
-import { navigationFiles } from '../../../../../examples/dailyUse';
+import findAllReferencesImage from '../../../assets/features/find-all-references.png';
+import { usageFiles } from '../../../../../examples/dailyUse';
 
 ## What It Is
 
@@ -25,13 +25,13 @@ Vide responds to VS Code's `Find All References` and `Peek References`. Results 
   <VideLab
     projectId="daily-references"
     projectLabel="Features: References"
-    entryFile="top.v"
-    files={navigationFiles}
+    entryFile="usage.v"
+    files={usageFiles}
     height="100%"
-    initialActiveFile="top.v"
-    initialSelection="8:5-8:13"
-    title="Find module instance references"
-    description="Run Find All References on and_gate or gate_out and inspect the references view."
+    initialActiveFile="usage.v"
+    initialSelection="26:10-26:25"
+    title="Find signal references"
+    description="Run Find All References on one_cycle_pulse and inspect the declaration, port connection, and assign usage."
   />
 </FeatureExample>
 

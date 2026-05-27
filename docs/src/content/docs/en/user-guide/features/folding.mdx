@@ -4,7 +4,7 @@ description: Fold modules, port lists, declarations, block statements, and comme
 ---
 
 import VideLab from '../../../../../components/VideLab.astro';
-import { structureFiles } from '../../../../../examples/dailyUse';
+import { inlayHintFiles } from '../../../../../examples/dailyUse';
 
 ## What It Is
 
@@ -16,9 +16,9 @@ Folding lets the editor collapse code by structure. Vide provides VS Code foldin
   projectId="daily-folding"
   projectLabel="Features: Folding"
   entryFile="inlay_hints.v"
-  files={structureFiles}
+  files={inlayHintFiles}
   initialActiveFile="inlay_hints.v"
-  initialSelection="1:1-23:10"
+  initialSelection="1:1-19:10"
   title="Fold by RTL structure"
   description="Use VS Code folding controls to collapse modules, port lists, and instance connections."
 />

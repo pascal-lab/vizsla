@@ -15,8 +15,8 @@ Three terms are useful:
 
 | Configuration | What Vide reads | Project analysis |
 | --- | --- | --- |
-| No project manifest | Best-effort indexes the workspace | Not created |
-| Manifest exists but omits `sources` | Best-effort indexes the workspace | Not created for those default-indexed files |
+| No project configuration file | Best-effort indexes the workspace | Not created |
+| Project configuration file exists but omits `sources` | Best-effort indexes the workspace | Not created for those default-indexed files |
 | Omits `sources`, but sets `include_dirs` | Best-effort indexes the workspace and loads include directories | Include directories can be used by project analysis; default-indexed files do not participate |
 | `sources = []` | Does not scan the workspace automatically | Not created |
 | `sources = []` with `include_dirs` | Loads only include directories | Include directories can be used by project analysis |
@@ -26,7 +26,7 @@ A short way to remember it: omitted `sources` means "read the workspace for me, 
 
 `include_dirs` only controls include search. If you set `sources` explicitly but omit `include_dirs`, Vide infers a default include directory from `sources`. For example, `sources = ["rtl/**/*.sv"]` uses `rtl` as the default include directory. When `sources` is omitted, Vide does not infer include directories from best-effort indexing. If `include_dirs = []` is set explicitly, no fallback is used.
 
-`libraries` are loaded as dependency workspaces and participate in the current project's analysis. `exclude` is a workspace-relative glob that filters generated files, simulation output, or black-box files out of loaded files. See [Project Configuration](../../user-guide/project-configuration/#paths-and-globs) for glob syntax.
+`libraries` are loaded as dependency workspaces and participate in the current project's analysis. `exclude` is a workspace-relative glob that filters generated files, simulation output, or black-box files out of loaded files. See [Project Configuration](../../user-guide/project-configuration/#path-and-glob-rules-for-sources-and-exclude) for glob syntax.
 
 ## Why Diagnostics Differ
 
@@ -55,15 +55,15 @@ This guess is not a SystemVerilog language rule. If there is one nearest candida
 
 ## Qihe Project Analysis
 
-Automatic Qihe project analysis uses the same manifest discovery result as Vide's project model. If the working directory contains `vide.toml`, Vide uses project analysis.
+Automatic Qihe project analysis uses the same project configuration discovery result as Vide's project model. If the working directory contains `vide.toml`, Vide uses project analysis.
 
-When a project manifest exists, Qihe uses the compile plan from project analysis. Vide only passes project files, `--top`, `-I`, and `-D` arguments when that plan has real source files.
+When a project configuration file exists, Qihe uses the compile plan from project analysis. Vide only passes project files, `--top`, `-I`, and `-D` arguments when that plan has real source files.
 
 If the current file only comes from best-effort indexing, or if no project compile plan is available, Vide lets Qihe fall back to single-file input. This prevents default indexing from accidentally triggering project analysis.
 
 ## FAQ
 
-:::note[Navigation and diagnostics without a manifest]
+:::note[Navigation and diagnostics without a project configuration file]
 Without `vide.toml`, navigation, references, hover, and completion can use information from best-effort indexing. Cross-file semantic diagnostics need explicit project analysis, usually from `vide.toml` entries such as `sources`, include directories, macro definitions, and libraries.
 :::
 
@@ -76,5 +76,5 @@ Without `vide.toml`, navigation, references, hover, and completion can use infor
 :::
 
 :::note[Qihe project-analysis fallback]
-Qihe reuses Vide's project manifest discovery result. Vide passes project files, `--top`, `-I`, and `-D` arguments only when a usable project manifest exists and the compile plan has real source files. Otherwise it falls back to single-file input.
+Qihe reuses Vide's project configuration discovery result. Vide passes project files, `--top`, `-I`, and `-D` arguments only when a usable project configuration file exists and the compile plan has real source files. Otherwise it falls back to single-file input.
 :::

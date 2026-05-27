@@ -4,7 +4,7 @@ description: Inspect target module parameters, ports, and the current position i
 ---
 
 import VideLab from '../../../../../components/VideLab.astro';
-import { structureFiles } from '../../../../../examples/dailyUse';
+import { inlayHintFiles } from '../../../../../examples/dailyUse';
 
 ## What It Is
 
@@ -16,9 +16,9 @@ Signature help shows the target module's parameters or ports while the cursor is
   projectId="daily-signature-help"
   projectLabel="Features: Signature Help"
   entryFile="inlay_hints.v"
-  files={structureFiles}
+  files={inlayHintFiles}
   initialActiveFile="inlay_hints.v"
-  initialSelection="18:11-18:11"
+  initialSelection="18:21-18:21"
   title="Inspect instance port signatures"
   description="Place the cursor in u_mux's parameter or port list to trigger signature help."
 />
