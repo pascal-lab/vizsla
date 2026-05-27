@@ -1,0 +1,136 @@
+---
+title: VS Code Settings
+description: Reference for Vide VS Code extension vide.* settings.
+---
+
+import VscodeSettingsTable from '../../../../components/VscodeSettingsTable.astro';
+
+VS Code settings control editor behavior such as diagnostic refresh, Qihe commands, formatting tools, inlay hints, and language-server launch arguments. Project source files, include directories, macro definitions, and dependency libraries belong in the `vide.toml` manifest described in [Project Configuration](../project-configuration/).
+
+All settings are under the `vide.*` namespace. Search for `Vide` in the VS Code Settings UI or edit user/workspace `settings.json` directly.
+
+## Common Settings Quick Reference
+
+| Goal | Common settings |
+| --- | --- |
+| Point VS Code at a local Qihe executable | `vide.qihe.command` |
+| Point Vide at `verible-verilog-format` | `vide.formatter.path` |
+| Refresh diagnostics on save or while typing | `vide.diagnostics.update` |
+| Toggle port, parameter, and end-structure inlay hints | `vide.inlayHints.*` |
+| Toggle instance counts above module declarations | `vide.lens.instantiations.enable` |
+| Refresh project information after manifest changes | `vide.workspace.auto.reload` |
+
+Server launch, file watching, diagnostic rules, and protocol tracing are mostly for troubleshooting or development. Keep their defaults unless you have a specific reason to change them.
+
+## Server
+
+These settings replace or debug the background language server. A normal installation does not need them.
+
+<VscodeSettingsTable
+  locale="en"
+  settings={[
+    'vide.server.command',
+    'vide.server.args',
+    'vide.server.additionalArgs',
+    'vide.server.cwd',
+    'vide.trace.server',
+  ]}
+/>
+
+After these server launch settings change, the extension prompts you to `Restart`: `vide.server.command`, `vide.server.args`, `vide.server.additionalArgs`, `vide.server.cwd`, `vide.trace.server`.
+
+## Qihe
+
+If you do not use `Vide: Run Qihe Analysis`, keep these defaults. By default, Vide derives the Qihe compile mode, top module, include directories, and macro definitions from the current `vide.toml`.
+
+<VscodeSettingsTable
+  locale="en"
+  settings={[
+    'vide.qihe.command',
+    'vide.qihe.autoConfigureArgsFromManifest',
+    'vide.qihe.compileArgs',
+    'vide.qihe.runArgs',
+  ]}
+/>
+
+## Files
+
+These settings are mainly for file-watching troubleshooting. Use `sources` / `exclude` in `vide.toml` for project file selection.
+
+<VscodeSettingsTable locale="en" settings={['vide.files.excludeDirs', 'vide.files.watcher']} />
+
+## Workspace
+
+<VscodeSettingsTable locale="en" settings={['vide.workspace.auto.reload']} />
+
+## Scope
+
+This setting affects reading features such as navigation, references, and rename. Keep the default when unsure.
+
+<VscodeSettingsTable locale="en" settings={['vide.scope.visibility']} />
+
+## Formatter and Formatting
+
+Configure these only if you use Verilog/SystemVerilog formatting. Vide calls an external `verible-verilog-format`.
+
+<VscodeSettingsTable
+  locale="en"
+  settings={[
+    'vide.formatter.provider',
+    'vide.formatter.path',
+    'vide.formatter.args',
+    'vide.formatting.on.enter',
+    'vide.formatting.in.comments',
+    'vide.formatting.indent.width',
+  ]}
+/>
+
+## Inlay Hints
+
+Inlay hints appear directly in the editor and are useful for reading port and parameter connections.
+
+<VscodeSettingsTable
+  locale="en"
+  settings={[
+    'vide.inlayHints.port.connection.enable',
+    'vide.inlayHints.parameter.assignment.enable',
+    'vide.inlayHints.end.structure.enable',
+  ]}
+/>
+
+## Lens
+
+Instance-count lens entries appear above module declarations.
+
+<VscodeSettingsTable locale="en" settings={['vide.lens.instantiations.enable']} />
+
+## Semantic Tokens
+
+Semantic tokens can make port direction, clock/reset ports, and read/write positions easier to distinguish when your theme supports them.
+
+<VscodeSettingsTable
+  locale="en"
+  settings={['vide.semantic.tokens.port.clk.rst.enable', 'vide.semantic.tokens.port.input.output.enable']}
+/>
+
+## Diagnostics
+
+Diagnostics appear in the VS Code `Problems` panel and as editor underlines.
+
+<VscodeSettingsTable
+  locale="en"
+  settings={[
+    'vide.diagnostics.enable',
+    'vide.diagnostics.update',
+    'vide.diagnostics.parse.enable',
+    'vide.diagnostics.semantic.enable',
+    'vide.diagnostics.slang.warnings',
+    'vide.diagnostics.slang.rules',
+  ]}
+/>
+
+## Signature Help
+
+Signature help is used for instance port connections and parameter assignment lists.
+
+<VscodeSettingsTable locale="en" settings={['vide.signature.help.params.only']} />

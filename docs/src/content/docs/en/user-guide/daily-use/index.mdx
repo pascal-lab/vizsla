@@ -1,24 +1,67 @@
 ---
-title: Daily Use
-description: Use Vide language support, diagnostics, navigation, structure help, completion, signature help, quick fixes, formatting, and Qihe by task.
+title: Feature Details
+description: Learn Vide go to definition, references, hover, completion, rename, syntax highlighting, semantic highlighting, inlay hints, document symbols, folding, refactoring, diagnostics, signature help, selection ranges, formatting, and Qihe.
 ---
 
 import { CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-Start from everyday tasks: recognizing RTL files, reading diagnostics, navigating code, completing and refactoring, formatting, and running Qihe from VS Code.
-
-Configuration lives in two places:
-
-- Project structure belongs in the workspace `vide.toml`: source files, include directories, macro definitions, and library dependencies.
-- Editor behavior belongs in VS Code Settings: diagnostic refresh, inlay hints, semantic highlighting, formatting, Qihe commands, and other `vide.*` settings. Press `Ctrl+,` and search for `Vide`, or run `Preferences: Open User Settings (JSON)` / `Preferences: Open Workspace Settings (JSON)` and add the setting keys there.
-
-See [VS Code Settings Reference](../../advanced-guide/vscode-settings/) for the full `vide.*` reference.
+This section explains the RTL editing features that Vide provides in VS Code. Each feature page describes the problem it solves, includes an interactive demo, and ends with the relevant `vide.toml` or VS Code Settings knobs for tailoring that feature.
 
 <CardGrid>
   <LinkCard
-    title="Language Support"
-    href="./language-support/"
-    description="Check file extensions, syntax highlighting, basic editor behavior, and project configuration boundaries."
+    title="Go to Definition"
+    href="./navigation/"
+    description="Jump from instances, symbols, and port connections to the real definitions Vide resolves."
+  />
+  <LinkCard
+    title="Find References"
+    href="./references/"
+    description="Find module, port, parameter, and signal usages across the project."
+  />
+  <LinkCard
+    title="Hover"
+    href="./hover/"
+    description="Inspect modules, ports, parameters, tasks, functions, and number literals beside the code."
+  />
+  <LinkCard
+    title="Completion"
+    href="./completion/"
+    description="Get candidates in expressions, instance connections, parameters, and preprocessor positions."
+  />
+  <LinkCard
+    title="Rename"
+    href="./rename/"
+    description="Rename RTL symbols across the project and update declarations and references together."
+  />
+  <LinkCard
+    title="Syntax Highlighting"
+    href="./syntax-highlighting/"
+    description="Confirm file recognition, base highlighting, and language-server boundaries."
+  />
+  <LinkCard
+    title="Semantic Highlighting"
+    href="./semantic-highlighting/"
+    description="Mark RTL semantics such as port directions, clocks, resets, and read/write positions."
+  />
+  <LinkCard
+    title="Inlay Hints"
+    href="./inlay-hints/"
+    description="Show port, parameter, and structure-name hints inside instance connections and block endings."
+  />
+  <LinkCard
+    title="Document Symbols"
+    href="./document-symbols/"
+    description="Browse RTL file structure through Outline, breadcrumbs, and symbol views."
+  />
+  <LinkCard
+    title="Folding"
+    href="./folding/"
+    description="Fold modules, port lists, declarations, statement blocks, comments, and RTL syntax regions."
+  />
+  <LinkCard
+    title="Quick Fixes"
+    href="./quick-fixes/"
+    description="Use code actions to fill ports and parameters, convert connection styles, and convert number bases."
   />
   <LinkCard
     title="Diagnostics"
@@ -26,29 +69,14 @@ See [VS Code Settings Reference](../../advanced-guide/vscode-settings/) for the 
     description="Understand the Problems panel, on-save/on-type refresh, and diagnostic rules."
   />
   <LinkCard
-    title="Navigation and Reading"
-    href="./navigation/"
-    description="Use definition, references, hover, and document highlights to read cross-file RTL code."
-  />
-  <LinkCard
-    title="Structure Help"
-    href="./structure/"
-    description="Use inlay hints, semantic highlighting, instance counts, outline, folding, and selection ranges."
-  />
-  <LinkCard
-    title="Completion"
-    href="./completion/"
-    description="Use Verilog/SystemVerilog completion for expressions, instances, parameters, and preprocessor directives."
-  />
-  <LinkCard
     title="Signature Help"
     href="./signature-help/"
     description="Inspect target module parameters, ports, and the current connection position inside instance lists."
   />
   <LinkCard
-    title="Quick Fixes and Rename"
-    href="./quick-fixes/"
-    description="Use port/parameter fixes, diagnostic quick fixes, and rename."
+    title="Selection Range"
+    href="./selection-range/"
+    description="Use expand/shrink selection to select code by RTL syntax nodes."
   />
   <LinkCard
     title="Formatting"
@@ -62,4 +90,4 @@ See [VS Code Settings Reference](../../advanced-guide/vscode-settings/) for the 
   />
 </CardGrid>
 
-Cross-file features share the project view from `vide.toml`: `sources`, `include_dirs`, `defines`, and `libraries` decide which files, macro branches, and dependencies Vide can resolve; see [Project Configuration](../project-configuration/).
+Use `vide.toml` to describe project structure, and VS Code Settings to tune editor behavior. See [Project Configuration Reference](../project-configuration/) and [VS Code Settings Reference](../vscode-settings/) for the full references.

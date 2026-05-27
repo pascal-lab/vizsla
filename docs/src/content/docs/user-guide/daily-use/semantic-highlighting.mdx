@@ -1,0 +1,47 @@
+---
+title: 语义高亮
+description: 用 RTL 语义标记端口方向、时钟复位和读写位置。
+---
+
+import FeatureExample from '../../../../components/FeatureExample.astro';
+import VideLab from '../../../../components/VideLab.astro';
+import semanticTokensImage from '../../assets/features/semantic-tokens.png';
+import { semanticTokenFiles } from '../../../../examples/dailyUse';
+
+## 什么是语义高亮
+
+语法高亮只知道一个词长得像关键字、数字还是注释；语义高亮会结合 Vide 的解析结果，标出端口方向、时钟/复位端口和符号读写位置。主题支持 semantic tokens 时，这些信息会通过颜色或字体样式展示出来。
+
+## 演示
+
+<FeatureExample
+  image={semanticTokensImage}
+  imageAlt="VS Code 中展示 input/output、clk/rst 和读写位置语义颜色差异的截图"
+  imageCaption="VS Code 中的语义高亮"
+  labCaption="在浏览器里查看同一类语义标记"
+>
+  <VideLab
+    projectId="daily-semantic-tokens"
+    projectLabel="Features: Semantic Highlighting"
+    entryFile="semantic-token-demo.v"
+    files={semanticTokenFiles}
+    height="100%"
+    initialActiveFile="semantic-token-demo.v"
+    initialSelection="1:1-18:10"
+    title="语义高亮"
+    description="加载后对照 input/output 端口、clk/rst 端口和信号读写位置的语义颜色。"
+  />
+</FeatureExample>
+
+## 项目配置影响
+
+当前文件里的基础语义标记可以直接计算；跨文件解析、宏分支和 include 关系会影响目标模块、端口和声明的判定。写好 `vide.toml` 后，语义高亮会按 `sources`、`include_dirs`、`defines` 和 `libraries` 描述的工程结构刷新。
+
+## 调整显示
+
+语义高亮需要当前 VS Code 主题支持 semantic tokens。Vide 还提供两个开关：
+
+- `vide.semantic.tokens.port.clk.rst.enable`：控制时钟/复位端口标记。
+- `vide.semantic.tokens.port.input.output.enable`：控制 input/output 端口方向标记。
+
+完整写法见 [Semantic Tokens 设置参考](../../vscode-settings/#semantic-tokens)。

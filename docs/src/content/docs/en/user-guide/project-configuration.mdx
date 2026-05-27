@@ -1,6 +1,6 @@
 ---
 title: Project Configuration
-description: Configure the vide.toml project manifest, source files, include directories, and macro definitions.
+description: Look up vide.toml fields, path globs, include directories, macro definitions, libraries, and exclusion rules.
 ---
 
 import VideLab from "../../../../components/VideLab.astro";
@@ -94,13 +94,15 @@ endmodule
   },
 ];
 
+This is a `vide.toml` reference. For first-time project setup, start with [Configure the First Project](../first-project/) and come back here when you need field details, path rules, or edge-case behavior.
+
 The project manifest tells Vide three things: which RTL files belong to the project, where include files live, and which macros or dependency libraries should be used. The file name must be `vide.toml`.
 
-The project manifest usually lives in the workspace root: the top-level folder you opened in VS Code. Vide does not automatically search parent or child directories for other manifests.
+The project manifest lives in the workspace root: the top-level folder you opened in VS Code. Vide does not automatically search parent or child directories for other manifests.
 
-## Minimal Configuration
+## Field Quick Reference
 
-Most small projects can start with:
+A common small project can use these fields:
 
 ```toml
 sources = ["rtl/**"]
@@ -109,12 +111,14 @@ defines = ["SYNTHESIS"]
 top_modules = ["top"]
 ```
 
-- `sources`: tells Vide which RTL files belong to the project. `rtl/**` recursively includes files under `rtl`.
-- `include_dirs`: tells Vide where to search for include files.
-- `defines`: predefines macros, similar to `+define+SYNTHESIS` or `-D SYNTHESIS` in a compile command.
-- `top_modules`: declares top-level module names. It does not decide which files are scanned; it helps project analysis match your real entry points.
-
-If you only want to open files and check syntax highlighting or single-file errors, you can temporarily keep the default `sources = []`. When the project layout is clear, replace it with real source patterns.
+| Field | Type | Purpose |
+| --- | --- | --- |
+| `sources` | Array of globs, or omitted | Selects project source files. A common value is `["rtl/**"]`. |
+| `include_dirs` | Array of paths, or omitted | Include search directories, for example `["include"]`. |
+| `defines` | Array of strings | Predefined macros. Supports both `"NAME"` and `"NAME=value"`. |
+| `top_modules` | Array of strings | Declares top-level modules for the current project. |
+| `libraries` | Array of paths | External libraries or dependency project directories. |
+| `exclude` | Array of globs | Filters generated directories, simulation output, or black-box files out of loaded files. |
 
 ## Paths and Globs
 
@@ -168,18 +172,7 @@ exclude = [
 ]
 ```
 
-The `#:schema ...` line is a TOML comment. It helps editors understand the manifest format, but it does not change how Vide reads the file. For the default template created by VS Code, see [First Project](../first-project/).
-
-## Fields
-
-| Field | Type | Purpose |
-| --- | --- | --- |
-| `sources` | Array of globs, or omitted | Selects project source files. A common value is `["rtl/**"]`. |
-| `include_dirs` | Array of paths, or omitted | Include search directories, for example `["include"]`. |
-| `defines` | Array of strings | Predefined macros. Supports both `"NAME"` and `"NAME=value"`. |
-| `top_modules` | Array of strings | Declares top-level modules for the current project. |
-| `libraries` | Array of paths | External libraries or dependency project directories. |
-| `exclude` | Array of globs | Filters generated directories, simulation output, or black-box files out of loaded files. |
+The `#:schema ...` line is a TOML comment. It helps editors understand the manifest format, but it does not change how Vide reads the file. For the default template created by VS Code, see [Configure the First Project](../first-project/).
 
 ## sources and include_dirs
 
@@ -217,7 +210,7 @@ The current project loader reads these extensions:
   activeFile="rtl/feature_gate.sv"
   selection="5:17-5:31"
   title="Include Directories and Macros"
-  description="This example contains vide.toml, an include file, and an RTL file. Removing include_dirs makes the `include` fail; removing FEATURE_PIPELINE changes which branch is active."
+  description="Load it and open vide.toml. Removing include_dirs makes the `include` fail; removing FEATURE_PIPELINE changes the active conditional-compilation branch."
 />
 
 ## defines

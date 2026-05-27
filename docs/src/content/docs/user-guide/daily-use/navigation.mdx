@@ -1,77 +1,51 @@
 ---
-title: 导航和阅读
-description: 使用跳转、引用、悬停和文档高亮阅读跨文件 RTL 代码。
+title: 定义跳转
+description: 从实例、符号和端口连接跳到 Vide 解析到的真实定义。
 ---
 
 import FeatureExample from '../../../../components/FeatureExample.astro';
 import VideLab from '../../../../components/VideLab.astro';
 import gotoDefGif from '../../assets/features/goto-def.gif';
-import hoverGif from '../../assets/features/hover.gif';
 import { navigationFiles } from '../../../../examples/dailyUse';
 
-Vide 提供这些阅读能力：
+## 什么是定义跳转
 
-- `转到定义` / `转到声明`：跳到符号、模块、端口、参数或实例目标。
-- `查找所有引用` / `查看引用`：查找符号引用。
-- 悬停或 `显示或聚焦悬停`：查看模块、端口、参数、任务/函数等签名信息。
-- 文档高亮：高亮当前文件里同一符号的使用位置。
-- `转到声明` 会优先跳到声明位置；当没有单独声明位置时，会退回定义跳转结果。
+定义跳转让你从当前引用位置直接进入它指向的声明或定义位置。阅读 RTL 时，最常见的场景是从模块实例跳到模块定义，从端口连接跳到目标端口，或者从信号使用位置跳到对应声明。
 
-相关设置参考：[Scope](../../../advanced-guide/vscode-settings/#scope)、[Semantic Tokens](../../../advanced-guide/vscode-settings/#semantic-tokens)。
+Vide 会把 VS Code 的 `转到定义`、`查看定义`、`转到声明` 和 `转到类型定义` 接到 RTL 解析结果上。`转到声明` 会优先返回声明位置；没有单独声明位置时，会使用定义跳转结果。
+
+## 演示
 
 <FeatureExample
   image={gotoDefGif}
   imageAlt="VS Code 中从 top 模块跳转到 and_gate 定义的动图"
-  imageCaption="VS Code 中的跨文件跳转"
-  labCaption="示例可尝试同一个跳转"
+  imageCaption="VS Code 中的跨文件定义跳转"
+  labCaption="在浏览器里尝试同一个跳转"
 >
   <VideLab
-    projectId="daily-navigation"
-    projectLabel="Features: Navigation"
+    projectId="daily-definition"
+    projectLabel="Features: Definition"
     entryFile="top.v"
     files={navigationFiles}
     height="100%"
     initialActiveFile="top.v"
     initialSelection="8:5-8:13"
     title="从实例跳转到模块定义"
-    description="在 and_gate 上执行转到定义；目标模块在另一个文件里，项目由当前页面直接提供。"
+    description="加载后在 and_gate 上执行转到定义；目标模块在另一个文件里。"
   />
 </FeatureExample>
 
-<FeatureExample
-  image={hoverGif}
-  imageAlt="VS Code 中查看模块悬停信息的动图"
-  imageCaption="VS Code 中的悬停信息"
-  labCaption="示例可在同一实例上查看悬停信息"
->
-  <VideLab
-    projectId="daily-hover"
-    projectLabel="Features: Hover"
-    entryFile="top.v"
-    files={navigationFiles}
-    height="100%"
-    initialActiveFile="top.v"
-    initialSelection="8:5-8:13"
-    title="查看实例目标信息"
-    description="把光标放在 and_gate 上查看模块签名；悬停信息来自当前项目视图里的目标模块解析。"
-  />
-</FeatureExample>
+## 项目配置影响
 
-## 项目范围
+定义跳转需要 Vide 能解析到目标文件。没有 `vide.toml` 时，Vide 会扫描工作区，为阅读代码提供基础跳转；写好 `vide.toml` 后，跳转会按 `sources`、`libraries`、`include_dirs` 和 `defines` 描述的工程结构解析目标。
 
-跨文件跳转需要目标文件已经进入项目视图。配置时重点看这些字段：
+配置时重点检查这些字段：
 
-- `sources` 匹配目标模块所在文件。
-- `include_dirs` 包含 include 目录。
-- `defines` 启用目标代码所在的条件编译分支；被 `` `ifdef `` 屏蔽的 module 不会进入当前项目视图。
+- `sources` 覆盖目标模块所在文件。
 - `libraries` 包含外部依赖工程。
+- `include_dirs` 包含 `` `include `` 使用的目录。
+- `defines` 打开目标代码所在的条件编译分支。
 
-配置方式见 [项目配置](../../project-configuration/)。
+## 同名模块
 
-:::caution[同名模块]
-尽力索引会为了阅读体验做一次就近推测，但这不是 SystemVerilog 的语言规则。正式工程里，同名 module 应该通过明确项目配置、库边界或编译脚本处理。想了解 Vide 在无配置项目中的具体取舍，见 [分析模型](../../../advanced-guide/parsing-and-analysis/#跳转和同名模块)。
-:::
-
-:::note[引用和重命名]
-引用和重命名同样依赖项目视图。只靠单文件打开时，Vide 可能只能处理当前文件或已索引到的局部信息；把相关源文件写进 `sources` 后，再重新加载项目配置。
-:::
+没有项目配置时，Vide 会为了阅读体验在扫描结果里选择就近且唯一的候选。正式工程里，同名模块应该通过明确的项目配置、库边界或编译脚本处理。相关规则见 [分析模型](../../../advanced-guide/parsing-and-analysis/#跳转和同名模块)。

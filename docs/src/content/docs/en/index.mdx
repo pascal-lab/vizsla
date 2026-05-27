@@ -9,10 +9,10 @@ hero:
   tagline: A language server and VS Code extension for Verilog and SystemVerilog that brings common RTL IDE features into your editor.
   actions:
     - text: Quick Start
-      link: ./user-guide/quick-start/
+      link: ./user-guide/
       icon: right-arrow
-    - text: Open Playground
-      link: ./playground/
+    - text: Online Experience
+      link: ./user-guide/online-experience/
       icon: rocket
       variant: secondary
     - text: View on GitHub
@@ -44,7 +44,7 @@ import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
   <LinkCard
     title="User Guide"
     href="./user-guide/"
-    description="Install the extension, open a project, configure a manifest, and use diagnostics, navigation, completion, formatting, and Qihe in daily work."
+    description="Start with online examples or VS Code installation, then configure a project and use Vide in RTL projects."
   />
   <LinkCard
     title="Advanced"
@@ -54,7 +54,7 @@ import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
   <LinkCard
     title="Playground"
     href="./playground/"
-    description="Run multi-file RTL examples in the browser and try hover, completion, navigation, diagnostics, inlay hints, and rename."
+    description="Open the full browser playground and experiment with editable multi-file RTL projects."
   />
   <LinkCard
     title="Changelog"
@@ -68,17 +68,22 @@ import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
 <CardGrid>
   <LinkCard
     title="Quick Start"
-    href="./user-guide/quick-start/"
-    description="Install the VS Code extension, open an RTL project, check the status bar, and try the core IDE features."
+    href="./user-guide/"
+    description="Choose the online experience or VS Code installation path, then follow the reading guide."
   />
   <LinkCard
-    title="Daily Use"
+    title="VS Code Installation"
+    href="./user-guide/vscode-installation/"
+    description="Install the extension, open an RTL project, and confirm that Vide starts in the editor."
+  />
+  <LinkCard
+    title="Features"
     href="./user-guide/daily-use/"
-    description="Find language support, diagnostics, navigation, editing assistance, formatting, structure help, and Qihe by task."
+    description="Find language support, diagnostics, navigation, editing assistance, formatting, structure help, and Qihe by feature."
   />
   <LinkCard
     title="VS Code Settings Reference"
-    href="./advanced-guide/vscode-settings/"
+    href="./user-guide/vscode-settings/"
     description="Reference server, Qihe, diagnostics, formatter, inlay hints, and other settings."
   />
   <LinkCard

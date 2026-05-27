@@ -1,0 +1,25 @@
+---
+title: 符号大纲
+description: 在大纲、面包屑和符号视图中浏览 RTL 文件结构。
+---
+
+import FeatureExample from '../../../../components/FeatureExample.astro';
+import VideLab from '../../../../components/VideLab.astro';
+import documentSymbolsImage from '../../assets/features/document-symbols.png';
+import { documentSymbolFiles } from '../../../../examples/dailyUse';
+
+## 什么是符号大纲
+
+符号大纲把当前文件里的模块、端口、参数、声明、函数、任务、generate 块和区域结构整理成层级。它会出现在 VS Code 的 Outline 面板、面包屑和 `转到文件中的符号` 等入口里。
+
+## 演示
+
+![符号大纲](../../assets/features/document-symbols.png)
+
+## 项目配置影响
+
+符号大纲主要来自当前文件的解析结果，因此打开单个文件就能使用。跨文件配置会影响 include 和宏分支后的解析结果，也会让当前文件处在更准确的工程上下文里。
+
+## 相关功能
+
+大纲用于定位结构；如果要折叠这些结构，看 [折叠](../folding/)；如果要按语法结构扩大当前选区，看 [语义选区](../selection-range/)。

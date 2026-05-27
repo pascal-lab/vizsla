@@ -3,7 +3,7 @@ title: 高级故障排查
 description: 排查本地 VSIX、扩展自带服务器、自定义服务器、文件监听、日志和 profiling 问题。
 ---
 
-本页只保留偏高级启动、日志和调试链路的问题。普通用户遇到诊断不更新、跳不到定义、格式化失败或 Qihe 运行失败时，优先看 [日常使用](../../user-guide/daily-use/) 中对应功能页。
+本页只保留偏高级启动、日志和调试链路的问题。普通用户遇到诊断不更新、跳不到定义、格式化失败或 Qihe 运行失败时，优先看 [功能特性](../../user-guide/daily-use/) 中对应功能页。
 
 启动链路先按 [当扩展无法正常启动](../check-server/) 自检；命令、状态栏和输出通道入口见 [操作参考](../commands-status-logs/)。
 
@@ -47,7 +47,7 @@ npm run package:debug
 }
 ```
 
-完整字段说明见 [Server 设置](../vscode-settings/#server)。
+完整字段说明见 [Server 设置](../../user-guide/vscode-settings/#server)。
 
 ## 状态栏显示启动错误
 

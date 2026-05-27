@@ -1,74 +1,55 @@
 ---
-title: Quick Fixes and Rename
-description: Use port/parameter fixes, diagnostic quick fixes, and rename.
+title: Code Actions
+description: Fill ports and parameters, convert connection styles, remove empty connections, and convert numeric literal bases.
 ---
 
 import FeatureExample from '../../../../../components/FeatureExample.astro';
 import VideLab from '../../../../../components/VideLab.astro';
-import codeActionRenameGif from '../../../assets/features/code-action-rename.gif';
-import inlayHintsGif from '../../../assets/features/inlay-hints.gif';
-import { editAidFiles, structureFiles } from '../../../../../examples/dailyUse';
+import codeActionsGif from '../../../assets/features/code-actions.gif';
+import { editAidFiles } from '../../../../../examples/dailyUse';
 
-Vide provides code actions near instance ports, parameters, selected diagnostics, and symbols that can be renamed. Place the cursor on the relevant code and open the VS Code lightbulb menu to see the available fix or refactor.
+## What It Is
 
-Quick fixes mostly fall into two groups: repairs that complete or rewrite ports/parameters from diagnostics or instance structure, and local refactors that do not require diagnostics, such as integer literal base conversion. Renameable symbols use VS Code's `Rename Symbol` command.
+Code actions are the fixes and refactors shown in VS Code's lightbulb menu. Vide generates them from the current position, instance structure, and selected diagnostics to handle repetitive RTL edits such as port connections, parameter assignments, and integer literals.
 
-Diagnostic quick-fix rules are VS Code Settings. Search for `Vide Diagnostics` in the Settings UI, or write `vide.diagnostics.*` keys in user or workspace `settings.json`; see [Diagnostics](../../../advanced-guide/vscode-settings/#diagnostics) for the full reference.
-
-<FeatureExample
-  image={inlayHintsGif}
-  imageAlt="Animation showing VS Code converting ordered port connections to named connections from inlay hints"
-  imageCaption="Convert port connections from inlay hints"
-  labCaption="The browser example reuses the same mux demo"
->
-  <VideLab
-    projectId="daily-port-connection-fix"
-    projectLabel="Features: Port Connection Fixes"
-    entryFile="inlay_hints.v"
-    files={structureFiles}
-    height="100%"
-    initialActiveFile="inlay_hints.v"
-    initialSelection="18:5-23:6"
-    title="Convert Ordered Port Connections to Named Connections"
-    description="The recording triggers the conversion by double-clicking port inlay hints. You can also place the cursor near the instance and run the ordered-to-named port connection code action from the lightbulb menu."
-  />
-</FeatureExample>
+## Demo
 
 <FeatureExample
-  image={codeActionRenameGif}
-  imageAlt="Animation showing code actions and rename in VS Code"
-  imageCaption="Code actions and rename in VS Code"
-  labCaption="The browser example reuses the same counter demo"
+  image={codeActionsGif}
+  imageAlt="Animation showing VS Code code actions and refactors"
+  imageCaption="Code actions in VS Code"
+  labCaption="Edit the same counter in the browser"
 >
   <VideLab
-    projectId="daily-edit-aids"
-    projectLabel="Features: Edit Aids"
+    projectId="daily-code-actions"
+    projectLabel="Features: Code Actions"
     entryFile="code_action_rename.v"
     files={editAidFiles}
     height="100%"
     initialActiveFile="code_action_rename.v"
-    initialSelection="22:16-22:23"
-    title="Code Actions and Rename"
-    description="This example uses the counter/top demo to show the lightbulb menu near an instance and the reference/rename scope for smp_cnt."
+    initialSelection="22:5-27:6"
+    title="Code actions near an instance"
+    description="Open the lightbulb menu near u_counter to inspect available refactors."
   />
 </FeatureExample>
 
 ## Supported Actions
 
-Place the cursor near the instance, numeric literal, or diagnostic and open the lightbulb menu. Vide currently supports these common fixes and rewrites:
+Place the cursor near an instance, integer literal, or diagnostic, then open the lightbulb menu. Vide currently supports:
 
-- Missing port connections: use `Fill connections`.
-- Parameters without values: use `Fill parameters`.
-- Mixed ordered and named port connections: use `Convert ordered port connections to named connections`, or `Remove empty port connections` for extra empty connections.
-- Mixed ordered and named parameter assignments: use `Convert ordered parameter assignments to named assignments`.
-- A `.port` shorthand missing explicit `()`: use `Add explicit empty port connection`.
-- An instance with no port list: use `Add empty instance port list`.
-- Integer literal base is inconvenient: use `Convert literal to binary`, `Convert literal to octal`, `Convert literal to decimal`, or `Convert literal to hexadecimal` near the number.
+- `Fill connections`
+- `Fill parameters`
+- `Convert ordered port connections to named connections`
+- `Convert ordered parameter assignments to named assignments`
+- `Remove empty port connections`
+- `Add explicit empty port connection`
+- `Add empty instance port list`
+- `Convert literal to binary/octal/decimal/hexadecimal`
 
-:::note[Project scope]
-Instance port and parameter actions need the target module to resolve. In cross-file projects, `sources`, `include_dirs`, `defines`, and `libraries` decide which modules Vide can see.
-:::
+## Project Configuration
 
-## Rename Scope
+Port and parameter actions need the target module to resolve. In cross-file projects, `sources`, `include_dirs`, `defines`, and `libraries` decide which modules Vide can see. Diagnostic-driven quick fixes also require the matching diagnostic to be present in the current file.
 
-Rename depends on symbol resolution. `Find References` and `Rename Symbol` use the same project view; after changing project configuration, run `Vide: Reload Project Configuration` to refresh references and rename scope.
+## Related Feature
+
+Code actions edit local structures. To change one symbol's declaration and references together, use [Rename](../rename/).

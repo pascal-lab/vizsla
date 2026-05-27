@@ -122,19 +122,19 @@ export const homepageFeatures: HomepageFeature[] = [
 
 export const comparisonColumns = [
   column('definition', '定义跳转', 'navigation'),
-  column('references', '引用搜索', 'navigation'),
-  column('hover', '悬停信息', 'navigation'),
-  column('completion', '代码补全', 'editing-assistance'),
-  column('rename', '重命名', 'editing-assistance'),
-  column('syntaxHighlighting', '语法高亮', 'language-support'),
-  column('semanticHighlighting', '语义高亮', 'structure'),
-  column('inlayHints', '代码注解', 'structure'),
-  column('documentSymbols', '符号大纲', 'structure'),
-  column('folding', '折叠', 'structure'),
-  column('codeActions', '自动重构', 'editing-assistance'),
+  column('references', '引用搜索', 'references'),
+  column('hover', '悬停信息', 'hover'),
+  column('completion', '代码补全', 'completion'),
+  column('rename', '重命名', 'rename'),
+  column('syntaxHighlighting', '语法高亮', 'syntax-highlighting'),
+  column('semanticHighlighting', '语义高亮', 'semantic-highlighting'),
+  column('inlayHints', '代码注解', 'inlay-hints'),
+  column('documentSymbols', '符号大纲', 'document-symbols'),
+  column('folding', '折叠', 'folding'),
+  column('codeActions', '自动重构', 'quick-fixes'),
   column('diagnostics', '实时诊断', 'diagnostics'),
-  column('signatureHelp', '签名提示', 'editing-assistance'),
-  column('selectionRange', '语义选区', 'structure'),
+  column('signatureHelp', '签名提示', 'signature-help'),
+  column('selectionRange', '语义选区', 'selection-range'),
 ] as const satisfies readonly ComparisonColumn[];
 
 export type ComparisonFeatureKey = (typeof comparisonColumns)[number]['key'];
@@ -239,7 +239,7 @@ export const homepageComparison = {
 
 export const homepageCtaActions = [
   {
-    href: './user-guide/quick-start/',
+    href: './user-guide/',
     label: '快速开始',
     variant: 'primary',
     icon: 'right-arrow',

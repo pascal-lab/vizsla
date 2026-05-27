@@ -1,6 +1,6 @@
 ---
 title: Diagnostics
-description: Use Vide diagnostics in the Problems panel, choose refresh behavior, and manage diagnostic rules.
+description: Use Vide diagnostics in the Problems panel, tune refresh behavior, and adjust diagnostic rules.
 ---
 
 import FeatureExample from '../../../../../components/FeatureExample.astro';
@@ -8,15 +8,17 @@ import VideLab from '../../../../../components/VideLab.astro';
 import missingPortGif from '../../../assets/features/missing-port.gif';
 import { diagnosticFiles } from '../../../../../examples/dailyUse';
 
-Diagnostics appear in the VS Code `Problems` panel and as editor underlines. Syntax and parse errors usually only need the current file; cross-file semantic diagnostics need project information from `vide.toml`, such as `sources`, `include_dirs`, `defines`, and `libraries`.
+## What Diagnostics Are
 
-Diagnostic refresh and diagnostic rules are VS Code Settings. Search for `Vide Diagnostics` in the Settings UI, or write `vide.diagnostics.*` keys in user or workspace `settings.json`; see [Diagnostics](../../../advanced-guide/vscode-settings/#diagnostics) for the full reference.
+Diagnostics are errors, warnings, and hints that Vide asks the editor to show. They appear in the VS Code Problems panel, as editor underlines, and near the affected code, helping you find syntax errors, parse errors, and semantic issues found by project analysis.
+
+## Demo
 
 <FeatureExample
   image={missingPortGif}
-  imageAlt="Animation showing a missing instance port diagnostic in VS Code"
-  imageCaption="Missing port diagnostics in VS Code"
-  labCaption="The browser example reproduces the same missing port"
+  imageAlt="Animation showing a missing port connection diagnostic in VS Code"
+  imageCaption="Missing port diagnostic in VS Code"
+  labCaption="Inspect the same missing port in the browser"
 >
   <VideLab
     projectId="daily-diagnostics"
@@ -27,16 +29,18 @@ Diagnostic refresh and diagnostic rules are VS Code Settings. Search for `Vide D
     initialActiveFile="missing_port_example.v"
     initialSelection="14:5-17:6"
     initialDiagnosticsOpen
-    title="Missing Port Connection Diagnostic"
-    description="This example intentionally leaves child.y unconnected. Open the diagnostics panel to see markers and the diagnostics list in the browser playground."
+    title="Missing port connection diagnostic"
+    description="child.y is not connected. Open the diagnostics panel and inspect the marker and diagnostic list."
   />
 </FeatureExample>
 
-## Refresh Policy
+## Project Configuration
 
-The default `vide.diagnostics.update` value is `onSave`, so diagnostics refresh when you save. Keep this default for large projects to avoid heavy analysis on every edit.
+After you open a Verilog/SystemVerilog file, Vide can report syntax and parse issues in that file. Cross-file semantic diagnostics need a configured `vide.toml` in the workspace so Vide knows which source files, headers, macro branches, and dependencies belong to the same project. See [Configure the First Project](../../first-project/) and [Project Configuration Reference](../../project-configuration/).
 
-For diagnostics while typing, add this to VS Code user or workspace `settings.json`:
+## Refresh Strategy
+
+The default `vide.diagnostics.update` value is `onSave`, so diagnostics refresh when files are saved. Large projects should usually keep this default to avoid running heavier analysis on every edit. To refresh while typing, set:
 
 ```json
 {
@@ -44,12 +48,8 @@ For diagnostics while typing, add this to VS Code user or workspace `settings.js
 }
 ```
 
-:::note[Project configuration changes]
-After changing `vide.toml`, run `Vide: Reload Project Configuration` to reread project configuration. Headers opened by themselves, or files that are not matched by `sources`, usually do not run cross-file diagnostics on their own; see [Project Configuration](../../project-configuration/).
-:::
+## Diagnostic Rules
 
-## Adjust Diagnostic Rules
+Place the cursor on a diagnostic and open the lightbulb menu. For slang diagnostics with recognizable codes, Vide can write quick fixes into user or workspace settings, such as ignoring that diagnostic or lowering an error to a warning.
 
-Place the cursor on the diagnostic and open the lightbulb menu. For slang diagnostics with an identifiable code, Vide provides quick fixes that write a rule to user or workspace settings, such as ignoring that diagnostic type or downgrading an error to a warning.
-
-You can also edit `vide.diagnostics.slang.rules` manually in VS Code Settings. The rule format is documented in the [Diagnostics settings reference](../../../advanced-guide/vscode-settings/#diagnostics).
+You can also edit `vide.diagnostics.slang.rules` manually in VS Code Settings. See [Diagnostics settings](../../vscode-settings/#diagnostics) for the full reference.

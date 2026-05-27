@@ -6,7 +6,7 @@ description: Why Vide can sometimes only read files and sometimes run full proje
 Three terms are useful:
 
 - Best-effort indexing: when there is no full project configuration, Vide still tries to read Verilog/SystemVerilog files in the workspace so navigation, references, hover, and completion can work where possible.
-- Project analysis: the project view Vide builds from `vide.toml`, including `sources`, `include_dirs`, `defines`, `libraries`, and `top_modules`. Cross-file diagnostics and Qihe project analysis depend on it.
+- Project analysis: the project model Vide builds from `vide.toml`, including `sources`, `include_dirs`, `defines`, `libraries`, and `top_modules`. Cross-file diagnostics and Qihe project analysis depend on it.
 - Diagnostics: errors, warnings, and hints in the VS Code `Problems` panel. Single-file syntax issues can be reported without full project configuration; cross-file semantic issues need project analysis.
 
 ## sources Is the Main Switch
@@ -47,7 +47,7 @@ Header files (`.vh`, `.svh`, `.svi`) are usually not standalone compile entries.
 
 Go to definition, references, hover, completion, and code lens prefer information from loaded indexes. Best-effort indexing makes these features available early, but it is not a strict compile configuration.
 
-In project analysis, duplicate module names are handled through the project view. Vide does not treat directory names as implicit namespaces.
+In project analysis, duplicate module names are handled through the project model. Vide does not treat directory names as implicit namespaces.
 
 In best-effort indexing, if several modules with the same name are visible, Vide makes an editor-only nearest-candidate guess: same file first, then deepest shared directory, then same scan root. The guess is used only when there is one best candidate; ties stay ambiguous.
 
@@ -68,7 +68,7 @@ Without `vide.toml`, navigation, references, hover, and completion can use infor
 :::
 
 :::note[Empty sources array]
-`sources = []` explicitly tells Vide not to scan the workspace automatically. Add files to `sources` when they should participate in the project view.
+`sources = []` explicitly tells Vide not to scan the workspace automatically. Add files to `sources` when they should participate in the project model.
 :::
 
 :::note[Headers in include directories]

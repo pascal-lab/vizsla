@@ -1,0 +1,32 @@
+---
+title: Selection Range
+description: Expand or shrink selections by RTL syntax nodes.
+---
+
+import VideLab from '../../../../../components/VideLab.astro';
+import { structureFiles } from '../../../../../examples/dailyUse';
+
+## What It Is
+
+Selection range powers VS Code's `Expand Selection` and `Shrink Selection`. Plain text selection expands by characters; Vide expands by RTL syntax nodes, which is better for selecting expressions, port connections, parameter lists, instances, block statements, or whole modules.
+
+## Demo
+
+<VideLab
+  projectId="daily-selection-range"
+  projectLabel="Features: Selection Range"
+  entryFile="inlay_hints.v"
+  files={structureFiles}
+  initialActiveFile="inlay_hints.v"
+  initialSelection="20:14-20:15"
+  title="Expand by syntax structure"
+  description="Run Expand Selection near choose_b and watch the selection grow from identifier to connection, instance, and module."
+/>
+
+## Project Configuration
+
+Selection ranges mainly come from the current file's syntax tree, so they work in single-file cases. Project configuration makes macro branches and include-expanded structure closer to the real project, which improves the selection hierarchy.
+
+## Related Features
+
+Use selection range to edit the current code block. Use [Document Symbols](../document-symbols/) to browse file hierarchy, and [Folding](../folding/) to collapse structures.

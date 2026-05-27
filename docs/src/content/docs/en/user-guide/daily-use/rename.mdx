@@ -1,0 +1,42 @@
+---
+title: Rename
+description: Rename RTL symbols across the project and update declarations and references together.
+---
+
+import FeatureExample from '../../../../../components/FeatureExample.astro';
+import VideLab from '../../../../../components/VideLab.astro';
+import codeActionRenameGif from '../../../assets/features/code-action-rename.gif';
+import { editAidFiles } from '../../../../../examples/dailyUse';
+
+## What It Is
+
+Rename changes a symbol's declaration and references together. It is useful for signals, ports, parameters, and local names. Vide first resolves the symbol at the cursor, then generates a VS Code workspace edit.
+
+## Demo
+
+<FeatureExample
+  image={codeActionRenameGif}
+  imageAlt="Animation showing symbol rename in a Verilog file"
+  imageCaption="Symbol rename in VS Code"
+  labCaption="Rename the same signal in the browser"
+>
+  <VideLab
+    projectId="daily-rename"
+    projectLabel="Features: Rename"
+    entryFile="code_action_rename.v"
+    files={editAidFiles}
+    height="100%"
+    initialActiveFile="code_action_rename.v"
+    initialSelection="22:16-22:23"
+    title="Rename a connected signal"
+    description="Rename smp_cnt and observe the declaration and references update together."
+  />
+</FeatureExample>
+
+## Project Configuration
+
+Rename depends on symbol resolution and an editable project scope. Without `vide.toml`, Vide uses workspace scan results for reading features, but project rename is not enabled. Add the relevant source files to `sources`, then run `Vide: Reload Project Configuration` to refresh the rename scope.
+
+## Boundaries
+
+If the position does not resolve to a unique symbol, or if the target file is outside the editable scope managed by the current project configuration, VS Code does not enter the rename flow. Confirm that [Go to Definition](../navigation/) and [Find References](../references/) resolve the same target first.

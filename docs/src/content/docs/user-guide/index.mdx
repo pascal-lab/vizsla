@@ -1,36 +1,52 @@
 ---
-title: 用户手册
-description: 面向日常 RTL 编辑者的 Vide 使用路径。
+title: 快速开始
+description: 从在线体验或 VS Code 安装开始使用 Vide。
 ---
 
 import { CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-欢迎使用 Vide！请阅读用户手册快速开始吧。
+Vide 是为 Verilog/SystemVerilog 开发者打造的现代 VS Code 开发环境，让编辑器真正理解硬件工程中的模块层级、端口连接、宏定义和 include 关系。Vide 把原本依赖搜索、经验和手动追线的日常工作，变成可以直接在代码里完成的跳转、补全、检查和重构；无论是接手一套陌生设计、补齐实例端口、追踪信号来源，还是结合 Qihe 分析真实工程问题，Vide 都把反馈收进编辑器的日常工作流里，帮助开发者更快读懂、修改和维护 RTL 代码。
+
+如果你只是想先感受核心功能，可以直接打开[「在线体验」](./online-experience/)，无需配置即可体验核心功能；如果要在自己的工程里正式使用 Vide，请从[「VS Code 安装」](./vscode-installation/)开始。
+
+## 从这里开始
 
 <CardGrid>
   <LinkCard
-    title="快速开始"
-    href="./quick-start/"
-    description="安装扩展，打开 RTL 目录，确认状态栏，再试用诊断、跳转、补全和悬停。"
+    title="在线体验"
+    href="./online-experience/"
+    description="无需安装本地扩展，直接在浏览器里体验符号导航、代码理解、精准补全和自动重构。"
   />
   <LinkCard
-    title="第一个工程"
+    title="VS Code 安装"
+    href="./vscode-installation/"
+    description="安装 Marketplace 扩展，打开 RTL 目录，并确认 Vide 已在编辑器里正常启动。"
+  />
+</CardGrid>
+
+## 文档指引
+
+体验后，可以按下面的顺序继续阅读。首次使用时先看教程和功能特性；项目配置字段和 VS Code 设置作为参考供大家按需查询。
+
+<CardGrid>
+  <LinkCard
+    title="配置第一个项目"
     href="./first-project/"
-    description="理解默认 vide.toml、工作区根目录和什么时候需要真实 sources。"
+    description="用一个小工程写第一份 vide.toml，理解源文件、头文件、宏定义和刷新流程。"
   />
   <LinkCard
-    title="项目配置"
-    href="./project-configuration/"
-    description="配置 sources、include_dirs、defines、libraries、top_modules 和 exclude。"
-  />
-  <LinkCard
-    title="日常使用"
+    title="功能特性"
     href="./daily-use/"
-    description="按任务查看语言识别、诊断、导航、结构辅助、补全、签名帮助、快速修复、格式化和骑河（Qihe）。"
+    description="按功能查看跳转、引用、悬停、补全、重命名、高亮、代码注解、诊断、格式化和 Qihe 分析。"
   />
   <LinkCard
-    title="Playground"
-    href="../playground/"
-    description="不用安装本地扩展，直接在浏览器里试用多文件 RTL 示例。"
+    title="项目配置参考"
+    href="./project-configuration/"
+    description="查 sources、include_dirs、defines、libraries、top_modules、exclude 的完整写法。"
+  />
+  <LinkCard
+    title="VS Code 设置参考"
+    href="./vscode-settings/"
+    description="查 vide.* 设置项，包括 Qihe、诊断、格式化、行内提示和服务器启动。"
   />
 </CardGrid>

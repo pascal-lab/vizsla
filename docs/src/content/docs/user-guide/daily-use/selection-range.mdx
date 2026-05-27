@@ -1,0 +1,32 @@
+---
+title: 语义选区
+description: 使用扩大/缩小选择按 RTL 语法节点选择表达式、端口列表、实例和结构。
+---
+
+import VideLab from '../../../../components/VideLab.astro';
+import { inlayHintFiles } from '../../../../examples/dailyUse';
+
+## 什么是语义选区
+
+语义选区接入 VS Code 的 `Expand Selection` 和 `Shrink Selection`。普通文本选择只按字符扩大；Vide 会按 RTL 语法节点扩大选区，更适合选中表达式、端口连接、参数列表、实例、块语句或整个模块。
+
+## 演示
+
+<VideLab
+  projectId="daily-selection-range"
+  projectLabel="Features: Selection Range"
+  entryFile="inlay_hints.v"
+  files={inlayHintFiles}
+  initialActiveFile="inlay_hints.v"
+  initialSelection="18:28-18:36"
+  title="按语法结构扩大选区"
+  description="加载后在 choose_b 附近执行 Expand Selection，观察选区从标识符扩大到连接、实例和模块。"
+/>
+
+## 项目配置影响
+
+语义选区主要来自当前文件的语法树，单文件也能使用。项目配置会让宏分支和 include 后的结构更接近真实工程，从而让选区层级更准确。
+
+## 相关功能
+
+语义选区用于编辑当前代码块；如果要浏览文件层级，使用 [符号大纲](../document-symbols/)；如果要收起结构，使用 [折叠](../folding/)。

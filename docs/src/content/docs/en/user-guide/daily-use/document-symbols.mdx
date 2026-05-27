@@ -1,0 +1,42 @@
+---
+title: Document Symbols
+description: Browse RTL file structure from Outline, breadcrumbs, and symbol views.
+---
+
+import FeatureExample from '../../../../../components/FeatureExample.astro';
+import VideLab from '../../../../../components/VideLab.astro';
+import documentSymbolImage from '../../../assets/features/document-symbols.png';
+import { structureFiles } from '../../../../../examples/dailyUse';
+
+## What It Is
+
+Document symbols organize modules, ports, parameters, declarations, functions, tasks, generate blocks, and regions into a hierarchy. VS Code uses them in Outline, breadcrumbs, and `Go to Symbol in Editor`.
+
+## Demo
+
+<FeatureExample
+  image={documentSymbolImage}
+  imageAlt="VS Code Outline showing modules, parameters, ports, registers, and functions"
+  imageCaption="Document symbols in VS Code"
+  labCaption="Inspect the same file structure in the browser"
+>
+  <VideLab
+    projectId="daily-document-symbols"
+    projectLabel="Features: Document Symbols"
+    entryFile="inlay_hints.v"
+    files={structureFiles}
+    height="100%"
+    initialActiveFile="inlay_hints.v"
+    initialSelection="1:1-23:10"
+    title="Browse RTL file structure"
+    description="Open Outline or the editor symbol picker to inspect mux2 and top."
+  />
+</FeatureExample>
+
+## Project Configuration
+
+Document symbols mainly come from the current file, so they work when a single file is open. Project configuration affects include and macro-expanded structure and gives the file a more accurate project context.
+
+## Related Features
+
+Use document symbols to navigate structure. Use [Folding](../folding/) to collapse those structures, or [Selection Range](../selection-range/) to expand the current selection by syntax node.

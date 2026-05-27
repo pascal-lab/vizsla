@@ -3,7 +3,7 @@ title: Advanced Troubleshooting
 description: Debug local VSIX packages, bundled servers, custom servers, file watching, logs, and profiling.
 ---
 
-This page keeps advanced startup, logging, and debugging issues only. For normal stale diagnostics, failed navigation, formatting failures, or Qihe run failures, start from the related page in [Daily Use](../../user-guide/daily-use/).
+This page keeps advanced startup, logging, and debugging issues only. For normal stale diagnostics, failed navigation, formatting failures, or Qihe run failures, start from the related page in [Features](../../user-guide/daily-use/).
 
 For startup checks, use [Server Self-Check](../check-server/). Command, status bar, and output channel entry points are in the [Operations Reference](../commands-status-logs/).
 
@@ -47,7 +47,7 @@ Example:
 }
 ```
 
-See [Server settings](../vscode-settings/#server) for the full field reference.
+See [Server settings](../../user-guide/vscode-settings/#server) for the full field reference.
 
 ## Status Bar Shows a Startup Error
 
