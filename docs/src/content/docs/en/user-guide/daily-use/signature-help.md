@@ -13,7 +13,9 @@ Related settings reference: [Signature Help](../../../advanced-guide/vscode-sett
 - In port connection lists `(...)`, it shows target module ports.
 - As the cursor moves across parameter or port positions, the active item updates.
 
-## Signature Help Is Missing
+## FAQ
+
+### Signature Help Is Missing
 
 Signature help needs the target module to resolve. If the instance module name itself does not jump to definition, first check project configuration, include directories, macro definitions, and library dependencies in [Navigation and Reading](../navigation/#definition-does-not-jump).
 

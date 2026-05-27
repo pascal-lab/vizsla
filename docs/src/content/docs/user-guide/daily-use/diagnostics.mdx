@@ -32,7 +32,9 @@ import { diagnosticFiles } from '../../../../examples/dailyUse';
   />
 </FeatureExample>
 
-## 诊断什么时候刷新
+## 常见问题
+
+### 诊断什么时候刷新
 
 默认 `vide.diagnostics.update` 是 `onSave`，保存文件时刷新诊断。大型工程建议保持这个默认值，避免输入时反复触发较重分析。
 
@@ -44,13 +46,13 @@ import { diagnosticFiles } from '../../../../examples/dailyUse';
 }
 ```
 
-## 诊断不更新
+### 诊断不更新
 
 先保存当前文件。仍然没有更新时，执行 `Vide：重新加载项目配置`；如果项目配置刚改过，这一步会重新读取 `vide.toml`。再不行，执行 `Vide：重启语言服务器`，并点击状态栏 `Vide` 看是否有项目配置错误。
 
 如果只打开了头文件，或文件没有被 `sources` 匹配到，跨文件诊断可能不会跑。回到 [项目配置](../../project-configuration/) 确认 `sources` 和 `include_dirs`。
 
-## 想隐藏或降低某类诊断
+### 想隐藏或降低某类诊断
 
 把光标放在对应诊断位置，打开灯泡菜单。对于带有可识别诊断代码的 slang 诊断，Vide 会提供写入用户设置或工作区设置的快速修复，例如忽略此类诊断，或把错误降级为警告。
 

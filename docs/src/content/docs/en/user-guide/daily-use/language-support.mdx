@@ -50,12 +50,14 @@ The useful cues are small but practical:
   />
 </FeatureExample>
 
-## The File Is Not Recognized
+## FAQ
+
+### The File Is Not Recognized
 
 Check the language mode in the lower-right corner of VS Code. If `.v` / `.vh` files are not Verilog, or `.sv` / `.svh` / `.svi` files are not SystemVerilog, switch the language mode manually once and check whether another extension has overridden the association.
 
 If syntax highlighting works but navigation, diagnostics, and completion do not, this is usually a language-server or project-configuration issue. Click the `Vide` status item first; if it reports no project manifest, create or update `vide.toml` using [First Project](../../first-project/).
 
-## Header Files Have Fewer Features
+### Header Files Have Fewer Features
 
 `.vh`, `.svh`, and `.svi` files usually participate through the `.v` or `.sv` file that includes them. When you open a header by itself, syntax highlighting and local editing features should work, but full cross-file diagnostics may not run standalone. Put the including source files in `sources` and the header directory in `include_dirs` for behavior closer to your real build.

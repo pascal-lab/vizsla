@@ -11,6 +11,8 @@ import { editAidFiles, structureFiles } from '../../../../../examples/dailyUse';
 
 Vide provides code actions near instance ports, parameters, selected diagnostics, and symbols that can be renamed. Place the cursor on the relevant code and open the VS Code lightbulb menu to see the available fix or refactor.
 
+Quick fixes mostly fall into two groups: repairs that complete or rewrite ports/parameters from diagnostics or instance structure, and local refactors that do not require diagnostics, such as integer literal base conversion. Renameable symbols use VS Code's `Rename Symbol` command.
+
 Related settings reference: [Diagnostics](../../../advanced-guide/vscode-settings/#diagnostics).
 
 <FeatureExample
@@ -51,7 +53,9 @@ Related settings reference: [Diagnostics](../../../advanced-guide/vscode-setting
   />
 </FeatureExample>
 
-## Instance Ports or Parameters Report Errors
+## FAQ
+
+### Instance Ports or Parameters Report Errors
 
 Place the cursor near the instance and open the lightbulb menu. Vide currently supports these common fixes:
 
@@ -59,11 +63,12 @@ Place the cursor near the instance and open the lightbulb menu. Vide currently s
 - Parameters without values: use `Fill parameters`.
 - Mixed ordered and named port connections: use `Convert ordered port connections to named connections`, or `Remove empty port connections` for extra empty connections.
 - Mixed ordered and named parameter assignments: use `Convert ordered parameter assignments to named assignments`.
-- A `.port` shorthand missing explicit `()`: use `Add explicit empty port connection`.
+- A `.port` shorthand missing explicit `()`: use `Add explicit empty port connections`.
 - An instance with no port list: use `Add empty instance port list`.
+- Integer literal base is inconvenient: use `Convert literal to binary`, `Convert literal to octal`, `Convert literal to decimal`, or `Convert literal to hexadecimal` near the number.
 
 If these actions are missing, confirm that Vide can resolve the target module first. A direct check is `Go to Definition` on the instance module name. If it does not jump, fix `sources`, `include_dirs`, `defines`, or `libraries` first.
 
-## Check Scope Before Rename
+### Check Scope Before Rename
 
 Rename depends on symbol resolution. Before a large rename, run `Find References` and confirm the result set. If references are missing, update project configuration and reload it first.

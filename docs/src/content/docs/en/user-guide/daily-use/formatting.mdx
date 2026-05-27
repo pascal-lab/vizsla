@@ -25,7 +25,9 @@ Related settings reference: [Formatter and Formatting](../../../advanced-guide/v
   Check this before configuring <code>vide.formatter.args</code>.
 </ThinLinkCard>
 
-## Configure verible the First Time
+## FAQ
+
+### Configure verible the First Time
 
 If `verible-verilog-format` is already on the `PATH` seen by VS Code, formatting can work without extra settings. When unsure, configure an absolute path:
 
@@ -35,12 +37,12 @@ If `verible-verilog-format` is already on the `PATH` seen by VS Code, formatting
 }
 ```
 
-## Formatting Produces No Result or Fails
+### Formatting Produces No Result or Fails
 
 First check that the current file is `.v`, `.vh`, `.sv`, `.svh`, or `.svi`. Then reduce custom `vide.formatter.args` and verify with the default arguments once.
 
 Formatter failures usually come from the external tool's output. If the path contains spaces, still write it as a normal JSON string; do not add an extra layer of quotes.
 
-## Enter Indentation Is Not What You Expect
+### Enter Indentation Is Not What You Expect
 
 Enter assistance is controlled by `vide.formatting.on.enter`, and comment handling is controlled by `vide.formatting.in.comments`. If the project style does not fit automatic handling, disable only Enter behavior and keep manual `Format Document`.

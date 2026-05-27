@@ -73,11 +73,13 @@ _分析结果：诊断位置和 Qihe 输出信息会一起帮助定位问题。_
 
 需要指定骑河（Qihe）可执行文件时，配置 `vide.qihe.command`。Windows 上从桌面启动 VS Code 时看到的 `PATH` 可能和终端不同；不确定时写绝对路径。
 
-## 命令不可用或按钮没有效果
+## 常见问题
+
+### 命令不可用或按钮没有效果
 
 先确认目标是本地文件，不是远程、虚拟文档或未保存文件。再确认扩展名属于 Verilog/SystemVerilog。命令仍不可用时，切换到实际 RTL 编辑器标签页后重试。
 
-## 分析失败
+### 分析失败
 
 打开 `Vide Qihe` 输出通道，按顺序看目标文件、编译参数、运行参数、Qihe stdout/stderr 和最后的失败信息。若失败与 include、宏或 top module 有关，先修正 [项目配置](../../project-configuration/)；若失败与骑河（Qihe）命令路径有关，优先把 `vide.qihe.command` 改成绝对路径。
 

@@ -32,7 +32,9 @@ Related settings reference: [Diagnostics](../../../advanced-guide/vscode-setting
   />
 </FeatureExample>
 
-## When Diagnostics Refresh
+## FAQ
+
+### When Diagnostics Refresh
 
 The default `vide.diagnostics.update` value is `onSave`, so diagnostics refresh when you save. Keep this default for large projects to avoid heavy analysis on every edit.
 
@@ -44,13 +46,13 @@ If you need diagnostics while typing:
 }
 ```
 
-## Diagnostics Are Stale
+### Diagnostics Are Stale
 
 Save the current file first. If diagnostics still do not update, run `Vide: Reload Project Configuration`; this rereads `vide.toml` after manifest changes. If the result is still stale, run `Vide: Restart Language Server` and click the `Vide` status item to check for project configuration errors.
 
 If you only opened a header, or if the file is not matched by `sources`, cross-file diagnostics may not run. Check `sources` and `include_dirs` in [Project Configuration](../../project-configuration/).
 
-## Hide or Downgrade a Diagnostic Type
+### Hide or Downgrade a Diagnostic Type
 
 Place the cursor on the diagnostic and open the lightbulb menu. For slang diagnostics with an identifiable code, Vide provides quick fixes that write a rule to user or workspace settings, such as ignoring that diagnostic type or downgrading an error to a warning.
 

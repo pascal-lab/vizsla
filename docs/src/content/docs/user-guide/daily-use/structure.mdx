@@ -38,14 +38,22 @@ import { structureFiles } from '../../../../examples/dailyUse';
   />
 </FeatureExample>
 
-## 行内提示太多或太少
+## 大纲、折叠和语义选区
+
+大纲和面包屑来自 VS Code 的符号视图，适合快速定位 module、interface、function/task、generate block 和声明。折叠由语言服务器按语法结构提供，能折叠模块体、块语句、声明列表等区域。
+
+扩大/缩小选择使用 VS Code 的 `Expand Selection` / `Shrink Selection` 命令。Vide 会按语法节点扩大选区，比纯文本扩大更适合选中端口列表、表达式、实例或整个结构。
+
+## 常见问题
+
+### 行内提示太多或太少
 
 在 VS Code 设置里搜索 `Vide inlay hints`，按类型开关端口连接、参数赋值和结构结尾提示。端口和参数提示依赖目标模块解析；如果提示缺失，先确认实例模块名可以跳转到定义。
 
-## 实例数量不显示
+### 实例数量不显示
 
 实例数量提示需要项目里能解析到模块关系。只打开单个文件，或 `sources = []` 时，结果可能不完整。先补 `sources` 并执行 `Vide：重新加载项目配置`。
 
-## 颜色看起来没变化
+### 颜色看起来没变化
 
 语义高亮还依赖当前 VS Code 主题是否为这些 token 提供样式。可以先切换主题验证；如果仍然没有变化，检查 `vide.semantic.tokens.*` 设置是否被关闭。

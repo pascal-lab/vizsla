@@ -38,14 +38,22 @@ Related settings reference: [Inlay Hints](../../../advanced-guide/vscode-setting
   />
 </FeatureExample>
 
-## Inlay Hints Are Too Noisy or Missing
+## Outline, Folding, and Semantic Selection
+
+The outline and breadcrumbs come from VS Code's symbol view, so they are useful for jumping between modules, interfaces, functions/tasks, generate blocks, and declarations. Folding ranges are provided by the language server from syntax structure, covering module bodies, block statements, declaration lists, and similar regions.
+
+Use VS Code's `Expand Selection` / `Shrink Selection` commands for semantic selection. Vide expands by syntax nodes, which is more useful than plain text expansion when selecting a port list, expression, instance, or whole construct.
+
+## FAQ
+
+### Inlay Hints Are Too Noisy or Missing
 
 Search for `Vide inlay hints` in VS Code Settings and toggle port connection, parameter assignment, and end-structure hints separately. Port and parameter hints depend on resolving the target module; if hints are missing, first check that the instance module name can jump to definition.
 
-## Instance Counts Do Not Appear
+### Instance Counts Do Not Appear
 
 Instance counts need module relationships from the project. With only a single file open, or with `sources = []`, results may be incomplete. Add `sources` and run `Vide: Reload Project Configuration`.
 
-## Colors Do Not Change
+### Colors Do Not Change
 
 Semantic highlighting also depends on your VS Code theme styling those tokens. Switch themes once to verify. If nothing changes, check whether `vide.semantic.tokens.*` settings were disabled.

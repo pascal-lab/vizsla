@@ -10,6 +10,14 @@ import { completionFiles } from '../../../../../examples/dailyUse';
 
 Vide provides completion around instance connections, parameter assignments, expressions, preprocessor directives, and common RTL structures. Completion results depend on the current syntax position and the project view that has already been resolved.
 
+Common trigger points include:
+
+- Complete target parameters, target ports, and connection expressions inside instance `#(...)` and `(...)` lists.
+- Complete available symbols and keyword snippets in expressions, block statements, generate/specify/config regions, and nearby syntax positions.
+- Type `$` for SystemVerilog system tasks/functions, or `` ` `` for preprocessor directives.
+- Type `'` to complete integer literal base markers such as `b`, `o`, `d`, and `h`.
+- Complete semantic candidates in event controls `@(...)`, member access `.`, and similar context-sensitive positions.
+
 <FeatureExample
   image={completionGif}
   imageAlt="Animation showing completion in a Verilog file in VS Code"
@@ -29,7 +37,9 @@ Vide provides completion around instance connections, parameter assignments, exp
   />
 </FeatureExample>
 
-## Completion Has Too Few Results
+## FAQ
+
+### Completion Has Too Few Results
 
 In single-file scenarios, completion usually only uses the current file and whatever has already been indexed. Port, parameter, and instance-related completion needs the target module to resolve; includes, macros, and library dependencies also need to be represented in project configuration.
 

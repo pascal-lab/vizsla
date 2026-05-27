@@ -73,11 +73,13 @@ If your project already manages Qihe arguments through scripts, disable automati
 
 Use `vide.qihe.command` when you need to point VS Code at a specific Qihe executable. On Windows, VS Code launched from the desktop may see a different `PATH` than your terminal; use an absolute path when unsure.
 
-## The Command Is Unavailable or Does Nothing
+## FAQ
+
+### The Command Is Unavailable or Does Nothing
 
 Confirm that the target is a local file, not a remote file, virtual document, or unsaved buffer. Then confirm the extension is a Verilog/SystemVerilog extension. If the command is still unavailable, focus the actual RTL editor tab and try again.
 
-## Analysis Fails
+### Analysis Fails
 
 Open the `Vide Qihe` output channel and read the target file, compile arguments, run arguments, Qihe stdout/stderr, and final failure details in order. If the failure mentions includes, macros, or top modules, fix [Project Configuration](../../project-configuration/) first. If the failure is about launching Qihe, set `vide.qihe.command` to an absolute path.
 
