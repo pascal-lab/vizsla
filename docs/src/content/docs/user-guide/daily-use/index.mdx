@@ -1,6 +1,6 @@
 ---
 title: 日常使用
-description: 按日常任务使用 Vide 的语言识别、诊断、导航、补全、格式化、结构辅助和 Qihe。
+description: 按日常任务使用 Vide 的语言识别、诊断、导航、补全、签名帮助、快速修复、格式化、结构辅助和 Qihe。
 ---
 
 import { CardGrid, LinkCard } from '@astrojs/starlight/components';
@@ -24,9 +24,19 @@ import { CardGrid, LinkCard } from '@astrojs/starlight/components';
     description="使用跳转、引用、悬停、文档高亮，并处理跳不到定义的情况。"
   />
   <LinkCard
-    title="补全与快速修复"
-    href="./editing-assistance/"
-    description="使用补全、签名帮助、重命名、端口/参数修复和诊断快速修复。"
+    title="补全"
+    href="./completion/"
+    description="使用 Verilog/SystemVerilog 补全，并处理补全内容太少的问题。"
+  />
+  <LinkCard
+    title="签名帮助"
+    href="./signature-help/"
+    description="在实例参数和端口列表中查看目标模块的参数、端口和当前连接位置。"
+  />
+  <LinkCard
+    title="快速修复与重命名"
+    href="./quick-fixes/"
+    description="使用端口/参数快速修复、诊断快速修复和重命名。"
   />
   <LinkCard
     title="格式化"

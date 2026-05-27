@@ -5,7 +5,7 @@ description: Vide VS Code 扩展的紧凑配置项参考。
 
 所有设置都在 `vide.*` 命名空间下。可以在 VS Code 设置界面搜索 `Vide`，也可以直接编辑 `settings.json`。
 
-从日常任务进入： [语言识别](../../user-guide/daily-use/language-support/) / [诊断](../../user-guide/daily-use/diagnostics/) / [导航和阅读](../../user-guide/daily-use/navigation/) / [补全与快速修复](../../user-guide/daily-use/editing-assistance/) / [格式化](../../user-guide/daily-use/formatting/) / [结构辅助](../../user-guide/daily-use/structure/) / [Qihe](../../user-guide/daily-use/qihe/)。
+从日常任务进入： [语言识别](../../user-guide/daily-use/language-support/) / [诊断](../../user-guide/daily-use/diagnostics/) / [导航和阅读](../../user-guide/daily-use/navigation/) / [补全](../../user-guide/daily-use/completion/) / [签名帮助](../../user-guide/daily-use/signature-help/) / [快速修复与重命名](../../user-guide/daily-use/quick-fixes/) / [格式化](../../user-guide/daily-use/formatting/) / [结构辅助](../../user-guide/daily-use/structure/) / [Qihe](../../user-guide/daily-use/qihe/)。
 
 ## 常用设置速查
 
@@ -184,7 +184,7 @@ description: Vide VS Code 扩展的紧凑配置项参考。
 
 签名帮助用于实例端口连接和参数赋值列表。
 
-对应日常使用页：[补全与快速修复](../../user-guide/daily-use/editing-assistance/)。
+对应日常使用页：[签名帮助](../../user-guide/daily-use/signature-help/)。
 
 | 设置 | 默认值 | 说明 |
 | --- | --- | --- |

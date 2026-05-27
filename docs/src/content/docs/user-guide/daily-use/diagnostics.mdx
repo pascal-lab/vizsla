@@ -12,18 +12,6 @@ import { diagnosticFiles } from '../../../../examples/dailyUse';
 
 相关设置参考：[Diagnostics](../../../advanced-guide/vscode-settings/#diagnostics)。
 
-## 诊断什么时候刷新
-
-默认 `vide.diagnostics.update` 是 `onSave`，保存文件时刷新诊断。大型工程建议保持这个默认值，避免输入时反复触发较重分析。
-
-如果你确实需要边输入边刷新：
-
-```json
-{
-  "vide.diagnostics.update": "onType"
-}
-```
-
 <FeatureExample
   image={missingPortGif}
   imageAlt="VS Code 中提示实例缺少端口连接的动图"
@@ -43,6 +31,18 @@ import { diagnosticFiles } from '../../../../examples/dailyUse';
     description="这个示例故意漏接 child.y。打开诊断面板后可以看到浏览器 playground 里的标记和诊断列表。"
   />
 </FeatureExample>
+
+## 诊断什么时候刷新
+
+默认 `vide.diagnostics.update` 是 `onSave`，保存文件时刷新诊断。大型工程建议保持这个默认值，避免输入时反复触发较重分析。
+
+如果你确实需要边输入边刷新：
+
+```json
+{
+  "vide.diagnostics.update": "onType"
+}
+```
 
 ## 诊断不更新
 

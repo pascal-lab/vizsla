@@ -3,11 +3,6 @@ title: 语言识别
 description: 确认 Vide 如何识别 Verilog/SystemVerilog 文件，以及基础编辑体验和语言服务器的边界。
 ---
 
-import FeatureExample from '../../../../components/FeatureExample.astro';
-import VideLab from '../../../../components/VideLab.astro';
-import completionGif from '../../assets/features/completion.gif';
-import { languageFiles } from '../../../../examples/dailyUse';
-
 VS Code 扩展会注册两类语言：
 
 | 语言 | 文件扩展名 |
@@ -20,25 +15,6 @@ VS Code 扩展会注册两类语言：
 语言服务器启动后，诊断、跳转、补全、悬停说明、签名帮助、行内提示、语义高亮、大纲、折叠、扩大/缩小选择和实例数量提示才会接入。需要跨文件理解时，工作区根目录需要有足够的项目配置。
 
 相关设置参考：[Semantic Tokens](../../../advanced-guide/vscode-settings/#semantic-tokens)、[Files](../../../advanced-guide/vscode-settings/#files)。
-
-<FeatureExample
-  image={completionGif}
-  imageAlt="VS Code 中在 Verilog 文件里触发补全的动图"
-  imageCaption="VS Code 中的 Verilog 补全"
-  labCaption="右侧示例使用同一个 Verilog demo"
->
-  <VideLab
-    projectId="daily-language"
-    projectLabel="Features: Completion"
-    entryFile="completion.v"
-    files={languageFiles}
-    height="100%"
-    initialActiveFile="completion.v"
-    initialSelection="16:5-16:12"
-    title="Verilog 文件里的补全"
-    description="这个示例来自 VS Code 录屏里的 adder/top demo，适合确认 .v 文件识别、项目配置和语言服务器接入。"
-  />
-</FeatureExample>
 
 ## 文件没有被识别
 

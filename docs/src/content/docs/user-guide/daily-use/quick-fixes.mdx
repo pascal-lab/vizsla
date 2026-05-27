@@ -1,16 +1,36 @@
 ---
-title: 补全与快速修复
-description: 使用补全、签名帮助、重命名、端口/参数修复和诊断快速修复。
+title: 快速修复与重命名
+description: 使用端口/参数快速修复、诊断快速修复和重命名。
 ---
 
 import FeatureExample from '../../../../components/FeatureExample.astro';
 import VideLab from '../../../../components/VideLab.astro';
 import codeActionRenameGif from '../../assets/features/code-action-rename.gif';
-import { editAidFiles } from '../../../../examples/dailyUse';
+import inlayHintsGif from '../../assets/features/inlay-hints.gif';
+import { editAidFiles, structureFiles } from '../../../../examples/dailyUse';
 
-Vide 会在实例连接、参数赋值、表达式、预处理指令和常见 RTL 结构附近提供补全。把光标放在实例参数或端口列表里时，签名帮助会显示目标模块的参数和端口信息。
+Vide 会在实例端口、参数、部分诊断和可重命名符号附近提供代码操作。把光标放到相关位置后，打开 VS Code 灯泡菜单即可查看当前可用的修复或重构。
 
-相关设置参考：[Signature Help](../../../advanced-guide/vscode-settings/#signature-help)、[Diagnostics](../../../advanced-guide/vscode-settings/#diagnostics)。
+相关设置参考：[Diagnostics](../../../advanced-guide/vscode-settings/#diagnostics)。
+
+<FeatureExample
+  image={inlayHintsGif}
+  imageAlt="VS Code 中双击行内提示将有序端口连接转换为命名连接的动图"
+  imageCaption="从行内提示转换端口连接"
+  labCaption="右侧示例复用同一个 mux demo"
+>
+  <VideLab
+    projectId="daily-port-connection-fix"
+    projectLabel="Features: Port Connection Fixes"
+    entryFile="inlay_hints.v"
+    files={structureFiles}
+    height="100%"
+    initialActiveFile="inlay_hints.v"
+    initialSelection="18:5-23:6"
+    title="有序端口连接转命名连接"
+    description="录屏里双击端口行内提示触发转换；也可以在实例附近打开灯泡菜单，执行将有序端口连接转换为命名连接。"
+  />
+</FeatureExample>
 
 <FeatureExample
   image={codeActionRenameGif}
@@ -43,10 +63,6 @@ Vide 会在实例连接、参数赋值、表达式、预处理指令和常见 RT
 - 实例完全没有端口列表：使用 `添加空实例端口列表`。
 
 如果灯泡里没有这些操作，先确认目标模块能被 Vide 找到。最直接的检查方式是在实例模块名上执行 `Go to Definition`；跳不过去时，优先修正 `sources`、`include_dirs`、`defines` 或 `libraries`。
-
-## 补全内容太少
-
-单文件场景下，补全通常只能利用当前文件和已索引到的内容。端口、参数、实例相关补全需要目标模块可解析；include、宏和库依赖也要在项目配置中写清楚。
 
 ## 重命名前先确认范围
 

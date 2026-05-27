@@ -4,7 +4,7 @@ sources = ["*.v"]
 top_modules = ["top"]
 `;
 
-export const languageFiles = [
+export const completionFiles = [
   {
     path: 'vide.toml',
     languageId: 'toml',

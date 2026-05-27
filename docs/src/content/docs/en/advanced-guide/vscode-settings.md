@@ -5,7 +5,7 @@ description: Compact configuration reference for the Vide VS Code extension.
 
 All settings are under the `vide.*` namespace. Search for `Vide` in the VS Code Settings UI or edit `settings.json` directly.
 
-Start from a daily task: [Language Support](../../user-guide/daily-use/language-support/) / [Diagnostics](../../user-guide/daily-use/diagnostics/) / [Navigation and Reading](../../user-guide/daily-use/navigation/) / [Editing Assistance](../../user-guide/daily-use/editing-assistance/) / [Formatting](../../user-guide/daily-use/formatting/) / [Structure Help](../../user-guide/daily-use/structure/) / [Qihe](../../user-guide/daily-use/qihe/).
+Start from a daily task: [Language Support](../../user-guide/daily-use/language-support/) / [Diagnostics](../../user-guide/daily-use/diagnostics/) / [Navigation and Reading](../../user-guide/daily-use/navigation/) / [Completion](../../user-guide/daily-use/completion/) / [Signature Help](../../user-guide/daily-use/signature-help/) / [Quick Fixes and Rename](../../user-guide/daily-use/quick-fixes/) / [Formatting](../../user-guide/daily-use/formatting/) / [Structure Help](../../user-guide/daily-use/structure/) / [Qihe](../../user-guide/daily-use/qihe/).
 
 ## Common Settings Quick Reference
 
@@ -184,7 +184,7 @@ Example:
 
 Signature help is used for instance port connections and parameter assignment lists.
 
-Related daily-use page: [Editing Assistance](../../user-guide/daily-use/editing-assistance/).
+Related daily-use page: [Signature Help](../../user-guide/daily-use/signature-help/).
 
 | Setting | Default | Description |
 | --- | --- | --- |

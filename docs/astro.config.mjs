@@ -1,5 +1,6 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import starlightUtils from '@lorenzo_lewis/starlight-utils';
 
 const base = process.env.ASTRO_BASE ?? '/';
 const site = process.env.ASTRO_SITE ?? 'https://vide.pascal-lab.net';
@@ -37,9 +38,13 @@ export default defineConfig({
         },
       ],
       customCss: ['./src/assets/landing.css'],
-      components: {
-        Header: './src/components/Header.astro',
-      },
+      plugins: [
+        starlightUtils({
+          multiSidebar: {
+            switcherStyle: 'dropdown',
+          },
+        }),
+      ],
       routeMiddleware: './src/starlightRouteData.ts',
       sidebar: [
         {
@@ -47,7 +52,6 @@ export default defineConfig({
           translations: { en: 'User Guide' },
           items: [
             'user-guide',
-            'user-guide/installation',
             'user-guide/quick-start',
             'user-guide/first-project',
             'user-guide/project-configuration',
@@ -59,7 +63,9 @@ export default defineConfig({
                 'user-guide/daily-use/language-support',
                 'user-guide/daily-use/diagnostics',
                 'user-guide/daily-use/navigation',
-                'user-guide/daily-use/editing-assistance',
+                'user-guide/daily-use/completion',
+                'user-guide/daily-use/signature-help',
+                'user-guide/daily-use/quick-fixes',
                 'user-guide/daily-use/formatting',
                 'user-guide/daily-use/structure',
                 'user-guide/daily-use/qihe',
