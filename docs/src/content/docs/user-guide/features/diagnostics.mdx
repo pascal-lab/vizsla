@@ -3,6 +3,7 @@ title: 实时诊断
 description: 使用 Vide 诊断查看问题面板、刷新策略和诊断规则。
 ---
 
+import Codicon from '../../../../components/Codicon.astro';
 import FeatureExample from '../../../../components/FeatureExample.astro';
 import VideLab from '../../../../components/VideLab.astro';
 import diagnosticImage from '../../assets/features/diagnostic.png';
@@ -10,7 +11,7 @@ import { slangDiagnosticFiles } from '../../../../examples/dailyUse';
 
 ## 什么是诊断
 
-诊断就是 Vide 让编辑器显示的报错、警告和提示。它会出现在 VS Code 的 `问题` 面板、编辑器下划线和对应代码位置附近，帮助你发现语法错误、解析错误，以及项目分析发现的语义问题。
+诊断就是 Vide 让编辑器显示的 <Codicon name="error" label="报错图标" color="#f14c4c" /> 报错、<Codicon name="warning" label="警告图标" color="#facc15" /> 警告和 <Codicon name="info" label="提示图标" color="#3794ff" /> 提示。它会出现在 VS Code 的 `问题` 面板、编辑器下划线和对应代码位置附近，帮助你发现语法错误、解析错误，以及项目分析发现的语义问题。
 
 ## 演示
 

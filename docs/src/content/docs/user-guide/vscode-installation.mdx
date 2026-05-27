@@ -9,7 +9,7 @@ import ThinLinkCard from '../../../components/ThinLinkCard.astro';
 
 ## 1. 安装扩展
 
-常规使用只需要安装 Marketplace 稳定版。
+常规使用只需要安装 Marketplace 稳定版。以下卡片可以跳转到 VS Code 扩展市场：
 
 <ThinLinkCard
   href="https://marketplace.visualstudio.com/items?itemName=vizsla.vizsla-lsp"
@@ -35,6 +35,8 @@ import ThinLinkCard from '../../../components/ThinLinkCard.astro';
 
 扩展激活后，VS Code 右侧状态栏会出现名为 `Vide` 的状态项。正常启动后状态项显示 `Vide`；启动或停止时会显示旋转图标，缺少项目配置文件时会显示警告图标，启动失败或项目配置失败时会显示错误图标。把鼠标停在状态项上，可以看到当前详情。
 
+如果没有显示 `Vide` 状态，请重新启动 VS Code。
+
 ![status bar](../assets/quick-start/status-bar.png)
 
 ## 4. 打开 RTL 文件
@@ -42,8 +44,6 @@ import ThinLinkCard from '../../../components/ThinLinkCard.astro';
 打开 Verilog `.v`/`.vh` 文件，或 SystemVerilog `.sv`/`.svh`/`.svi` 文件。VS Code 应该识别对应语言并启用语法高亮和语言服务。
 
 ![example](../assets/quick-start/editor-example.png)
-
-如果装好后没有反应，先确认你打开的是包含 RTL 文件的目录，并且当前编辑器打开的是 Verilog/SystemVerilog 文件。状态栏没有出现 `Vide` 时，可以重新加载 VS Code 窗口；状态栏显示错误或需要看输出日志时，再进入 [启动自检](../../advanced-guide/check-server/) 或 [命令、状态与日志](../../advanced-guide/commands-status-logs/)。
 
 ## 下一步
 

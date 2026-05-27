@@ -3,6 +3,7 @@ title: 自动重构
 description: 使用代码操作补齐端口参数、转换连接写法、清理空连接和转换数字进制。
 ---
 
+import Codicon from '../../../../components/Codicon.astro';
 import FeatureExample from '../../../../components/FeatureExample.astro';
 import VideLab from '../../../../components/VideLab.astro';
 import missingPortGif from '../../assets/features/missing-port.gif';
@@ -10,7 +11,7 @@ import { missingPortFiles } from '../../../../examples/dailyUse';
 
 ## 什么是自动重构
 
-自动重构是 VS Code 灯泡菜单里的 Code Actions。Vide 会根据当前位置、实例结构和部分诊断生成修复或重写操作，用来处理端口连接、参数赋值和数字 literal 这类重复但容易出错的编辑工作。
+自动重构是 VS Code <Codicon name="lightbulb" label="灯泡菜单图标" color="#facc15" /> 灯泡菜单里的 Code Actions。Vide 会根据当前位置、实例结构和部分诊断生成修复或重写操作，用来处理端口连接、参数赋值和数字字面量基数转换这类重复但容易出错的编辑工作。
 
 ## 演示
 

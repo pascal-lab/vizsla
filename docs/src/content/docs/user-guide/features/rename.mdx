@@ -10,7 +10,7 @@ import { codeActionRenameFiles } from '../../../../examples/dailyUse';
 
 ## 什么是重命名
 
-重命名会把同一个 RTL 符号的声明和引用一起更名。它比手动搜索替换更安全，因为 Vide 会先解析当前位置对应的符号，再生成 VS Code 工作区编辑。
+重命名会把同一个 RTL 符号的声明和引用一起更名。它比手动搜索替换更安全，因为 Vide 会先解析当前位置对应的符号，再生成 VS Code 工作区编辑，保证了修改的符号不会超出它的作用域影响到其他符号。
 
 ## 演示
 
@@ -40,3 +40,5 @@ import { codeActionRenameFiles } from '../../../../examples/dailyUse';
 ## 使用边界
 
 如果当前位置不能解析为唯一符号，或者目标文件不在当前项目配置管理的可编辑范围内，VS Code 不会进入重命名流程。需要先确认 [定义跳转](../navigation/) 和 [引用搜索](../references/) 能定位到同一个目标。
+
+局部符号的作用域可见性由 `vide.scope.visibility` 控制；常规项目保持默认值即可。完整参考见 [Scope 设置](../../vscode-settings/#scope)。

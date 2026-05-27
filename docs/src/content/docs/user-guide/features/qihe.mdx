@@ -1,5 +1,5 @@
 ---
-title: 骑河（Qihe）
+title: 骑河分析
 description: 在 Vide 中集成骑河，对项目或单个 Verilog/SystemVerilog 文件运行深度静态分析。
 ---
 
@@ -124,6 +124,8 @@ qihe run <qihe-run-args> -i <tmp.qh> -c storage.root=<tmp-storage>
   "vide.qihe.runArgs": ["-g", "std"]
 }
 ```
+
+完整参考见 [Qihe 设置](../../vscode-settings/#qihe)。
 
 随后，Vide 会解析骑河输出的诊断结果，并将诊断信息显示在编辑器中。命令执行过程可以在 VS Code 的 Output 面板中查看：在输出通道下拉框中选择 `Vide Qihe`。
 

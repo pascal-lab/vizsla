@@ -7,15 +7,11 @@ import { FileTree } from '@astrojs/starlight/components';
 
 Vide 打开任何 Verilog/SystemVerilog 项目后，都可以提供语法高亮和基础的编辑体验。要让 Vide 更准确地做跨文件跳转、补全、诊断、宏分支判断和 Qihe 参数推导，就需要在工作区根目录放一个项目配置文件：`vide.toml`。
 
-这页内容会指导大家进行轻量的配置，完整字段和边界规则见 [项目配置参考](../project-configuration/)。
+这页内容会指导大家进行项目的配置，完整字段和边界规则见 [项目配置参考](../project-configuration/)。
 
 ## 1. 创建项目配置文件
 
 用 VS Code 打开 RTL 工程目录。如果目录里有 RTL 文件但没有 `vide.toml`，Vide 会提示创建项目配置文件。你也可以点击右下角 `Vide` 状态项，在状态菜单里选择 `创建项目配置文件`。
-
-:::note
-后续文档里说到“工作区根目录”时，指的就是你在 VS Code 里打开的这个顶层目录。
-:::
 
 默认模板会创建一个空的项目配置：
 
@@ -30,9 +26,9 @@ sources = []
 # exclude = ["build/**"]
 ```
 
-接下来会为大家介绍不同字段的作用。
-
+:::note
 默认模板里的 `sources = []` 只是一个待填写状态：它会阻止 Vide 直接扫描整个工作区。把 `sources` 改成 `rtl/**` 这类真实路径后，Vide 才会按你的工程结构分析。
+:::
 
 ## 2. 按目录结构编写配置
 
@@ -41,12 +37,12 @@ sources = []
 <FileTree>
 - my-rtl/
   - vide.toml
-  - rtl/
+  - rtl/ # 使用 rtl/** 递归匹配该目录下所有文件
     - top.sv
     - counter.sv
-  - include/
+  - include/ # 目录名即 include
     - defs.svh
-  - sim/
+  - sim/ # 目录名即 sim
     - work/
   - build/
 </FileTree>
@@ -63,14 +59,14 @@ exclude = ["build/**", "sim/work/**"]
 
 这几项分别告诉 Vide：
 
-- `sources`：哪些 RTL 源文件属于这个工程。小工程先写源码目录，例如 `rtl/**` 或 `rtl/*.sv`。
-- `include_dirs`：提示 Vide `` `include "defs.svh" `` 这类头文件从哪里找。
+- `sources`：哪些 RTL 源文件属于这个工程。例如 `rtl/**` 递归匹配目录下所有文件，或 `rtl/*.sv` 匹配该目录下一级所有的 `sv` 后缀的文件。
+- `include_dirs`：提示 Vide `` `include "defs.svh" `` 这类头文件从哪里找。例如 `include`。
 - `defines`：预先打开哪些宏分支，例如可以写 `"SYNTHESIS"` 或 `"DATA_WIDTH=32"`。
 - `top_modules`：当前工程的顶层模块名，提示 Vide 从哪里开始分析。
 - `exclude`：可以用于排除生成目录、仿真输出和缓存目录，Vide 不会分析这些目录。
 
 :::note
-路径统一写 `/`，即使在 Windows 上也写 `rtl/**`，不要写 `rtl\**`。
+路径统一写 `/`，即使在 Windows 上也写 `rtl/**`，不要写 `rtl\**`。所有路径只能在工作区根目录中。
 :::
 
 ## 3. 一个更接近真实工程的例子
@@ -143,6 +139,8 @@ top_modules = ["darksocv"]
 - 没有 `vide.toml`：Vide 会扫描工作区，先提供阅读类功能，但不会创建项目级编译配置。
 - 刚创建的空模板：默认写着 `sources = []`，表示暂时不扫描整个工作区，等你填入真实源码路径。
 - 写好 `vide.toml`：Vide 按 `sources`、`include_dirs`、`defines`、`libraries` 等字段理解工程。
+
+具体来说，各行为是否配置项目的差异可以见以下表格。
 
 ## 项目配置前后的行为差异
 
