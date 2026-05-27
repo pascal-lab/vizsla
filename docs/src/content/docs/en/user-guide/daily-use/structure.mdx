@@ -34,7 +34,7 @@ Related settings reference: [Inlay Hints](../../../advanced-guide/vscode-setting
     initialActiveFile="inlay_hints.v"
     initialSelection="18:5-23:6"
     title="Instance Port Inlay Hints"
-    description="This example uses the mux2/top demo, which is useful for checking port connection inlay hints and target module resolution."
+    description="This example uses the mux2/top demo to show how port connection inlay hints come from target-module resolution."
   />
 </FeatureExample>
 
@@ -42,18 +42,16 @@ Related settings reference: [Inlay Hints](../../../advanced-guide/vscode-setting
 
 The outline and breadcrumbs come from VS Code's symbol view, so they are useful for jumping between modules, interfaces, functions/tasks, generate blocks, and declarations. Folding ranges are provided by the language server from syntax structure, covering module bodies, block statements, declaration lists, and similar regions.
 
+![VS Code outline showing module, parameter, port, register, and function symbols](../../../assets/features/document-symbol.png)
+
+_The outline shows modules, parameters, ports, declarations, and functions from an RTL file in a hierarchy._
+
 Use VS Code's `Expand Selection` / `Shrink Selection` commands for semantic selection. Vide expands by syntax nodes, which is more useful than plain text expansion when selecting a port list, expression, instance, or whole construct.
 
-## FAQ
+## Adjust Display
 
-### Inlay Hints Are Too Noisy or Missing
+Search for `Vide inlay hints` in VS Code Settings and toggle port connection, parameter assignment, and end-structure hints separately. Semantic highlighting also depends on your current theme styling these token types.
 
-Search for `Vide inlay hints` in VS Code Settings and toggle port connection, parameter assignment, and end-structure hints separately. Port and parameter hints depend on resolving the target module; if hints are missing, first check that the instance module name can jump to definition.
-
-### Instance Counts Do Not Appear
-
-Instance counts need module relationships from the project. With only a single file open, or with `sources = []`, results may be incomplete. Add `sources` and run `Vide: Reload Project Configuration`.
-
-### Colors Do Not Change
-
-Semantic highlighting also depends on your VS Code theme styling those tokens. Switch themes once to verify. If nothing changes, check whether `vide.semantic.tokens.*` settings were disabled.
+:::note[Project scope]
+Port/parameter hints and instance count lenses depend on target-module resolution. With only one file open, or with `sources = []`, these results are computed from the project view currently visible to Vide; add the related source files to `sources`, then run `Vide: Reload Project Configuration`.
+:::

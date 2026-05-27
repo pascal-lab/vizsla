@@ -1,6 +1,6 @@
 ---
 title: Diagnostics
-description: Use Vide diagnostics and handle refresh timing, stale results, and rule overrides.
+description: Use Vide diagnostics in the Problems panel, choose refresh behavior, and manage diagnostic rules.
 ---
 
 import FeatureExample from '../../../../../components/FeatureExample.astro';
@@ -8,9 +8,9 @@ import VideLab from '../../../../../components/VideLab.astro';
 import missingPortGif from '../../../assets/features/missing-port.gif';
 import { diagnosticFiles } from '../../../../../examples/dailyUse';
 
-Diagnostics appear in the VS Code `Problems` panel and as editor underlines. Syntax and parse errors usually only need the current file; cross-file semantic diagnostics need project information such as `sources`, `include_dirs`, `defines`, and `libraries`.
+Diagnostics appear in the VS Code `Problems` panel and as editor underlines. Syntax and parse errors usually only need the current file; cross-file semantic diagnostics need project information from `vide.toml`, such as `sources`, `include_dirs`, `defines`, and `libraries`.
 
-Related settings reference: [Diagnostics](../../../advanced-guide/vscode-settings/#diagnostics).
+Diagnostic refresh and diagnostic rules are VS Code Settings. Search for `Vide Diagnostics` in the Settings UI, or write `vide.diagnostics.*` keys in user or workspace `settings.json`; see [Diagnostics](../../../advanced-guide/vscode-settings/#diagnostics) for the full reference.
 
 <FeatureExample
   image={missingPortGif}
@@ -32,13 +32,11 @@ Related settings reference: [Diagnostics](../../../advanced-guide/vscode-setting
   />
 </FeatureExample>
 
-## FAQ
-
-### When Diagnostics Refresh
+## Refresh Policy
 
 The default `vide.diagnostics.update` value is `onSave`, so diagnostics refresh when you save. Keep this default for large projects to avoid heavy analysis on every edit.
 
-If you need diagnostics while typing:
+For diagnostics while typing, add this to VS Code user or workspace `settings.json`:
 
 ```json
 {
@@ -46,14 +44,12 @@ If you need diagnostics while typing:
 }
 ```
 
-### Diagnostics Are Stale
+:::note[Project configuration changes]
+After changing `vide.toml`, run `Vide: Reload Project Configuration` to reread project configuration. Headers opened by themselves, or files that are not matched by `sources`, usually do not run cross-file diagnostics on their own; see [Project Configuration](../../project-configuration/).
+:::
 
-Save the current file first. If diagnostics still do not update, run `Vide: Reload Project Configuration`; this rereads `vide.toml` after manifest changes. If the result is still stale, run `Vide: Restart Language Server` and click the `Vide` status item to check for project configuration errors.
-
-If you only opened a header, or if the file is not matched by `sources`, cross-file diagnostics may not run. Check `sources` and `include_dirs` in [Project Configuration](../../project-configuration/).
-
-### Hide or Downgrade a Diagnostic Type
+## Adjust Diagnostic Rules
 
 Place the cursor on the diagnostic and open the lightbulb menu. For slang diagnostics with an identifiable code, Vide provides quick fixes that write a rule to user or workspace settings, such as ignoring that diagnostic type or downgrading an error to a warning.
 
-If the lightbulb does not offer those actions, edit `vide.diagnostics.slang.rules` manually. The rule format is documented in the [Diagnostics settings reference](../../../advanced-guide/vscode-settings/#diagnostics).
+You can also edit `vide.diagnostics.slang.rules` manually in VS Code Settings. The rule format is documented in the [Diagnostics settings reference](../../../advanced-guide/vscode-settings/#diagnostics).

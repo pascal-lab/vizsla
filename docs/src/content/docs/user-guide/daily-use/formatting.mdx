@@ -1,13 +1,13 @@
 ---
 title: 格式化
-description: 使用 Verilog/SystemVerilog 格式化，并处理 verible 路径和参数问题。
+description: 配置 verible，并使用文档、选区和 Enter 格式化。
 ---
 
 import ThinLinkCard from '../../../../components/ThinLinkCard.astro';
 
 格式化入口包括 VS Code 的 `格式化文档`、`格式化选定内容` 和按 Enter 时的自动缩进行为。当前格式化后端只有 `verible`，会调用外部 `verible-verilog-format`；Vide 不随扩展打包这个工具。
 
-相关设置参考：[Formatter 和 Formatting](../../../advanced-guide/vscode-settings/#formatter-和-formatting)。
+`vide.formatter.*` 和 `vide.formatting.*` 都是 VS Code Settings，不写在 `vide.toml`。可以在设置界面搜索 `Vide Formatter`，也可以在用户或工作区 `settings.json` 里写入这些键。完整参考见 [Formatter 和 Formatting](../../../advanced-guide/vscode-settings/#formatter-和-formatting)。
 
 <ThinLinkCard
   href="https://github.com/chipsalliance/verible#installation"
@@ -22,14 +22,12 @@ import ThinLinkCard from '../../../../components/ThinLinkCard.astro';
   title="verible-verilog-format 参数文档"
   action="打开"
 >
-  配置 <code>vide.formatter.args</code> 前先对照这里的参数。
+  查看 <code>vide.formatter.args</code> 可以传给外部 formatter 的参数。
 </ThinLinkCard>
 
-## 常见问题
+## 配置 verible
 
-### 第一次配置 verible
-
-如果 `verible-verilog-format` 已经在 VS Code 进程可见的 `PATH` 中，可以直接使用格式化命令。如果不确定，建议写绝对路径：
+`vide.formatter.provider` 目前只有 `verible`。`vide.formatter.path` 留空时，Vide 会从 VS Code 进程可见的 `PATH` 查找 `verible-verilog-format`；写入路径时，会直接调用这个可执行文件：
 
 ```json
 {
@@ -37,12 +35,10 @@ import ThinLinkCard from '../../../../components/ThinLinkCard.astro';
 }
 ```
 
-### 格式化没有结果或失败
+## 格式化入口
 
-先确认当前文件是 `.v`、`.vh`、`.sv`、`.svh` 或 `.svi`。然后减少自定义 `vide.formatter.args`，用默认参数验证一次。
+`格式化文档` 会把整个文件交给 `verible-verilog-format`。`格式化选定内容` 会把选区对应的行范围传给同一个 formatter。两者都会使用当前的 `vide.formatter.path` 和 `vide.formatter.args`；`vide.formatting.indent.width` 会作为 `--indentation_spaces` 传入。
 
-格式化失败通常会显示外部工具输出的错误。路径里有空格时仍然写普通 JSON 字符串，不要自己额外加一层引号。
+## Enter 行为
 
-### 按 Enter 时缩进不符合预期
-
-按 Enter 的辅助格式化由 `vide.formatting.on.enter` 控制，注释里的 Enter 行为由 `vide.formatting.in.comments` 控制。如果项目风格不适合自动处理，可以只关闭 Enter 行为，保留手动 `格式化文档`。
+按 Enter 的辅助格式化由 `vide.formatting.on.enter` 控制，注释里的 Enter 行为由 `vide.formatting.in.comments` 控制。项目只需要手动格式化时，可以关闭 Enter 行为，保留 `格式化文档` 和 `格式化选定内容`。

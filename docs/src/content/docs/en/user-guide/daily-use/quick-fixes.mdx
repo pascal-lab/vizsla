@@ -13,7 +13,7 @@ Vide provides code actions near instance ports, parameters, selected diagnostics
 
 Quick fixes mostly fall into two groups: repairs that complete or rewrite ports/parameters from diagnostics or instance structure, and local refactors that do not require diagnostics, such as integer literal base conversion. Renameable symbols use VS Code's `Rename Symbol` command.
 
-Related settings reference: [Diagnostics](../../../advanced-guide/vscode-settings/#diagnostics).
+Diagnostic quick-fix rules are VS Code Settings. Search for `Vide Diagnostics` in the Settings UI, or write `vide.diagnostics.*` keys in user or workspace `settings.json`; see [Diagnostics](../../../advanced-guide/vscode-settings/#diagnostics) for the full reference.
 
 <FeatureExample
   image={inlayHintsGif}
@@ -49,26 +49,26 @@ Related settings reference: [Diagnostics](../../../advanced-guide/vscode-setting
     initialActiveFile="code_action_rename.v"
     initialSelection="22:16-22:23"
     title="Code Actions and Rename"
-    description="This example uses the counter/top demo. Try opening the lightbulb menu near the instance, or use Find References before renaming smp_cnt."
+    description="This example uses the counter/top demo to show the lightbulb menu near an instance and the reference/rename scope for smp_cnt."
   />
 </FeatureExample>
 
-## FAQ
+## Supported Actions
 
-### Instance Ports or Parameters Report Errors
-
-Place the cursor near the instance and open the lightbulb menu. Vide currently supports these common fixes:
+Place the cursor near the instance, numeric literal, or diagnostic and open the lightbulb menu. Vide currently supports these common fixes and rewrites:
 
 - Missing port connections: use `Fill connections`.
 - Parameters without values: use `Fill parameters`.
 - Mixed ordered and named port connections: use `Convert ordered port connections to named connections`, or `Remove empty port connections` for extra empty connections.
 - Mixed ordered and named parameter assignments: use `Convert ordered parameter assignments to named assignments`.
-- A `.port` shorthand missing explicit `()`: use `Add explicit empty port connections`.
+- A `.port` shorthand missing explicit `()`: use `Add explicit empty port connection`.
 - An instance with no port list: use `Add empty instance port list`.
 - Integer literal base is inconvenient: use `Convert literal to binary`, `Convert literal to octal`, `Convert literal to decimal`, or `Convert literal to hexadecimal` near the number.
 
-If these actions are missing, confirm that Vide can resolve the target module first. A direct check is `Go to Definition` on the instance module name. If it does not jump, fix `sources`, `include_dirs`, `defines`, or `libraries` first.
+:::note[Project scope]
+Instance port and parameter actions need the target module to resolve. In cross-file projects, `sources`, `include_dirs`, `defines`, and `libraries` decide which modules Vide can see.
+:::
 
-### Check Scope Before Rename
+## Rename Scope
 
-Rename depends on symbol resolution. Before a large rename, run `Find References` and confirm the result set. If references are missing, update project configuration and reload it first.
+Rename depends on symbol resolution. `Find References` and `Rename Symbol` use the same project view; after changing project configuration, run `Vide: Reload Project Configuration` to refresh references and rename scope.

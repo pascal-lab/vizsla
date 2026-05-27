@@ -1,6 +1,6 @@
 ---
 title: 骑河（Qihe）
-description: 从 VS Code 运行骑河（Qihe）分析，理解目标文件、参数来源、输出通道和失败处理。
+description: 从 VS Code 运行骑河（Qihe）分析，理解目标文件、参数来源和输出通道。
 ---
 
 import Codicon from '../../../../components/Codicon.astro';
@@ -8,7 +8,7 @@ import ThinLinkCard from '../../../../components/ThinLinkCard.astro';
 
 执行 `Vide：运行 Qihe 分析` 可以对当前本地 Verilog/SystemVerilog 文件运行骑河（Qihe）分析。命令只对 `file:` URI 可用，文件扩展名必须是 `.v`、`.vh`、`.sv`、`.svh` 或 `.svi`。
 
-相关设置参考：[骑河（Qihe）](../../../advanced-guide/vscode-settings/#qihe)。
+Qihe 运行选项属于 VS Code Settings。可以在设置界面搜索 `Vide Qihe`，也可以在用户或工作区 `settings.json` 里写入 `vide.qihe.*`；完整参考见 [骑河（Qihe）](../../../advanced-guide/vscode-settings/#qihe)。
 
 <ThinLinkCard
   href="https://qihe.pascal-lab.net/"
@@ -23,7 +23,7 @@ import ThinLinkCard from '../../../../components/ThinLinkCard.astro';
   title="骑河（Qihe）命令行快速开始"
   action="打开"
 >
-  先确认本机 <code>qihe</code> 命令可以完成一次基本分析。
+  了解本机 <code>qihe</code> 命令的基本分析流程。
 </ThinLinkCard>
 
 ## 如何运行
@@ -31,7 +31,7 @@ import ThinLinkCard from '../../../../components/ThinLinkCard.astro';
 1. 在 VS Code 中打开要分析的 RTL 文件。
 2. 点击编辑器标题栏里的 <Codicon name="beaker" label="运行 Qihe 分析图标" /> 烧杯图标，或从命令面板执行 `Vide：运行 Qihe 分析`。
 3. 运行时会出现独立的 <Codicon name="beaker" label="Qihe 状态图标" /> `Qihe` 状态项。
-4. 失败后点击这个状态项，或点击错误通知里的 `显示 Qihe 输出`，查看 `Vide Qihe` 输出通道。
+4. 运行后点击这个状态项，或点击通知里的 `显示 Qihe 输出`，查看 `Vide Qihe` 输出通道。
 
 ![正在运行 Qihe 分析的状态提示](../../assets/features/qihe-analysing.png)
 
@@ -61,7 +61,7 @@ _分析结果：诊断位置和 Qihe 输出信息会一起帮助定位问题。_
   配置 <code>vide.qihe.runArgs</code> 前先对照这里。
 </ThinLinkCard>
 
-如果项目已经用脚本管理骑河（Qihe）参数，可以关闭自动推导并显式配置：
+项目已经用脚本管理骑河（Qihe）参数时，可以关闭自动推导并显式配置：
 
 ```json
 {
@@ -71,16 +71,14 @@ _分析结果：诊断位置和 Qihe 输出信息会一起帮助定位问题。_
 }
 ```
 
-需要指定骑河（Qihe）可执行文件时，配置 `vide.qihe.command`。Windows 上从桌面启动 VS Code 时看到的 `PATH` 可能和终端不同；不确定时写绝对路径。
+需要指定骑河（Qihe）可执行文件时，配置 `vide.qihe.command`。Windows 上从桌面启动 VS Code 时看到的 `PATH` 可能和终端不同；工作区配置里写绝对路径可以固定使用的 Qihe 版本。
 
-## 常见问题
+## 运行范围
 
-### 命令不可用或按钮没有效果
+这个命令面向本地已保存的 RTL 文件：目标必须是 `file:` URI，扩展名必须是 `.v`、`.vh`、`.sv`、`.svh` 或 `.svi`。远程文件、虚拟文档和未保存缓冲区不会作为 Qihe 分析目标。
 
-先确认目标是本地文件，不是远程、虚拟文档或未保存文件。再确认扩展名属于 Verilog/SystemVerilog。命令仍不可用时，切换到实际 RTL 编辑器标签页后重试。
+## 输出内容
 
-### 分析失败
-
-打开 `Vide Qihe` 输出通道，按顺序看目标文件、编译参数、运行参数、Qihe stdout/stderr 和最后的失败信息。若失败与 include、宏或 top module 有关，先修正 [项目配置](../../project-configuration/)；若失败与骑河（Qihe）命令路径有关，优先把 `vide.qihe.command` 改成绝对路径。
+`Vide Qihe` 输出通道会记录目标文件、编译参数、运行参数、Qihe stdout/stderr 和最后的结果信息。include 目录、宏定义和 top module 默认来自 [项目配置](../../project-configuration/)；骑河（Qihe）可执行文件由 `vide.qihe.command` 指定。
 
 想了解为什么有时按工程分析、有时退回单文件分析，见 [骑河（Qihe）工程分析](../../../advanced-guide/parsing-and-analysis/#qihe-工程分析)。

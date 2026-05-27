@@ -5,7 +5,14 @@ description: Use Vide language support, diagnostics, navigation, structure help,
 
 import { CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-Daily use is organized by the task you are doing in VS Code. Each page starts with feature entry points and required prerequisites, then keeps troubleshooting under an FAQ section; the full `vide.*` setting reference remains in [VS Code Settings Reference](../../advanced-guide/vscode-settings/).
+Start from everyday tasks: recognizing RTL files, reading diagnostics, navigating code, completing and refactoring, formatting, and running Qihe from VS Code.
+
+Configuration lives in two places:
+
+- Project structure belongs in the workspace `vide.toml`: source files, include directories, macro definitions, and library dependencies.
+- Editor behavior belongs in VS Code Settings: diagnostic refresh, inlay hints, semantic highlighting, formatting, Qihe commands, and other `vide.*` settings. Press `Ctrl+,` and search for `Vide`, or run `Preferences: Open User Settings (JSON)` / `Preferences: Open Workspace Settings (JSON)` and add the setting keys there.
+
+See [VS Code Settings Reference](../../advanced-guide/vscode-settings/) for the full `vide.*` reference.
 
 <CardGrid>
   <LinkCard
@@ -16,12 +23,12 @@ Daily use is organized by the task you are doing in VS Code. Each page starts wi
   <LinkCard
     title="Diagnostics"
     href="./diagnostics/"
-    description="Understand the Problems panel, on-save/on-type refresh, diagnostic rules, and stale diagnostics."
+    description="Understand the Problems panel, on-save/on-type refresh, and diagnostic rules."
   />
   <LinkCard
     title="Navigation and Reading"
     href="./navigation/"
-    description="Use definition, references, hover, document highlights, and fix failed navigation."
+    description="Use definition, references, hover, and document highlights to read cross-file RTL code."
   />
   <LinkCard
     title="Structure Help"
@@ -31,7 +38,7 @@ Daily use is organized by the task you are doing in VS Code. Each page starts wi
   <LinkCard
     title="Completion"
     href="./completion/"
-    description="Use Verilog/SystemVerilog completion and handle missing completion results."
+    description="Use Verilog/SystemVerilog completion for expressions, instances, parameters, and preprocessor directives."
   />
   <LinkCard
     title="Signature Help"
@@ -46,13 +53,13 @@ Daily use is organized by the task you are doing in VS Code. Each page starts wi
   <LinkCard
     title="Formatting"
     href="./formatting/"
-    description="Configure verible, run formatting, and handle missing formatter output or failures."
+    description="Configure verible and use document, selection, and Enter formatting entry points."
   />
   <LinkCard
     title="Qihe"
     href="./qihe/"
-    description="Run Qihe analysis from VS Code, understand argument sources, and inspect failures."
+    description="Run Qihe analysis from VS Code and understand argument sources and output channels."
   />
 </CardGrid>
 
-If a feature behaves differently from these pages, first check whether the current file belongs to the project manifest. Cross-file features usually depend on `sources`, `include_dirs`, `defines`, and `libraries` in `vide.toml`; see [Project Configuration](../project-configuration/).
+Cross-file features share the project view from `vide.toml`: `sources`, `include_dirs`, `defines`, and `libraries` decide which files, macro branches, and dependencies Vide can resolve; see [Project Configuration](../project-configuration/).

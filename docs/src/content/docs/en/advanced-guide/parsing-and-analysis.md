@@ -63,18 +63,18 @@ If the current file only comes from best-effort indexing, or if no project compi
 
 ## FAQ
 
-### Why can navigation work without `vide.toml`, while cross-file diagnostics are incomplete?
+:::note[Navigation and diagnostics without a manifest]
+Without `vide.toml`, navigation, references, hover, and completion can use information from best-effort indexing. Cross-file semantic diagnostics need explicit project analysis, usually from `vide.toml` entries such as `sources`, include directories, macro definitions, and libraries.
+:::
 
-Navigation, references, hover, and completion can use information from best-effort indexing. Cross-file semantic diagnostics need explicit project analysis, usually from `vide.toml` entries such as `sources`, include directories, macro definitions, and libraries.
-
-### Why does `sources = []` stop Vide from scanning the workspace automatically?
-
+:::note[Empty sources array]
 `sources = []` explicitly tells Vide not to scan the workspace automatically. Add files to `sources` when they should participate in the project view.
+:::
 
-### Why does a header listed through `include_dirs` not always get standalone diagnostics?
-
+:::note[Headers in include directories]
 `include_dirs` only provides include search paths. Header files usually participate through the source file that includes them; being in an include directory does not make a header a standalone compile entry.
+:::
 
-### Why does Qihe sometimes use project analysis and sometimes fall back to single-file analysis?
-
+:::note[Qihe project-analysis fallback]
 Qihe reuses Vide's project manifest discovery result. Vide passes project files, `--top`, `-I`, and `-D` arguments only when a usable project manifest exists and the compile plan has real source files. Otherwise it falls back to single-file input.
+:::

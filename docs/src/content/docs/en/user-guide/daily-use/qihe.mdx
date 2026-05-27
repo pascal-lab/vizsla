@@ -1,6 +1,6 @@
 ---
 title: Qihe
-description: Run Qihe analysis from VS Code and understand target files, arguments, output channels, and failure handling.
+description: Run Qihe analysis from VS Code and understand target files, arguments, and output channels.
 ---
 
 import Codicon from '../../../../../components/Codicon.astro';
@@ -8,7 +8,7 @@ import ThinLinkCard from '../../../../../components/ThinLinkCard.astro';
 
 Run `Vide: Run Qihe Analysis` to analyze the current local Verilog/SystemVerilog file with Qihe. The command is available only for `file:` URIs whose extension is `.v`, `.vh`, `.sv`, `.svh`, or `.svi`.
 
-Related settings reference: [Qihe](../../../advanced-guide/vscode-settings/#qihe).
+Qihe run options are VS Code Settings. Search for `Vide Qihe` in the Settings UI, or write `vide.qihe.*` keys in user or workspace `settings.json`; see [Qihe](../../../advanced-guide/vscode-settings/#qihe) for the full reference.
 
 <ThinLinkCard
   href="https://qihe.pascal-lab.net/"
@@ -23,7 +23,7 @@ Related settings reference: [Qihe](../../../advanced-guide/vscode-settings/#qihe
   title="Qihe CLI Getting Started"
   action="Open"
 >
-  Confirm that the local <code>qihe</code> command can run a basic analysis.
+  Learn the basic analysis flow for the local <code>qihe</code> command.
 </ThinLinkCard>
 
 ## How to Run It
@@ -31,7 +31,7 @@ Related settings reference: [Qihe](../../../advanced-guide/vscode-settings/#qihe
 1. Open the RTL file you want to analyze in VS Code.
 2. Click the <Codicon name="beaker" label="Run Qihe Analysis icon" /> beaker icon in the editor title bar, or run `Vide: Run Qihe Analysis` from the Command Palette.
 3. A separate <Codicon name="beaker" label="Qihe status icon" /> `Qihe` status item appears while the run is active.
-4. After a failure, click that status item or the `Show Qihe Output` action in the error notification to open the `Vide Qihe` output channel.
+4. After a run, click that status item or the `Show Qihe Output` action in the notification to open the `Vide Qihe` output channel.
 
 ![Qihe analysis running status notification](../../../assets/features/qihe-analysing.png)
 
@@ -61,7 +61,7 @@ By default, Vide derives the Qihe compile mode, top module, include directories,
   Check this before configuring <code>vide.qihe.runArgs</code>.
 </ThinLinkCard>
 
-If your project already manages Qihe arguments through scripts, disable automatic derivation and configure explicit arguments:
+When your project already manages Qihe arguments through scripts, disable automatic derivation and configure explicit arguments:
 
 ```json
 {
@@ -71,16 +71,14 @@ If your project already manages Qihe arguments through scripts, disable automati
 }
 ```
 
-Use `vide.qihe.command` when you need to point VS Code at a specific Qihe executable. On Windows, VS Code launched from the desktop may see a different `PATH` than your terminal; use an absolute path when unsure.
+Use `vide.qihe.command` when you need to point VS Code at a specific Qihe executable. On Windows, VS Code launched from the desktop may see a different `PATH` than your terminal; an absolute path in workspace settings pins the Qihe version used by the extension.
 
-## FAQ
+## Run Scope
 
-### The Command Is Unavailable or Does Nothing
+This command targets local saved RTL files: the target must be a `file:` URI, and its extension must be `.v`, `.vh`, `.sv`, `.svh`, or `.svi`. Remote files, virtual documents, and unsaved buffers are not Qihe analysis targets.
 
-Confirm that the target is a local file, not a remote file, virtual document, or unsaved buffer. Then confirm the extension is a Verilog/SystemVerilog extension. If the command is still unavailable, focus the actual RTL editor tab and try again.
+## Output Contents
 
-### Analysis Fails
-
-Open the `Vide Qihe` output channel and read the target file, compile arguments, run arguments, Qihe stdout/stderr, and final failure details in order. If the failure mentions includes, macros, or top modules, fix [Project Configuration](../../project-configuration/) first. If the failure is about launching Qihe, set `vide.qihe.command` to an absolute path.
+The `Vide Qihe` output channel records the target file, compile arguments, run arguments, Qihe stdout/stderr, and final result details. Include directories, macro definitions, and top modules come from [Project Configuration](../../project-configuration/) by default; the Qihe executable is selected by `vide.qihe.command`.
 
 For why Qihe sometimes uses project analysis and sometimes falls back to a single-file input, see [Qihe Project Analysis](../../../advanced-guide/parsing-and-analysis/#qihe-project-analysis).

@@ -1,11 +1,11 @@
 ---
 title: "Operations Reference: Commands, Status, and Logs"
-description: Quick reference for Vide command IDs, status bar items, and output channels.
+description: Vide command IDs, status item meanings, and output channel inventory.
 ---
 
 import Codicon from '../../../../components/Codicon.astro';
 
-Use this page as an operations reference. To check whether the server starts correctly, follow [Server Self-Check Flow](../check-server/). For advanced failures, use [Advanced Troubleshooting](../troubleshooting/).
+Use this page only as an entry-point reference, not as a troubleshooting flow. To check whether the server starts correctly, follow [Server Self-Check Flow](../check-server/). For advanced failures, use [Advanced Troubleshooting](../troubleshooting/).
 
 ## Command Palette Commands
 
@@ -34,7 +34,7 @@ The main status item is named `Vide` and appears on the right side of the VS Cod
 | <Codicon name="warning" label="Warning icon" /> `Vide` | Usually means the current workspace has no project manifest. |
 | <Codicon name="error" label="Error icon" /> `Vide` | Server startup or project configuration loading failed. |
 
-Click the `Vide` status item or run `Vide: Show Status` to open the status menu. Depending on the current project state, the menu can show `Open Manifest`, `Create Manifest`, `Profile Diagnostics`, `Reload Project`, `Restart Language Server`, and `Show Output`.
+Click the `Vide` status item or run `Vide: Show Status` to open the status menu. Menu items vary with project state; common actions include opening or creating the project manifest, profiling diagnostics, reloading the project, restarting the language server, and showing output.
 
 When Qihe analysis runs, a separate `Qihe` status item appears. If Qihe fails, clicking that item opens the `Vide Qihe` output channel.
 

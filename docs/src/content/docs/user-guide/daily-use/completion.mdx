@@ -1,6 +1,6 @@
 ---
 title: 补全
-description: 使用 Verilog/SystemVerilog 补全，并处理补全内容太少的问题。
+description: 使用 Verilog/SystemVerilog 补全填写表达式、实例连接、参数和预处理指令。
 ---
 
 import FeatureExample from '../../../../components/FeatureExample.astro';
@@ -37,10 +37,8 @@ Vide 会在实例连接、参数赋值、表达式、预处理指令和常见 RT
   />
 </FeatureExample>
 
-## 常见问题
-
-### 补全内容太少
-
+:::note[补全范围]
 单文件场景下，补全通常只能利用当前文件和已索引到的内容。端口、参数、实例相关补全需要目标模块可解析；include、宏和库依赖也要在项目配置中写清楚。
 
-如果实例模块名本身跳不到定义，先回到 [导航和阅读](../navigation/#跳不到定义) 排查项目配置。实例端口和参数列表里的调用提示见 [签名帮助](../signature-help/)。
+实例端口和参数列表里的调用提示见 [签名帮助](../signature-help/)。
+:::

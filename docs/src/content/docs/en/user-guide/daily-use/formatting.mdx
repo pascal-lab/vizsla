@@ -1,13 +1,13 @@
 ---
 title: Formatting
-description: Use Verilog/SystemVerilog formatting and handle verible paths and arguments.
+description: Configure verible and use document, selection, and Enter formatting.
 ---
 
 import ThinLinkCard from '../../../../../components/ThinLinkCard.astro';
 
 Formatting entry points include VS Code's `Format Document`, `Format Selection`, and on-type formatting when pressing Enter. The only current formatter backend is `verible`, which calls the external `verible-verilog-format` executable; Vide does not bundle that tool.
 
-Related settings reference: [Formatter and Formatting](../../../advanced-guide/vscode-settings/#formatter-and-formatting).
+`vide.formatter.*` and `vide.formatting.*` are VS Code Settings, not `vide.toml` fields. Search for `Vide Formatter` in the Settings UI, or write these keys in user or workspace `settings.json`. See [Formatter and Formatting](../../../advanced-guide/vscode-settings/#formatter-and-formatting) for the full reference.
 
 <ThinLinkCard
   href="https://github.com/chipsalliance/verible#installation"
@@ -22,14 +22,12 @@ Related settings reference: [Formatter and Formatting](../../../advanced-guide/v
   title="verible-verilog-format Options"
   action="Open"
 >
-  Check this before configuring <code>vide.formatter.args</code>.
+  Review the options that <code>vide.formatter.args</code> can pass to the external formatter.
 </ThinLinkCard>
 
-## FAQ
+## Configure verible
 
-### Configure verible the First Time
-
-If `verible-verilog-format` is already on the `PATH` seen by VS Code, formatting can work without extra settings. When unsure, configure an absolute path:
+`vide.formatter.provider` currently supports `verible`. When `vide.formatter.path` is empty, Vide looks for `verible-verilog-format` on the `PATH` seen by the VS Code process; when the path is set, Vide invokes that executable directly:
 
 ```json
 {
@@ -37,12 +35,10 @@ If `verible-verilog-format` is already on the `PATH` seen by VS Code, formatting
 }
 ```
 
-### Formatting Produces No Result or Fails
+## Formatting Commands
 
-First check that the current file is `.v`, `.vh`, `.sv`, `.svh`, or `.svi`. Then reduce custom `vide.formatter.args` and verify with the default arguments once.
+`Format Document` sends the whole file to `verible-verilog-format`. `Format Selection` sends the selected line range to the same formatter. Both commands use the current `vide.formatter.path` and `vide.formatter.args`; `vide.formatting.indent.width` is passed as `--indentation_spaces`.
 
-Formatter failures usually come from the external tool's output. If the path contains spaces, still write it as a normal JSON string; do not add an extra layer of quotes.
+## Enter Behavior
 
-### Enter Indentation Is Not What You Expect
-
-Enter assistance is controlled by `vide.formatting.on.enter`, and comment handling is controlled by `vide.formatting.in.comments`. If the project style does not fit automatic handling, disable only Enter behavior and keep manual `Format Document`.
+Enter assistance is controlled by `vide.formatting.on.enter`, and comment handling is controlled by `vide.formatting.in.comments`. Projects that only want manual formatting can disable Enter behavior while keeping `Format Document` and `Format Selection`.

@@ -1,6 +1,6 @@
 ---
 title: 诊断
-description: 使用 Vide 诊断，并处理诊断太频繁、不更新、规则需要隐藏或降级的问题。
+description: 使用 Vide 诊断查看问题面板、刷新策略和诊断规则。
 ---
 
 import FeatureExample from '../../../../components/FeatureExample.astro';
@@ -8,9 +8,9 @@ import VideLab from '../../../../components/VideLab.astro';
 import missingPortGif from '../../assets/features/missing-port.gif';
 import { diagnosticFiles } from '../../../../examples/dailyUse';
 
-诊断会显示在 VS Code 的 `问题` 面板和编辑器下划线里。语法错误、解析错误通常只需要当前文件；跨文件语义诊断需要项目配置里的 `sources`、`include_dirs`、`defines`、`libraries` 等信息。
+诊断会显示在 VS Code 的 `问题` 面板和编辑器下划线里。语法错误、解析错误通常只需要当前文件；跨文件语义诊断需要 `vide.toml` 里的 `sources`、`include_dirs`、`defines`、`libraries` 等项目信息。
 
-相关设置参考：[Diagnostics](../../../advanced-guide/vscode-settings/#diagnostics)。
+诊断刷新和诊断规则属于 VS Code Settings。可以在设置界面搜索 `Vide Diagnostics`，也可以在用户或工作区 `settings.json` 里写入 `vide.diagnostics.*`；完整参考见 [Diagnostics](../../../advanced-guide/vscode-settings/#diagnostics)。
 
 <FeatureExample
   image={missingPortGif}
@@ -32,13 +32,11 @@ import { diagnosticFiles } from '../../../../examples/dailyUse';
   />
 </FeatureExample>
 
-## 常见问题
-
-### 诊断什么时候刷新
+## 刷新策略
 
 默认 `vide.diagnostics.update` 是 `onSave`，保存文件时刷新诊断。大型工程建议保持这个默认值，避免输入时反复触发较重分析。
 
-如果你确实需要边输入边刷新：
+需要输入时刷新时，在 VS Code 的用户或工作区 `settings.json` 中写：
 
 ```json
 {
@@ -46,14 +44,12 @@ import { diagnosticFiles } from '../../../../examples/dailyUse';
 }
 ```
 
-### 诊断不更新
+:::note[项目配置变化]
+刚改过 `vide.toml` 时，执行 `Vide：重新加载项目配置` 会重新读取项目配置。只打开头文件，或文件未被 `sources` 匹配时，跨文件诊断通常不单独运行；配置方式见 [项目配置](../../project-configuration/)。
+:::
 
-先保存当前文件。仍然没有更新时，执行 `Vide：重新加载项目配置`；如果项目配置刚改过，这一步会重新读取 `vide.toml`。再不行，执行 `Vide：重启语言服务器`，并点击状态栏 `Vide` 看是否有项目配置错误。
-
-如果只打开了头文件，或文件没有被 `sources` 匹配到，跨文件诊断可能不会跑。回到 [项目配置](../../project-configuration/) 确认 `sources` 和 `include_dirs`。
-
-### 想隐藏或降低某类诊断
+## 调整诊断规则
 
 把光标放在对应诊断位置，打开灯泡菜单。对于带有可识别诊断代码的 slang 诊断，Vide 会提供写入用户设置或工作区设置的快速修复，例如忽略此类诊断，或把错误降级为警告。
 
-灯泡里没有这些操作时，可以手动编辑 `vide.diagnostics.slang.rules`。规则写法见 [Diagnostics 设置参考](../../../advanced-guide/vscode-settings/#diagnostics)。
+也可以在 VS Code Settings 里手动编辑 `vide.diagnostics.slang.rules`。规则写法见 [Diagnostics 设置参考](../../../advanced-guide/vscode-settings/#diagnostics)。

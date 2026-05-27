@@ -13,7 +13,7 @@ Vide 会在实例端口、参数、部分诊断和可重命名符号附近提供
 
 快速修复主要分两类：一类根据诊断或实例结构补齐/改写端口参数，另一类是不依赖诊断的局部重构，例如整数 literal 进制转换。可重命名符号则走 VS Code 的 `重命名符号` 命令。
 
-相关设置参考：[Diagnostics](../../../advanced-guide/vscode-settings/#diagnostics)。
+诊断快速修复规则属于 VS Code Settings。可以在设置界面搜索 `Vide Diagnostics`，也可以在用户或工作区 `settings.json` 里写入 `vide.diagnostics.*`；完整参考见 [Diagnostics](../../../advanced-guide/vscode-settings/#diagnostics)。
 
 <FeatureExample
   image={inlayHintsGif}
@@ -49,15 +49,13 @@ Vide 会在实例端口、参数、部分诊断和可重命名符号附近提供
     initialActiveFile="code_action_rename.v"
     initialSelection="22:16-22:23"
     title="代码操作和重命名"
-    description="这个示例使用 counter/top demo。试试在实例附近打开灯泡菜单，或先用查找所有引用检查 smp_cnt 的重命名范围。"
+    description="这个示例使用 counter/top demo，展示实例附近的灯泡菜单和 smp_cnt 的引用/重命名范围。"
   />
 </FeatureExample>
 
-## 常见问题
+## 支持的操作
 
-### 实例端口或参数报错
-
-先把光标放到对应实例附近，打开灯泡菜单。Vide 目前支持这些常见修复：
+把光标放到对应实例、数字 literal 或诊断附近，打开灯泡菜单。Vide 目前支持这些常见修复和重写：
 
 - 端口没有接全：使用 `补全连接`。
 - 参数没有值：使用 `补全参数`。
@@ -67,8 +65,10 @@ Vide 会在实例端口、参数、部分诊断和可重命名符号附近提供
 - 实例完全没有端口列表：使用 `添加空实例端口列表`。
 - 整数 literal 进制不合适：在数字附近使用 `将字面量转换为二进制`、`将字面量转换为八进制`、`将字面量转换为十进制` 或 `将字面量转换为十六进制`。
 
-如果灯泡里没有这些操作，先确认目标模块能被 Vide 找到。最直接的检查方式是在实例模块名上执行 `转到定义`；跳不过去时，优先修正 `sources`、`include_dirs`、`defines` 或 `libraries`。
+:::note[项目范围]
+实例端口和参数相关操作需要目标模块能被解析到。跨文件项目里，`sources`、`include_dirs`、`defines` 和 `libraries` 决定 Vide 能看到哪些模块。
+:::
 
-### 重命名前先确认范围
+## 重命名范围
 
-重命名依赖符号解析结果。大范围重命名前，先用 `查找所有引用` 看结果是否符合预期；如果引用结果缺文件，先补项目配置并重新加载。
+重命名依赖符号解析结果。`查找所有引用` 和 `重命名符号` 使用同一个项目视图；补充项目配置后执行 `Vide：重新加载项目配置` 会刷新引用和重命名范围。

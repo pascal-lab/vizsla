@@ -1,6 +1,6 @@
 ---
 title: Navigation and Reading
-description: Use definition, references, hover, and document highlights, and handle failed navigation or duplicate modules.
+description: Use definition, references, hover, and document highlights to read cross-file RTL code.
 ---
 
 import FeatureExample from '../../../../../components/FeatureExample.astro';
@@ -53,27 +53,25 @@ Related settings reference: [Scope](../../../advanced-guide/vscode-settings/#sco
     initialActiveFile="top.v"
     initialSelection="8:5-8:13"
     title="Inspect Instance Target Information"
-    description="Place the cursor on and_gate to inspect the module signature. If hover has no information, the target module is usually not resolved in the current project view."
+    description="Place the cursor on and_gate to inspect the module signature. Hover information comes from target-module resolution in the current project view."
   />
 </FeatureExample>
 
-## FAQ
+## Project Scope
 
-### Definition Does Not Jump
+Cross-file navigation needs the target file to be part of the project view. The important fields are:
 
-Run `Go to Definition` on the instance module name first. If the module name itself does not jump, the target file is usually not loaded through project configuration:
-
-- Does `sources` match the file that defines the target module?
-- Does `include_dirs` include the include directory?
-- Do macro definitions, configured through `defines`, enable the conditional-compilation branch that contains the target? If the target module is hidden behind an inactive `` `ifdef ``, it is not analyzed in the current project view.
-- Does `libraries` include the dependency project?
+- `sources` matches the file that defines the target module.
+- `include_dirs` includes the include directory.
+- Macro definitions configured through `defines` enable the conditional-compilation branch that contains the target; modules hidden behind inactive `` `ifdef `` branches are not analyzed in the current project view.
+- `libraries` includes the dependency project.
 
 See [Project Configuration](../../project-configuration/) for the fields.
 
-### Duplicate Modules Jump Somewhere Unexpected
-
+:::caution[Duplicate modules]
 Best-effort indexing can make a nearest-candidate guess for reading, but this is not a SystemVerilog language rule. In real projects, handle duplicate module names through explicit project configuration, library boundaries, or your build scripts. For the exact behavior without full configuration, see [Navigation and Duplicate Modules](../../../advanced-guide/parsing-and-analysis/#navigation-and-duplicate-modules).
+:::
 
-### References or Rename Miss Files
-
-Confirm that the current file belongs to the same project view. With only one file open, Vide may only handle that file or locally indexed information. Add the related sources to `sources`, then run `Vide: Reload Project Configuration`.
+:::note[References and rename]
+References and rename use the same project view. With only one file open, Vide may only handle that file or locally indexed information; add the related sources to `sources`, then run `Vide: Reload Project Configuration`.
+:::
