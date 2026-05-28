@@ -10,9 +10,15 @@
     text-align: center;
     text-wrap: wrap;
     word-break: keep-all;
-    width: min(100%, 72rem);
-    max-width: 72rem;
+    width: min(100%, 88rem);
+    max-width: 88rem;
     font-size: clamp(2.2rem, 4.75vw, 4.15rem);
+  }
+
+  html:lang(en)[data-has-hero] .hero h1 {
+    width: min(100%, 92rem);
+    max-width: 92rem;
+    font-size: clamp(2.1rem, 4.35vw, 3.85rem);
   }
 
   [data-has-hero] .hero h1::before {
@@ -36,6 +42,10 @@
     font-size: clamp(1rem, 1.35vw, 1.2rem);
     line-height: 1.7;
     text-align: center;
+  }
+
+  html:lang(zh-CN)[data-has-hero] .hero .tagline {
+    font-size: clamp(1.18rem, 1.45vw, 1.38rem);
   }
 
   [data-has-hero] .hero .hero-tagline-accent {
@@ -89,8 +99,14 @@
     }
   }
 
-  [data-has-hero][data-has-sidebar] {
-    --sl-content-width: 67.5rem;
+  html[data-has-hero]:not([data-has-sidebar]),
+  html[data-has-hero][data-has-sidebar] {
+    --sl-content-width: 78rem;
+  }
+
+  html:lang(en)[data-has-hero]:not([data-has-sidebar]),
+  html:lang(en)[data-has-hero][data-has-sidebar] {
+    --sl-content-width: 84rem;
   }
 
   @media (min-width: 50rem) {

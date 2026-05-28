@@ -2,7 +2,7 @@
   --sl-font: Inter, var(--sl-font-system);
   --vide-accent-hsl: 215, 14%, 34%;
   --vide-accent: hsl(var(--vide-accent-hsl));
-  --vide-overlay: hsla(var(--vide-accent-hsl), 0.18);
+  --vide-overlay: hsla(var(--vide-accent-hsl), 0.08);
 }
 
 :root[data-theme='light'] {
@@ -11,7 +11,7 @@
 }
 
 :root[data-theme='dark'] {
-  --vide-accent-hsl: 0, 0%, 90%;
+  --vide-accent-hsl: 0, 0%, 84%;
   --vide-primary-button-color: #111827;
 }
 
