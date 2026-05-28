@@ -28,4 +28,18 @@
     font-weight: 400;
     line-height: 1.35;
   }
+
+  [data-has-hero][data-has-sidebar] {
+    --sl-content-width: 67.5rem;
+  }
+
+  @media (min-width: 50rem) {
+    [data-has-hero][data-has-sidebar] {
+      --sl-content-inline-start: 0rem;
+    }
+
+    [data-has-hero][data-has-sidebar] .sidebar-pane {
+      display: none;
+    }
+  }
 </style>
