@@ -1,15 +1,15 @@
 ---
 title: VS Code Installation
-description: Install the Vide extension and confirm that the language service has started in VS Code.
+description: Install the Vide extension and confirm that the language server starts in VS Code.
 ---
 
 import ThinLinkCard from '../../../../components/ThinLinkCard.astro';
 
-This page helps you install Vide and verify that it is working.
+This page shows how to install Vide and verify that it is working.
 
 ## 1. Install the Extension
 
-For regular use, install the stable Marketplace extension.
+For day-to-day use, install the stable Marketplace extension.
 
 <ThinLinkCard
   href="https://marketplace.visualstudio.com/items?itemName=pascal-lab.vide"
@@ -25,9 +25,9 @@ You can also search for the display name `Vide` or the extension ID `pascal-lab.
 
 ## 2. Open an RTL Project Directory
 
-Open the project folder that contains your RTL source code in VS Code.
+Open the folder that contains your RTL source code in VS Code.
 
-If the project contains Verilog/SystemVerilog source files but has no project configuration file named `vide.toml`, the extension prompts you to create a default configuration. For exploration, you can skip this step for now, because Vide can still provide some analysis without configuration.
+If the project contains Verilog/SystemVerilog source files but no `vide.toml` project configuration file, the extension prompts you to create a default configuration. For a quick trial, you can skip this step for now; Vide can still provide some analysis without configuration.
 
 ![notification for creating a project configuration file](../../assets/quick-start/create-manifest-notification.png)
 
@@ -35,7 +35,7 @@ We will create the first `vide.toml` in [Configure the First Project](../first-p
 
 ## 3. Confirm Vide Started
 
-After the extension activates, the right side of the VS Code status bar shows a status item named `Vide`. When startup is normal, the item displays `Vide`. Hover over the status item and check the current status details to confirm that Vide has started.
+After the extension activates, the right side of the VS Code status bar shows a `Vide` status item. During a normal startup, the item displays `Vide`. Hover over it and check the status details to confirm that Vide has started.
 
 ![status bar](../../assets/quick-start/status-bar.png)
 
@@ -45,10 +45,10 @@ If the `Vide` status item does not appear, reload VS Code and open the project f
 
 ## 4. Open an RTL File
 
-Open a Verilog `.v`/`.vh` file or a SystemVerilog `.sv`/`.svh`/`.svi` file. VS Code can recognize the language and enable syntax highlighting and Vide analysis.
+Open a Verilog `.v`/`.vh` file or a SystemVerilog `.sv`/`.svh`/`.svi` file. VS Code should recognize the language, enable syntax highlighting, and start Vide analysis.
 
 ![example](../../assets/quick-start/editor-example.png)
 
 ## Next Step
 
-After installation is verified, use [Configure the First Project](../first-project/) to write the first `vide.toml`, then read [Features](../features/).
+After verifying the installation, use [Configure the First Project](../first-project/) to write your first `vide.toml`, then continue to [Features](../features/).

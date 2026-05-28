@@ -5,7 +5,7 @@ description: Write the first vide.toml for a small project.
 
 import { FileTree } from '@astrojs/starlight/components';
 
-Vide can provide syntax highlighting and basic editing after opening any Verilog/SystemVerilog project. To make cross-file navigation, completion, diagnostics, macro-branch selection, and Qihe argument derivation more accurate, add a project configuration file named `vide.toml` to the workspace root.
+After you open a Verilog/SystemVerilog project, Vide can already provide syntax highlighting and basic editing support. To make cross-file navigation, completion, diagnostics, macro-branch selection, and Qihe argument generation more accurate, add a `vide.toml` project configuration file to the workspace root.
 
 This page walks through a lightweight first configuration. For complete field details and boundary rules, see [Project Configuration Reference](../project-configuration/).
 
@@ -31,7 +31,7 @@ sources = []
 ```
 
 :::note
-- The default `sources = []` is an unfinished state: it tells Vide not to scan the whole workspace yet. Replace it with real paths such as `rtl/**`, and Vide will analyze the project according to that structure.
+- The default `sources = []` is an unfinished state: it tells Vide not to scan the whole workspace yet. Replace it with real paths such as `rtl/**`, and Vide will analyze the project using that structure.
 - The leading `#:schema ...` line is a TOML comment. It can help editors identify the configuration format.
 :::
 
@@ -64,11 +64,11 @@ exclude = ["build/**", "sim/work/**"]
 
 These fields tell Vide:
 
-- `sources`: **required**, selects which RTL source files belong to this project. For example, `rtl/**` recursively matches every file under the directory, while `rtl/*.sv` only matches `.sv` files directly under `rtl`.
+- `sources`: **required**, selects the RTL source files that belong to this project. For example, `rtl/**` recursively matches every file under the directory, while `rtl/*.sv` only matches `.sv` files directly under `rtl`.
 - `include_dirs`: **recommended**, tells Vide where to search for headers used by `` `include "defs.svh" ``. For example, `include`.
 - `defines`: **optional**, predefines macro branches, such as `"SYNTHESIS"` or `"DATA_WIDTH=32"`.
 - `top_modules`: **recommended**, declares the top-level module names for this project and tells Vide where to start analysis.
-- `exclude`: **optional**, filters out generated directories, simulation output, and cache directories so Vide does not analyze them. In this example, `exclude` can also be omitted because `sources` is not affected by those paths.
+- `exclude`: **optional**, filters out generated directories, simulation output, and cache directories so Vide does not analyze them. In this example, `exclude` can also be omitted because those paths are not matched by `sources`.
 
 :::note
 Always write paths with `/`, even on Windows. Use `rtl/**`, not `rtl\**`. All paths must stay inside the workspace root.
@@ -91,7 +91,7 @@ include_dirs = [
 ]
 ```
 
-The mapping is:
+This maps to `vide.toml` as follows:
 
 - `top_modules = ["darksocv"]`: comes from `toplevel: darksocv` in the `.core` default target.
 - `sources = ["rtl/*.v"]`: covers module definitions used directly or indirectly by `darksocv`, including `darkpll.v`, `darkbridge.v`, `darkram.v`, `darkio.v`, `darkriscv.v`, and `darkuart.v`.
@@ -99,7 +99,7 @@ The mapping is:
   - `rtl/config.vh` is an include file, so `rtl` is an include directory.
   - `src/darksocv.mem` is simulation or initialization data used by the source code, so put `src` in `include_dirs`.
 
-The configuration above only covers the synthesizable part. If you also want to analyze simulation code, how should `vide.toml` be written?
+The configuration above only covers the synthesizable part. To analyze simulation code as well, adjust `vide.toml` for that target.
 
 For example, to analyze the simulation entry from the `.core` `sim` target, add `sim/darksimv.v` from the `tb` fileset and change the top module to `darksimv`. The `sim` target's icarus configuration uses `-g2012`, and `config.vh` switches simulation branches based on `__ICARUS__`, so define that macro as well:
 
@@ -134,15 +134,15 @@ top_modules = ["darksocv"]
 
 ## 4. Project Status
 
-After you save `vide.toml`, Vide reloads project configuration automatically by default.
+After you save `vide.toml`, Vide reloads the project configuration automatically by default.
 
 In practice there are three project states:
 
-- No `vide.toml`: Vide scans the workspace for reading features, but does not create a project-level compilation profile.
+- No `vide.toml`: Vide scans the workspace for code-reading features, but does not create a project-level compilation profile.
 - The empty default template: `sources = []` tells Vide not to scan the whole workspace yet, because the real source paths still need to be filled in.
 - A configured `vide.toml`: Vide understands the project through `sources`, `include_dirs`, `defines`, `libraries`, and related fields.
 
-For details, each [feature page](../features/) explains the behavior with and without project configuration. We also summarize the differences in [What Changes After Configuration](../project-configuration/#what-changes-after-configuration).
+For details, each [feature page](../features/) explains its behavior with and without project configuration. [What Changes After Configuration](../project-configuration/#what-changes-after-configuration) summarizes the main differences.
 
 ## Next Step
 

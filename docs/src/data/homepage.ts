@@ -138,21 +138,21 @@ export const getHomepageFeatures = (localeInput?: string): HomepageFeature[] => 
         layout: 'image-left',
         eyebrow: 'Navigation',
         title: 'Symbol Navigation',
-        description: `Use ${accent('Go to Definition')}, ${accent('Find References')}, and ${accent('Document Symbols')} in Vide to move quickly across modules, ports, and registers, so RTL connections can be traced without leaving the current context.<br /><br />Writing RTL no longer has to start with Ctrl + F.`,
+        description: `Use ${accent('Go to Definition')}, ${accent('Find References')}, and ${accent('Document Symbols')} in Vide to move quickly across modules, ports, and registers, so RTL connections are easier to trace without leaving the current context.<br /><br />Writing RTL no longer has to start with Ctrl + F.`,
         images: localizedImages('navigation', locale),
       },
       {
         layout: 'image-right',
         eyebrow: 'Insight',
         title: 'Code Insight',
-        description: `Use Vide ${accent('Hover')} and ${accent('Inlay Hints')} to inspect modules, literals, and port connections in one editor window. Less window switching, more focus on the RTL design itself.`,
+        description: `Use Vide ${accent('Hover')} and ${accent('Inlay Hints')} to inspect modules, literals, and port connections in one editor window. Fewer context switches, more focus on the RTL design itself.`,
         images: localizedImages('insight', locale),
       },
       {
         layout: 'image-left',
         eyebrow: 'Completion',
         title: 'Precise Completion',
-        description: `Vide ${accent('Completion')} understands the current code context, suggests candidates that fit instantiations, port connections, and other editing positions, and provides structured edits through ${accent('Snippets')}.`,
+        description: `Vide ${accent('Completion')} understands the current code context, suggests candidates that fit instantiations, port connections, and other editing positions, and provides structured completion through ${accent('Snippets')}.`,
         images: localizedImages('completion', locale),
       },
       {
@@ -166,7 +166,7 @@ export const getHomepageFeatures = (localeInput?: string): HomepageFeature[] => 
         layout: 'image-left',
         eyebrow: 'Diagnostics',
         title: 'Diagnostics',
-        description: `Vide reports code diagnostics as you edit, so errors surface earlier.<br /><br />It can also combine with ${externalLink('https://qihe.pascal-lab.net', 'Qihe')} for deeper static analysis results directly inside the editor.`,
+        description: `Vide reports code diagnostics as you edit, so errors surface earlier.<br /><br />It can also work with ${externalLink('https://qihe.pascal-lab.net', 'Qihe')} to show deeper static-analysis results directly inside the editor.`,
         images: localizedImages('diagnostics', locale),
       },
     ];
@@ -249,7 +249,7 @@ const comparisonProductFeatures = (locale: HomepageLocale): ComparisonProduct[] 
     meta: 'Intel',
     features: {
       syntaxHighlighting: true,
-      definition: locale === 'en' ? 'Can jump from an instance to a module definition' : '支持从实例跳到模块定义',
+      definition: locale === 'en' ? 'Jump from an instance to a module definition' : '支持从实例跳到模块定义',
       references: false,
       hover: false,
       completion: false,

@@ -11,9 +11,9 @@ import ThinLinkCard from '../../../../../components/ThinLinkCard.astro';
 
 Qihe is a general-purpose Verilog static analysis framework from the PASCAL research group behind Vide. It includes a set of deep hardware analysis capabilities that can be used out of the box.
 
-Qihe and Vide are complementary. Vide focuses on fast, immediate static-analysis feedback during hardware development, so it is not the right place for deeper and more expensive tasks such as hardware vulnerability mining. Qihe focuses on deep static analysis for non-realtime workflows.
+Qihe and Vide are complementary. Vide focuses on fast, immediate static-analysis feedback during hardware development, so it is not intended for deeper and more computationally expensive tasks such as hardware vulnerability mining. Qihe focuses on deep static analysis for non-real-time workflows.
 
-Vide can call the Qihe command-line tool from `vide.toml`, run Qihe analysis for the whole project, and show Qihe diagnostics in the editor. Together, Vide and Qihe provide both immediate feedback and deeper analysis results inside the same VS Code workflow.
+Vide can call the Qihe command-line tool using information from `vide.toml`, run Qihe analysis for the whole project, and show Qihe diagnostics in the editor. Together, Vide and Qihe provide both immediate feedback and deeper analysis results inside the same VS Code workflow.
 
 ## Get Qihe
 
@@ -37,7 +37,7 @@ Before using Qihe from Vide, register on the [Qihe project site](https://qihe.pa
 
 ## Run Qihe
 
-Vide currently supports running Qihe on the whole project or on the current file.
+Vide currently supports running Qihe for the whole project or the current file.
 
 ### Analyze a Project
 
@@ -71,7 +71,7 @@ module top(
 endmodule
 ```
 
-This code intentionally keeps a divide-by-zero expression. After Qihe runs, the editor shows a diagnostic from `ZeroDivisionAnalysis`.
+This code intentionally contains a divide-by-zero expression. After Qihe runs, the editor shows a diagnostic from `ZeroDivisionAnalysis`.
 
 Run it:
 
@@ -96,7 +96,7 @@ If `vide.toml` is still the default empty template and no project source files a
 
 ## How Commands Are Built
 
-For project analysis, Vide reads `vide.toml` and builds the Qihe compile input. With the default settings, the command shape is:
+For project analysis, Vide reads `vide.toml` and builds the Qihe compile input. With the default settings, the commands look like this:
 
 ```bash
 qihe compile <qihe-compile-args> --mode sv <project-files> -o <tmp.qh> -- <forwarded-slang-args> --top <top-module> -I <include-dir> -D<macro>
@@ -129,9 +129,9 @@ Common defaults are:
 
 See [Qihe settings](../../vscode-settings/#qihe) for the full reference.
 
-Vide then parses Qihe diagnostics and shows them in the editor. The command execution details are available in VS Code's Output panel: choose the `Vide Qihe` output channel.
+Vide then parses Qihe diagnostics and shows them in the editor. Command execution details are available in VS Code's Output panel: choose the `Vide Qihe` output channel.
 
-If you do not want Vide to generate `--mode sv`, `--top`, `-I`, and `-D` from `vide.toml`, set `vide.qihe.autoConfigureArgsFromManifest` to `false` in VS Code Settings. After that, input files still come from the current project or the current file, and the command shape becomes:
+If you do not want Vide to generate `--mode sv`, `--top`, `-I`, and `-D` from `vide.toml`, set `vide.qihe.autoConfigureArgsFromManifest` to `false` in VS Code Settings. After that, input files still come from the current project or the current file, and the commands become:
 
 ```bash
 qihe compile <qihe-compile-args> <input-files> -o <tmp.qh> [-- <forwarded-slang-args>]
@@ -171,11 +171,11 @@ If Qihe analysis fails, open the `Vide Qihe` output channel first and check:
 1. Whether the target is a local saved `.v`, `.vh`, `.sv`, `.svh`, or `.svi` file.
 2. Whether the `qihe compile` command and compile arguments match the project.
 3. Whether the `qihe run` command and run arguments match the analysis target.
-4. Whether Qihe stdout or stderr contains a direct compile or run error.
+4. Whether Qihe stdout or stderr contains an explicit compile or run error.
 5. The final failure message at the end of the output.
 
 If the error is related to include paths, macro definitions, or top modules, fix [Project Configuration](../../project-configuration/) first.
 
 If the error is related to the Qihe command path, first set `vide.qihe.command` to the absolute path of the `qihe` executable. On Windows, if the default shell resolves the batch entry point, set it to the absolute path of `qihe.bat`.
 
-If the problem comes from Qihe's own compile or run process, file an issue in the [Qihe project](https://qihe.pascal-lab.net/).
+If the problem comes from Qihe's own compile or run process, file an issue with the [Qihe project](https://qihe.pascal-lab.net/).

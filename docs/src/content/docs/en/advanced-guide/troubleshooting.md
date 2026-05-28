@@ -3,7 +3,7 @@ title: Advanced Troubleshooting
 description: Troubleshoot local VSIX packages, custom servers, file watching, logs, and profiling by symptom.
 ---
 
-This page handles issues beyond normal feature usage, such as local VSIX packages, replacement servers, file watching, server logs, and diagnostics profiling. For ordinary diagnostics, navigation, formatting, or Qihe usage problems, start from the related page in [Features](../../user-guide/features/).
+This page covers issues beyond normal feature usage, such as local VSIX packages, replacement servers, file watching, server logs, and diagnostics profiling. For ordinary diagnostics, navigation, formatting, or Qihe usage problems, start from the related page in [Features](../../user-guide/features/).
 
 If you cannot yet confirm whether the language server started, run through [Server Self-Check](../check-server/) first. Command, status bar, and output channel names are listed in [Commands, Status, and Logs](../../user-guide/commands-status-logs/).
 
@@ -13,7 +13,7 @@ If you cannot yet confirm whether the language server started, run through [Serv
 | --- | --- | --- |
 | The status bar shows a language-server error | `Vide Language Server` output channel | VSIX platform mismatch, missing custom command, invalid working directory |
 | A local VSIX cannot find the server | "Local VSIX Cannot Find the Server" on this page | The extension was compiled without bundling the server into the VSIX |
-| A custom server works in a terminal but fails in the extension | "Custom Server Startup Fails" on this page | `vide.server.cwd`, argument arrays, or VS Code process PATH differ from the terminal |
+| A custom server works in a terminal but fails in the extension | "Custom Server Startup Fails" on this page | `vide.server.cwd`, argument arrays, or the VS Code process PATH differ from the terminal |
 | File changes do not refresh | "File Changes Do Not Trigger Refresh" on this page | File watcher events are missing, or files are excluded |
 | You need internal logs or performance data | "Server Logs" and "Diagnostics Profiling" on this page | Additional startup arguments or profiling artifacts are needed |
 

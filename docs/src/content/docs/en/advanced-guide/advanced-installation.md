@@ -3,17 +3,17 @@ title: Advanced Installation
 description: Install local VSIX packages, choose release channels, or configure a custom Vide language server.
 ---
 
-In most cases, follow [VS Code Installation](../../user-guide/vscode-installation/) to install the stable Marketplace extension. This page is for offline installation, local validation, prerelease packages, and custom servers.
+In most cases, follow [VS Code Installation](../../user-guide/vscode-installation/) to install the stable Marketplace extension. This page covers offline installation, local validation, prerelease packages, and custom servers.
 
 ## Choose an Installation Channel
 
-You can download a `.vsix` file and install it manually. Choose the source based on the version you want:
+You can download a `.vsix` file and install it manually. Choose the source based on the version you need:
 
 | Version | Source | Use when |
 | --- | --- | --- |
 | Stable | [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=pascal-lab.vide), or the latest non-prerelease entry in [GitHub Releases](https://github.com/pascal-lab/vide/releases) | Daily use and offline installation |
 | Beta | A prerelease entry in [GitHub Releases](https://github.com/pascal-lab/vide/releases) | You want to try the next version early |
-| Nightly dev package | Artifacts from [GitHub Actions CI](https://github.com/pascal-lab/vide/actions/workflows/ci.yml), named like `vide-vscode-dev-<target>-<commit>` | You need to verify a specific commit or a latest fix |
+| Nightly dev package | Artifacts from [GitHub Actions CI](https://github.com/pascal-lab/vide/actions/workflows/ci.yml), named like `vide-vscode-dev-<target>-<commit>` | You need to verify a specific commit or a recent fix |
 
 VSIX packages are platform-specific. Current release and CI artifacts cover these targets:
 
@@ -26,9 +26,9 @@ VSIX packages are platform-specific. Current release and CI artifacts cover thes
 
 ## Install a VSIX
 
-After you have a `.vsix` file, install it from the VS Code command palette:
+After you have a `.vsix` file, install it from the VS Code Command Palette:
 
-1. Open the command palette.
+1. Open the Command Palette.
 2. Run `Extensions: Install from VSIX...`.
 3. Select the `vide-vscode-*.vsix` file for your platform.
 
@@ -44,7 +44,7 @@ If the status bar reports an error after installation, use [Server Self-Check](.
 
 The extension uses the bundled language server by default. Configure `vide.server.command` only when you need to replace the server binary or debug startup arguments.
 
-These cases are good reasons to configure a custom server:
+These are good reasons to configure a custom server:
 
 - You built `vide` from source and want the extension to use your local binary.
 - You are debugging server startup arguments or logs.

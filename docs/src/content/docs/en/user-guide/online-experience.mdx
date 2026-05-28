@@ -11,15 +11,15 @@ import {
   structureFiles,
 } from '../../../../examples/dailyUse';
 
-We provide several small RTL projects that run directly in the browser. Without extra configuration, you can try symbol navigation, code insight, precise completion, and automatic refactoring.
+Vide provides several small RTL projects that run directly in the browser. Without extra configuration, you can try symbol navigation, code insight, precise completion, and automatic refactoring.
 
-When an example first loads, wait for the circle indicator in the upper-right corner of the editor to turn green. Then start from the selected code position. You can edit RTL, switch files, open the diagnostics panel, and use the reset button in the toolbar when you want to restore the initial state.
+When an example first loads, wait for the circular indicator in the upper-right corner of the editor to turn green. Then start from the selected code position. You can edit RTL, switch files, open the diagnostics panel, and use the reset button in the toolbar to restore the initial state.
 
 ## Symbol Navigation
 
-In traditional Verilog project development, finding where a variable is defined or used often means running a global Ctrl+F string search. That also pulls in similar names and same-named symbols from unrelated scopes, which quickly gets in the way.
+In traditional Verilog project development, finding where a variable is defined or used often means running a global Ctrl+F string search. That also pulls in similar names and same-named symbols from unrelated scopes, which quickly becomes noisy.
 
-In Vide, go to definition, find references, and document symbols help you move between modules, ports, and registers without leaving the current context, so you can trace RTL connections more directly.
+In Vide, go to definition, find references, and document symbols help you move between modules, ports, and registers without leaving the current context, so RTL connections are easier to trace.
 
 This example demonstrates go to definition and find references.
 
@@ -43,7 +43,7 @@ This example demonstrates go to definition and find references.
 
 ## Code Insight
 
-In a typical editing flow, checking module signatures and port connections often means jumping back and forth between files. Even converting a numeric literal between bases can require an external tool. These interruptions make it harder to stay focused on the RTL design.
+In a typical editing flow, checking module signatures and port connections often means jumping back and forth between files. Even converting a numeric literal between bases can require an external tool. These interruptions make it harder to stay focused on the RTL design itself.
 
 Vide provides hover information and inlay hints at the edit location, so you can inspect modules, literals, and port connections in one window with fewer context switches.
 
@@ -69,9 +69,9 @@ This example demonstrates hover information for module signatures and instances,
 
 ## Precise Completion
 
-Writing RTL without completion depends heavily on your memory of language syntax and project structure. If completion only does string matching, the candidate list is easily polluted by similar symbols and does not improve editing efficiency much.
+Writing RTL without completion depends heavily on remembering language syntax and project structure. If completion only performs string matching, the candidate list is easily polluted by similar symbols and does little to improve editing speed.
 
-Vide's completion understands the current code context. It can provide more project-aware suggestions for instantiations, port connections, and other editing positions, and it can use snippets to provide structured completion.
+Vide's completion understands the current code context. It provides more project-aware suggestions for instantiations, port connections, and other editing positions, and uses snippets for structured completion.
 
 ### Steps
 
@@ -93,7 +93,7 @@ Vide's completion understands the current code context. It can provide more proj
 
 ## Automatic Refactoring
 
-Refactoring RTL often involves repetitive work, such as filling missing ports one by one during module instantiation, converting ordered port connections to named connections, or renaming symbols across declarations and uses. These repetitive operations are exactly the kind of detail a program can handle accurately.
+Refactoring RTL often involves repetitive work, such as filling missing ports one by one during module instantiation, converting ordered port connections to named connections, or renaming symbols across declarations and uses. These are exactly the mechanical details an editor can handle accurately.
 
 Vide provides automatic refactoring and rename support, so those mechanical details can be handled by the editor.
 
@@ -121,4 +121,4 @@ This example demonstrates automatic completion for missing port connections and 
 
 After these examples, you should have a clearer sense of how Vide helps with RTL editing. For more flexible online exploration, open the [Playground](../../playground/) and use it together with [Configure the First Project](../first-project/) and [Features](../features/).
 
-To use Vide in a local project, first finish [VS Code Installation](../vscode-installation/), then write the first `vide.toml` with [Configure the First Project](../first-project/) for more accurate analysis.
+To use Vide in a local project, complete [VS Code Installation](../vscode-installation/), then write your first `vide.toml` with [Configure the First Project](../first-project/) for more accurate analysis.

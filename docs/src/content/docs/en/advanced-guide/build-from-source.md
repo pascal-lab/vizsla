@@ -9,7 +9,7 @@ This page is for users who need local server builds, extension startup debugging
 
 When building Vide from source, `cargo build` compiles the vendored
 `crates/slang` tree through a Rust build script, so the build needs a C++
-environment that can compile slang:
+environment capable of compiling slang:
 
 - Rust toolchain and Cargo.
 - CMake 3.20 or newer.
@@ -40,8 +40,8 @@ cargo build --release
 
 Release builds embed build metadata in the `vide --version` output. Local
 builds automatically use the current short Git commit and UTC build time when
-`VIDE_COMMIT_HASH` and `VIDE_BUILD_DATE` are not set; CI or release scripts
-can still override the defaults with those environment variables.
+`VIDE_COMMIT_HASH` and `VIDE_BUILD_DATE` are not set; CI and release scripts
+can still override those defaults with environment variables.
 
 Verify the version:
 

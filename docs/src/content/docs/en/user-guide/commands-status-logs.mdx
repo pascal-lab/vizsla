@@ -1,15 +1,15 @@
 ---
 title: "Commands, Status, and Logs"
-description: Vide command IDs, status item meanings, and output channel inventory.
+description: Vide command IDs, status item meanings, and output channel reference.
 ---
 
 import Codicon from '../../../../components/Codicon.astro';
 
-This page lists commands, status bar meanings, and output channels contributed by the Vide VS Code extension. For startup failures, start with [Server Self-Check](../../advanced-guide/check-server/). For deeper troubleshooting, use [Advanced Troubleshooting](../../advanced-guide/troubleshooting/).
+This page lists the commands, status bar states, and output channels contributed by the Vide VS Code extension. For startup failures, start with [Server Self-Check](../../advanced-guide/check-server/). For deeper troubleshooting, use [Advanced Troubleshooting](../../advanced-guide/troubleshooting/).
 
 ## Command Palette Commands
 
-The VS Code extension contributes these commands. Use the Command Palette title in daily work; command IDs are mainly for keybindings or scripts.
+The VS Code extension contributes these commands. Use the Command Palette title in daily work; command IDs are mainly for keybindings and scripts.
 
 | Command ID | Command Palette title | Purpose |
 | --- | --- | --- |
@@ -19,7 +19,7 @@ The VS Code extension contributes these commands. Use the Command Palette title 
 | `vide.reloadWorkspace` | `Vide: Reload Project Configuration` | Rereads project configuration files and refreshes project information without restarting the server. |
 | `vide.showStatus` | `Vide: Show Status` | Opens the Vide status menu. |
 | `vide.runQiheAnalysis` | `Vide: Run Qihe Analysis` | Runs Qihe analysis for the current local Verilog/SystemVerilog file. |
-| `vide.profileDiagnostics` | `Vide: Profile Diagnostics` | Starts a temporary language server and runs one diagnostics profiling pass for the workspace or current file. |
+| `vide.profileDiagnostics` | `Vide: Profile Diagnostics` | Starts a temporary language server and runs one diagnostics-profiling pass for the workspace or current file. |
 
 `vide.runQiheAnalysis` is available only for local files whose extension is `.v`, `.vh`, `.sv`, `.svh`, or `.svi`.
 
@@ -60,7 +60,7 @@ When Qihe analysis runs, a separate `Qihe` status item appears. If Qihe fails, c
 
 Profiling uses an isolated temporary language server process, so it does not restart or affect the language server used by your editor session.
 
-## Server Launch Setting Changes
+## Server Startup Setting Changes
 
 After these settings change, the extension prompts you to `Restart`:
 

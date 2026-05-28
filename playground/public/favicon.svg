@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Vide favicon</title>
+  <desc id="desc">A rounded square Vide mark with V I over D E.</desc>
+  <rect x="32" y="32" width="448" height="448" rx="80" fill="rgb(75,85,99)" />
+  <g fill="none" stroke="rgb(213,213,213)" stroke-linecap="round" stroke-linejoin="round" stroke-width="17">
+    <svg x="78" y="72" width="150" height="150" viewBox="40 25 220 230">
+      <path d="M55 39H245L150 205Z" />
+      <circle cx="150" cy="224" r="21" />
+    </svg>
+    <svg x="284" y="72" width="150" height="150" viewBox="295 25 174 230">
+      <path d="M382 55V166" />
+      <path d="M317 166H447" />
+      <path d="M342 196H422" />
+      <path d="M364 226H400" />
+    </svg>
+    <svg x="78" y="292" width="150" height="150" viewBox="510 25 250 230">
+      <path d="M527 39H593C650 39 698 85 698 137C698 189 650 236 593 236H527Z" />
+      <circle cx="723" cy="137" r="22" />
+    </svg>
+    <svg x="284" y="292" width="150" height="150" viewBox="812 25 174 230">
+      <path d="M835 39H968" />
+      <path d="M835 39V236" />
+      <path d="M835 236H968" />
+      <path d="M835 137H960" />
+      <path d="M942 122L960 137L942 153" />
+    </svg>
+  </g>
+</svg>

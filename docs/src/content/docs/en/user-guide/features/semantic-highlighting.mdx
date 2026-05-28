@@ -10,7 +10,7 @@ import { semanticTokenFiles } from '../../../../../examples/dailyUse';
 
 ## What It Is
 
-Syntax highlighting only knows whether a token looks like a keyword, number, or comment. Semantic highlighting uses Vide's parse result so RTL identifiers that look the same can use different styles. When reading code, you can more quickly distinguish clock/reset ports, input/output ports, module instance names, and `typedef` types. In the default display, input ports are bold (for example <strong>data_i</strong>), output ports are bold and underlined (for example <strong><u>data_o</u></strong>), and clock/reset ports use colors that differ from ordinary ports.
+Syntax highlighting only knows whether a token looks like a keyword, number, or comment. Semantic highlighting uses Vide's parse result so RTL identifiers that look the same can use different styles. When reading code, you can more quickly distinguish clock/reset ports, input/output ports, module instance names, and `typedef` types. With the default styling, input ports are bold (for example <strong>data_i</strong>), output ports are bold and underlined (for example <strong><u>data_o</u></strong>), and clock/reset ports use colors that differ from ordinary ports.
 
 ## Demo
 
@@ -35,7 +35,7 @@ Syntax highlighting only knows whether a token looks like a keyword, number, or 
 
 ## Project Configuration
 
-Basic semantic markings for the current file can be computed directly. Cross-file resolution, macro branches, and include relationships affect target modules, ports, and declarations. After `vide.toml` is configured, semantic highlighting refreshes from the project structure described by `vide.toml`.
+Basic semantic markings for the current file can be computed directly. Cross-file resolution, macro branches, and include relationships affect target modules, ports, and declarations. After `vide.toml` is configured, semantic highlighting uses the project structure described by `vide.toml`.
 
 ## Settings
 

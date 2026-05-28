@@ -94,7 +94,7 @@ endmodule
   },
 ];
 
-This is a `vide.toml` project configuration reference. For first-time setup, first use [Configure the First Project](../first-project/) to write a working project configuration file.
+This is the `vide.toml` project configuration reference. For first-time setup, start with [Configure the First Project](../first-project/) and write a working project configuration file.
 
 ## Field Quick Reference
 
@@ -118,7 +118,7 @@ top_modules = ["top"]
 
 ## Path and Glob Rules for `sources` and `exclude`
 
-`sources` and `exclude` are not plain directory paths. They are path patterns with wildcards, also called globs. The two most common wildcards are:
+`sources` and `exclude` are not plain directory paths. They are wildcard path patterns, also called globs. The two most common wildcards are:
 
 - `*`: matches names within one directory. For example, `rtl/*.sv` only matches `.sv` files directly under `rtl`.
 - `**`: matches across nested directories. For example, `rtl/**` continues matching files inside subdirectories under `rtl`.
@@ -144,9 +144,9 @@ In `include_dirs` and `libraries`, values are ordinary paths resolved relative t
 
 | Form | Result |
 | --- | --- |
-| Omitted | Vide best-effort indexes the workspace for read features such as navigation, references, and hover, but does not treat it as a fully configured project. |
+| Omitted | Vide best-effort indexes the workspace for code-reading features such as navigation, references, and hover, but does not treat it as a fully configured project. |
 | `sources = []` | Disables automatic workspace scanning. This is useful when you want to open the project safely and configure it later. |
-| `sources = ["rtl/**"]` | Loads matching files with globs and puts them into project analysis. |
+| `sources = ["rtl/**"]` | Loads matching files through globs and includes them in project analysis. |
 
 Common examples:
 
@@ -210,7 +210,7 @@ exclude = ["build/**", "out/**", "sim/work/**", "**/*_bb.v"]
 
 | Area | Without a project configuration file | After `vide.toml` is configured |
 | --- | --- | --- |
-| [Go to definition](../features/navigation/), [find references](../features/references/), and [hover](../features/hover/) | Scans the workspace and provides the jumps, references, and symbol information needed while reading code | Resolves real targets through `sources`, `libraries`, include directories, and macro branches |
+| [Go to definition](../features/navigation/), [find references](../features/references/), and [hover](../features/hover/) | Scans the workspace and provides the jumps, references, and symbol information needed while reading code | Resolves targets through `sources`, `libraries`, include directories, and macro branches |
 | [Completion](../features/completion/) and [signature help](../features/signature-help/) | Uses the current file and scanned files for candidates; shows port/parameter help once the target module is resolved | Uses target modules, include directories, and macro branches for candidates and current-position hints |
 | [Rename](../features/rename/) and [quick fixes](../features/quick-fixes/) | Local code actions are available; project rename is disabled | Fills or converts ports and parameters across the project, and updates declarations, references, and connections |
 | [Syntax highlighting](../features/syntax-highlighting/) and [semantic highlighting](../features/semantic-highlighting/) | Syntax highlighting is available, and the current file gets basic semantic markings | Uses project analysis to mark port directions, read/write locations, and macro branches |

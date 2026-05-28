@@ -10,9 +10,9 @@ import { completionFiles } from '../../../../../examples/dailyUse';
 
 ## What It Is
 
-Completion inserts candidates at the current position. Vide combines syntax position and RTL semantics: target ports in instance port lists, target parameters in parameter lists, visible symbols in expressions, and directives or macro-related candidates in preprocessor positions.
+Completion inserts candidates at the current position. Vide combines syntax position and RTL semantics: target ports in instance port lists, target parameters in parameter lists, visible symbols in expressions, and directives or macro-related candidates in preprocessor contexts.
 
-Common trigger positions include instance `#(...)` and `(...)`, expressions, member access `.`, event controls `@(...)`, system tasks after `$`, preprocessor positions after `` ` ``, and integer literal base markers after `'`.
+Common trigger positions include instance `#(...)` and `(...)`, expressions, member access `.`, event controls `@(...)`, system tasks after `$`, preprocessor positions after `` ` ``, and integer-literal base markers after `'`.
 
 ## Demo
 
@@ -37,7 +37,7 @@ Common trigger positions include instance `#(...)` and `(...)`, expressions, mem
 
 ## Project Configuration
 
-In single-file cases, completion uses the current file and indexed content. Port, parameter, and instance completion need the target module to resolve. In cross-file projects, `vide.toml` decides which modules and macro branches Vide can see.
+In single-file cases, completion uses the current file and indexed content. Port, parameter, and instance completion require target module resolution. In cross-file projects, `vide.toml` decides which modules and macro branches Vide can see.
 
 ## Related Features
 
