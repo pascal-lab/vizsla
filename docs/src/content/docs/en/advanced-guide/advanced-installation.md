@@ -3,7 +3,7 @@ title: Advanced Installation
 description: Install local VSIX packages, choose release channels, or configure a custom Vide language server.
 ---
 
-Most users should follow [Quick Start](../../user-guide/quick-start/) to install the stable Marketplace extension. This page is for offline installation, local validation, prerelease packages, and custom servers.
+In most cases, follow [VS Code Installation](../../user-guide/vscode-installation/) to install the stable Marketplace extension. This page is for offline installation, local validation, prerelease packages, and custom servers.
 
 ## Choose an Installation Channel
 
@@ -11,7 +11,7 @@ You can download a `.vsix` file and install it manually. Choose the source based
 
 | Version | Source | Use when |
 | --- | --- | --- |
-| Stable | [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=vizsla.vizsla-lsp), or the latest non-prerelease entry in [GitHub Releases](https://github.com/pascal-lab/vide/releases) | Daily use and offline installation |
+| Stable | [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=pascal-lab.vide), or the latest non-prerelease entry in [GitHub Releases](https://github.com/pascal-lab/vide/releases) | Daily use and offline installation |
 | Beta | A prerelease entry in [GitHub Releases](https://github.com/pascal-lab/vide/releases) | You want to try the next version early |
 | Nightly dev package | Artifacts from [GitHub Actions CI](https://github.com/pascal-lab/vide/actions/workflows/ci.yml), named like `vide-vscode-dev-<target>-<commit>` | You need to verify a specific commit or a latest fix |
 
@@ -62,4 +62,4 @@ Use an absolute path:
 }
 ```
 
-Both `vide.server.args` and `vide.server.additionalArgs` must be arrays of strings. When the extension starts the server, it passes `server.args` first and then appends `server.additionalArgs`. See the full [VS Code Settings Reference](../vscode-settings/#server).
+Both `vide.server.args` and `vide.server.additionalArgs` must be arrays of strings. When the extension starts the server, it passes `server.args` first and then appends `server.additionalArgs`. See the full [VS Code Settings Reference](../../user-guide/vscode-settings/#server).
