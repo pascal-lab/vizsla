@@ -41,11 +41,13 @@ Ports, declarations, and types in the current file can receive basic semantic hi
 
 ### With Complete Configuration
 
-After `vide.toml` is configured, semantic highlighting refreshes from the project structure. Port directions, clock/reset ports, instance names, and type names are identified with the real include files, macro definitions, and libraries.
+After `vide.toml` is configured, semantic highlighting refreshes from the project structure. Port directions, clock/reset ports, instance names, and type names are identified using the actual include files, macro definitions, and libraries.
 
 ## Settings
 
-If semantic highlighting does not look different, first confirm that the active VS Code theme supports semantic tokens. Vide provides two switches:
+If semantic highlighting does not look different, first confirm that the active VS Code theme supports semantic tokens. You can also try another theme to check whether the markings take effect.
+
+Vide provides two switches:
 
 - `vide.semantic.tokens.port.clk.rst.enable`: controls clock/reset port tokens.
 - `vide.semantic.tokens.port.input.output.enable`: controls input/output direction tokens.

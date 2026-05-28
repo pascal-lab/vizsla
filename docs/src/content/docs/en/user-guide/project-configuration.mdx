@@ -149,7 +149,7 @@ In `include_dirs` and `libraries`, values are ordinary paths resolved relative t
 
 | Form | Result |
 | --- | --- |
-| Omitted | Vide builds a best-effort workspace index for features such as Go to Definition, references, and hover, but does not treat it as a fully configured project. |
+| Omitted | Vide creates a best-effort workspace index for code-reading features such as navigation, references, and hover, but does not treat it as a fully configured project. |
 | `sources = []` | Disables automatic workspace scanning. This is useful when you want to open the project safely and configure it later. |
 | `sources = ["rtl/**"]` | Loads matching files with globs and adds them to project analysis. |
 
@@ -215,7 +215,7 @@ exclude = ["build/**", "out/**", "sim/work/**", "**/*_bb.v"]
 
 | Area | Without a project configuration file | After `vide.toml` is configured |
 | --- | --- | --- |
-| [Go to Definition](../features/navigation/), [Find References](../features/references/), and [Hover](../features/hover/) | Scans the workspace and provides navigation targets, references, and symbol information for code exploration | Resolves concrete targets through `sources`, `libraries`, include directories, and macro branches |
+| [Go to Definition](../features/navigation/), [Find References](../features/references/), and [Hover](../features/hover/) | Scans the workspace and provides the jumps, references, and symbol information needed while reading code | Resolves actual targets through `sources`, `libraries`, include directories, and macro branches |
 | [Completion](../features/completion/) and [Signature Help](../features/signature-help/) | Uses the current file and scanned files for candidates; shows port/parameter help once the target module is resolved | Uses target modules, include directories, and macro branches for candidates and position-aware hints |
 | [Rename](../features/rename/) and [Automatic Refactoring](../features/quick-fixes/) | Local code actions are available; project rename is disabled | Fills or converts ports and parameters across the project, and updates declarations, references, and connections |
 | [Syntax Highlighting](../features/syntax-highlighting/) and [Semantic Highlighting](../features/semantic-highlighting/) | Syntax highlighting is available, and the current file gets basic semantic markings | Uses project analysis to mark port directions, read/write locations, and macro branches |

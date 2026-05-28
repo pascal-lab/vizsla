@@ -13,20 +13,20 @@ Vide enters different working states depending on whether the workspace has `vid
 
 | State | What gets loaded | What it is for |
 | --- | --- | --- |
-| No `vide.toml` | Verilog/SystemVerilog files in the workspace are scanned into a best-effort index | Quick code exploration: basic definition jumps, references, hover, and completion |
+| No `vide.toml` | Verilog/SystemVerilog files in the workspace are scanned into a best-effort index | Initial code reading: basic definition jumps, references, hover, and completion |
 | `vide.toml` exists but omits `sources` | Best-effort indexing continues; if `include_dirs` is configured, those directories are loaded as include search paths | Transitional state; not recommended as a long-term setup |
 | `sources = []` | Workspace source scanning is explicitly disabled; if `include_dirs` is configured, only those include directories are loaded | Newly created templates, or workspaces where Vide should not guess the source layout |
 | `sources = ["rtl/**"]` | Project source files are loaded from `sources`, then combined with `include_dirs`, `defines`, `libraries`, and `top_modules` to build project analysis | Normal project configuration |
 
 A short way to remember it:
 
-- Omitted `sources`: build a best-effort workspace index, but do not treat the scan result as the configured project.
+- Omitted `sources`: scan the workspace for code reading, but do not treat the scan result as the configured project.
 - `sources = []`: do not scan source files automatically.
 - `sources = ["rtl/**"]`: these files are the current project sources.
 
 ## Best-Effort Indexing and Project Analysis
 
-Best-effort indexing is for quick code exploration. It tries to load RTL files in the workspace so definition jumps, references, hover, completion, and the instance-count lens can work early. It is not a real compile configuration, and it does not enable full project semantic diagnostics or project rename.
+Best-effort indexing is for reading code. It tries to load RTL files in the workspace so definition jumps, references, hover, completion, and the instance-count lens can work early. It is not a real compile configuration, and it does not enable full project semantic diagnostics or project rename.
 
 Project analysis comes from `vide.toml`. After `sources` points to actual source files, Vide adds those files to the project view and uses `include_dirs`, `defines`, `libraries`, and `top_modules` for cross-file parsing, diagnostics, rename, and Qihe project analysis.
 
@@ -64,7 +64,7 @@ Definition jumps, references, hover, completion, and the instance-count lens pre
 
 In project analysis, duplicate module names are handled through the current project view. Vide does not treat directory names as implicit namespaces; if several duplicate module names are visible, the project should resolve that ambiguity through project configuration, library boundaries, or build scripts.
 
-In best-effort indexing, if one instance can match several modules with the same name, Vide makes a nearest-candidate guess for navigation and inspection features only: same file first, then deepest shared directory, then same scan root. The guess is used only when there is one best candidate; ties stay ambiguous.
+In best-effort indexing, if one instance can match several modules with the same name, Vide makes a nearest-candidate guess for code-reading features only: same file first, then deepest shared directory, then same scan root. The guess is used only when there is one best candidate; ties stay ambiguous.
 
 This guess is not a SystemVerilog language rule. If there is one nearest candidate, Vide does not report a diagnostic. If no unique candidate exists, Vide reports an informational `ambiguous-module-instantiation` diagnostic. Configured projects still use stricter semantic rules; when third-party `slang` semantic diagnostics are enabled, Vide prefers slang's diagnostics.
 
