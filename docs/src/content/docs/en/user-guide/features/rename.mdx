@@ -10,7 +10,7 @@ import { codeActionRenameFiles } from '../../../../../examples/dailyUse';
 
 ## What It Is
 
-Rename changes the declaration and references of the same SystemVerilog symbol together. It is safer than manual search-and-replace because Vide first decides which symbol is under the cursor, then generates a workspace edit, avoiding unrelated symbols with the same name.
+Rename updates the declaration and references of the same SystemVerilog symbol together. It is safer than manual search-and-replace because Vide first resolves the symbol under the cursor, then generates a workspace edit that avoids unrelated symbols with the same name.
 
 ## Demo
 
