@@ -22,7 +22,7 @@ export function onRequest(
       ? route.id.slice(route.locale.length + 1)
       : route.id;
 
-  if (routeId === '' || routeId === 'index') {
+  if (routeId === '' || routeId === 'index' || routeId === route.locale) {
     route.hasSidebar = true;
     return next();
   }
