@@ -14,14 +14,6 @@ import { BrowserMessageReader, BrowserMessageWriter } from "vscode-languageserve
 
 const CLIENT_DISPOSED_MESSAGE = "Vide LSP client has been disposed.";
 
-function referencesRequestOptions(
-  options: { includeDeclaration: boolean },
-): { includeDeclaration: boolean } {
-  // Match the desktop extension: references should list usages only, while
-  // definitions remain reachable via definition / declaration navigation.
-  return options.includeDeclaration ? { ...options, includeDeclaration: false } : options;
-}
-
 export function isClientDisposedError(error: unknown): boolean {
   return error instanceof Error && error.message === CLIENT_DISPOSED_MESSAGE;
 }
@@ -124,8 +116,6 @@ export class VideBrowserClient {
         handleDiagnostics: (uri, diagnostics, next) => {
           next(uri, diagnostics);
         },
-        provideReferences: (document, position, options, token, next) =>
-          next(document, position, referencesRequestOptions(options), token),
         workspace: {
           configuration: () => [],
         },
