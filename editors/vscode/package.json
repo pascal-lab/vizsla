@@ -407,7 +407,8 @@
     "copy-speedscope": "tsx scripts/copy-speedscope-assets.ts",
     "copy-web-assets": "tsx scripts/copy-web-assets.ts",
     "typecheck": "tsc -p . --noEmit && tsc -p tsconfig.browser.json --noEmit && tsc -p tsconfig.test-web.json --noEmit",
-    "compile": "npm run clean && npm run typecheck && npm run bundle:node && npm run bundle:browser",
+    "compile": "npm run clean && npm run typecheck && npm run bundle:node",
+    "compile:web": "npm run clean && npm run typecheck && npm run bundle:node && npm run bundle:browser",
     "test": "npm run compile && node --import tsx --test \"test/**/*.test.ts\"",
     "test:web": "npm run bundle:browser && npm run bundle:test-web && tsx test-web/runTests.ts",
     "package:debug": "npm run compile && tsx scripts/package.ts --debug",
@@ -417,7 +418,7 @@
     "package:darwin-x64": "npm run compile && tsx scripts/package.ts darwin-x64",
     "package:linux-x64": "npm run compile && tsx scripts/package.ts linux-x64",
     "package:linux-arm64": "npm run compile && tsx scripts/package.ts linux-arm64",
-    "package:web": "npm run compile && tsx scripts/package.ts web",
+    "package:web": "npm run compile:web && tsx scripts/package.ts web",
     "package:win32-x64": "npm run compile && tsx scripts/package.ts win32-x64",
     "package:win32-arm64": "npm run compile && tsx scripts/package.ts win32-arm64",
     "install-extension": "tsx scripts/install-extension.ts"
