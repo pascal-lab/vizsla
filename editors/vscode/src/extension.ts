@@ -62,6 +62,14 @@ const activeQiheTokens = new Set<string>();
 const qiheProgressNotifications = new Map<string, { resolve: () => void }>();
 let qiheStatusHideTimer: NodeJS.Timeout | undefined;
 
+function referencesRequestOptions(
+  options: { includeDeclaration: boolean },
+): { includeDeclaration: boolean } {
+  // Vide surfaces references as actual usages; declarations stay available through
+  // go to definition / declaration instead of being mixed into the references list.
+  return options.includeDeclaration ? { ...options, includeDeclaration: false } : options;
+}
+
 function log(message: string): void {
   outputChannel?.appendLine(message);
 }
@@ -649,6 +657,10 @@ async function createClient(context: vscode.ExtensionContext): Promise<LanguageC
     traceOutputChannel: channel,
     revealOutputChannelOn: RevealOutputChannelOn.Never,
     initializationOptions: serverInitializationOptions(vscode.workspace.getConfiguration('vide')),
+    middleware: {
+      provideReferences: (document, position, options, token, next) =>
+        next(document, position, referencesRequestOptions(options), token),
+    },
     ...(config.trace !== 'off' && { trace: config.trace }),
   };
 
