@@ -327,6 +327,7 @@ jobs:
           retention-days: 14
       - name: Upload dev language server binary
         shell: bash
+        working-directory: .
         run: |
           set -euo pipefail
           server_dir="editors/vscode/server/${{ matrix.target }}"
