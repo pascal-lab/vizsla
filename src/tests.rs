@@ -1491,6 +1491,38 @@ fn unconfigured_workspace_rename_rejects_cross_file_symbol() {
 }
 
 #[test]
+fn configured_workspace_rename_updates_cross_file_symbol() {
+    let child_text = "module child;\nendmodule\n";
+    let top_text = "module top;\n  child u();\nendmodule\n";
+    let (_temp_dir, client, server_thread, uris) = setup_configured_multi_file_diagnostics_test(
+        ClientCapabilities::default(),
+        UserConfig::default(),
+        &[("child.sv", child_text), ("top.sv", top_text)],
+    );
+    let child_uri = uris[0].clone();
+    let top_uri = uris[1].clone();
+    let _ = request_document_diagnostics(&client, top_uri.clone(), 1);
+
+    let edit = request_rename(&client, top_uri, top_text, "child u", "renamed_child", 2)
+        .expect("configured cross-file rename should return an edit");
+
+    let Some(lsp_types::DocumentChanges::Edits(document_edits)) = edit.document_changes else {
+        panic!("rename should use document edits: {edit:?}");
+    };
+    assert_eq!(
+        document_edits.len(),
+        2,
+        "cross-file rename should edit both declaration and use sites: {document_edits:?}"
+    );
+    assert!(
+        document_edits.iter().any(|edit| edit.text_document.uri == child_uri),
+        "configured cross-file rename should edit child declaration: {document_edits:?}"
+    );
+
+    shutdown_test_server(&client, server_thread);
+}
+
+#[test]
 fn unconfigured_workspace_diagnostics_skip_unopened_indexed_files() {
     let pull_caps = ClientCapabilities {
         text_document: Some(TextDocumentClientCapabilities {
