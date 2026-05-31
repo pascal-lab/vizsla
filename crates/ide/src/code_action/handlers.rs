@@ -8,6 +8,7 @@ mod add_missing_connections;
 mod add_missing_parameters;
 mod convert_literal_base;
 mod convert_ordered_connections;
+mod insert_expected_token;
 mod remove_empty_port_connections;
 
 pub(crate) fn all() -> &'static [Handler] {
@@ -20,5 +21,6 @@ pub(crate) fn all() -> &'static [Handler] {
         remove_empty_port_connections::remove_empty_port_connections,
         add_implicit_named_port_parens::add_implicit_named_port_parens,
         add_instance_parens::add_instance_parens,
+        insert_expected_token::insert_expected_token,
     ]
 }
